@@ -12,6 +12,9 @@
 
 ## Suggested story beats
 
+- Begin with an attendee PRD: run `factory plan`, review the generated Markdown,
+  edit the companion JSON, and emphasize that GitHub remains unchanged until the
+  attendee types `APPROVE` in `factory approve`.
 - Pause on the dry-run waves: #1, #3, #7, and the vague #8 can begin together.
 - Start the mock run. Point out isolation while several cards are In Progress.
 - Let #8 exhaust its retries. Ask the room what acceptance criteria are missing.

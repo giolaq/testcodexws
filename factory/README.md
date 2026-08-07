@@ -56,6 +56,46 @@ The ticket backend is isolated in `github_backend.py`; adapter commands and gate
 are all in `factory.toml`. That makes swapping a CLI, model wrapper, remote
 execution command, test suite, or lint policy a small workshop-2 exercise.
 
+## Start from an attendee PRD
+
+Copy `factory/PRD_TEMPLATE.md`, fill it in, then ask the read-only planning agent
+to turn it into a dependency-mapped proposal:
+
+```sh
+cp factory/PRD_TEMPLATE.md workshop-prd.md
+# Edit workshop-prd.md
+./factory/factory plan workshop-prd.md
+```
+
+The command uses the authenticated Codex CLI but gives it a read-only sandbox.
+It creates two local files under `.factory/plans/`:
+
+- JSON is the editable source of truth.
+- Markdown is the readable review sheet for the attendee and facilitator.
+
+The plan contains stable ticket keys, specs, testable acceptance criteria,
+dependencies, agent choices, and explicit open questions. Nothing is sent to
+GitHub and no implementation agent starts during planning.
+
+Review both files. Edit the JSON to split, combine, rewrite, or reorder tickets.
+Resolve and remove every `open_questions` entry, then approve the JSON plan:
+
+```sh
+./factory/factory approve .factory/plans/workshop-prd-PLAN_ID.json
+```
+
+The factory validates references and cycles, prints the complete plan, and asks
+the human to type `APPROVE`. Only then does it create or update GitHub Issues,
+translate plan dependencies into real issue numbers, add them to the Projects
+board, and set dependency-free tickets Ready. Approval is idempotent: rerunning
+the same plan updates its marked issues instead of duplicating them.
+
+Inspect the GitHub board, then deliberately start implementation:
+
+```sh
+./factory/factory run --agent codex --max-parallel 4
+```
+
 ## Real GitHub and agent mode
 
 Use a clean GitHub repository. If this checkout is not connected to GitHub yet,
@@ -139,6 +179,9 @@ demo works offline.
 ```text
 factory run [--repo PATH] [--agent NAME] [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
+factory plan PRD.md [--output PLAN.json] [--default-agent NAME]
+                    [--min-tickets N] [--max-tickets N]
+factory approve PLAN.json [--project-number N] [--yes]
 factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
 ```

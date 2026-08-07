@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from github_backend import GitHubBackend, GitHubError
+from planner import approve_plan, plan_prd
 
 STATES = ["Backlog", "Ready", "In Progress", "Verifying", "In Review", "Done", "Blocked"]
 ACTIVE = {"In Progress", "Verifying"}
@@ -458,6 +459,13 @@ def parser():
     status = sub.add_parser("status"); status.add_argument("--repo", default=".")
     retry = sub.add_parser("retry"); retry.add_argument("issue", type=int); retry.add_argument("--repo", default=".")
     retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=int)
+    plan = sub.add_parser("plan", help="turn a PRD into an editable ticket plan")
+    plan.add_argument("prd"); plan.add_argument("--repo", default="."); plan.add_argument("--output")
+    plan.add_argument("--default-agent", choices=["claude", "codex", "cursor"], default="codex")
+    plan.add_argument("--min-tickets", type=int, default=3); plan.add_argument("--max-tickets", type=int, default=12)
+    approve = sub.add_parser("approve", help="review and publish a ticket plan to GitHub")
+    approve.add_argument("plan"); approve.add_argument("--repo", default=".")
+    approve.add_argument("--project-number", type=int); approve.add_argument("--yes", action="store_true")
     return p
 
 
@@ -465,10 +473,20 @@ def main():
     args = parser().parse_args()
     repo = Path(args.repo).resolve()
     try:
-        if args.command == "status": show_status(repo)
-        elif args.command == "retry": retry_ticket(repo, args.issue, args.mock, args.project_number)
-        else: Factory(args).run_loop()
-    except (RuntimeError, GitHubError, FileNotFoundError) as exc:
+        if args.command == "status":
+            show_status(repo)
+        elif args.command == "retry":
+            retry_ticket(repo, args.issue, args.mock, args.project_number)
+        elif args.command == "plan":
+            plan_prd(
+                repo, Path(args.prd), args.output, args.default_agent,
+                args.min_tickets, args.max_tickets, resolve_codex_cli(),
+            )
+        elif args.command == "approve":
+            approve_plan(repo, Path(args.plan), args.project_number, args.yes)
+        else:
+            Factory(args).run_loop()
+    except (RuntimeError, GitHubError, FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(f"factory: {exc}") from exc
 
 
