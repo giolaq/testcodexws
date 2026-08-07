@@ -1,0 +1,129 @@
+body.tv.detail-page {
+  width:100vw;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+  background:#08090d;
+  font-size:clamp(18px,1.25vw,28px);
+}
+
+body.tv.detail-page::before {
+  content:"";
+  position:fixed;
+  inset:0;
+  background:
+    radial-gradient(circle at 22% 45%,var(--poster-a),transparent 38%),
+    linear-gradient(110deg,var(--poster-b),transparent 62%);
+  opacity:.32;
+  pointer-events:none;
+}
+
+body.tv .detail-shell {
+  position:relative;
+  width:100vw;
+  height:100vh;
+  height:100dvh;
+  max-width:none;
+  margin:0;
+  padding:clamp(64px,8vh,112px) clamp(72px,7vw,144px);
+  display:grid;
+  grid-template-columns:minmax(260px,29vw) minmax(0,1fr);
+  align-items:center;
+  gap:clamp(64px,8vw,160px);
+}
+
+body.tv .detail-poster {
+  width:min(29vw,48vh);
+  max-width:100%;
+  margin:0 auto;
+  border-radius:clamp(16px,1.4vw,28px);
+  box-shadow:0 4vh 9vh #000a;
+}
+
+body.tv .detail-poster .poster-mark {
+  right:-.5vw;
+  top:-3vw;
+  font-size:clamp(180px,18vw,360px);
+}
+
+body.tv .detail-poster .poster-title {
+  font-size:clamp(24px,1.65vw,36px);
+}
+
+body.tv .detail-content {
+  max-width:50vw;
+}
+
+body.tv .detail-content .eyebrow {
+  margin:0 0 1.2vh;
+  font-size:clamp(13px,.9vw,20px);
+}
+
+body.tv .detail-shell h1 {
+  max-width:12ch;
+  margin:0 0 2vh;
+  font-size:clamp(52px,5.2vw,104px);
+  line-height:.94;
+}
+
+body.tv .detail-content .meta {
+  margin:0 0 2.4vh;
+  font-size:clamp(16px,1.05vw,23px);
+}
+
+body.tv .detail-content .synopsis {
+  max-width:42ch;
+  margin:0;
+  color:#e2ded7;
+  font-size:clamp(20px,1.35vw,30px);
+  line-height:1.5;
+}
+
+body.tv .detail-actions {
+  margin-top:4vh;
+}
+
+body.tv .detail-shell .primary {
+  width:auto;
+  min-width:clamp(260px,20vw,390px);
+  height:clamp(64px,7vh,84px);
+  margin:0;
+  padding:0 clamp(28px,2vw,42px);
+  border:2px solid #ffffff1f;
+  border-radius:999px;
+  color:var(--ink);
+  background:#292b35;
+  font-size:clamp(18px,1.15vw,25px);
+  cursor:pointer;
+}
+
+body.tv .detail-shell .back {
+  position:absolute;
+  z-index:1;
+  top:clamp(28px,4.5vh,64px);
+  left:clamp(36px,4vw,80px);
+  padding:.55em .8em;
+  border-radius:999px;
+  color:#ddd9d3;
+  font-size:clamp(17px,1vw,22px);
+}
+
+body.tv .detail-action {
+  transition:transform 150ms ease,background-color 150ms ease,box-shadow 150ms ease;
+}
+
+body.tv .detail-action:focus {
+  outline:5px solid var(--lime);
+  outline-offset:6px;
+  box-shadow:0 0 0 10px #08090da6,0 18px 44px #0008;
+}
+
+body.tv .detail-shell .primary:focus {
+  transform:scale(1.04);
+  color:#10120d;
+  background:var(--lime);
+}
+
+@media (prefers-reduced-motion:reduce) {
+  body.tv .detail-action { transition:none; }
+}
