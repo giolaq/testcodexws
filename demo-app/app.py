@@ -35,7 +35,7 @@ def create_app(testing: bool = False) -> Flask:
         movie = by_id.get(movie_id)
         if not movie:
             abort(404)
-        return render_template("detail.html", movie=movie)
+        return render_template("detail.html", movie=movie, tv_mode=is_tv_mode())
 
     @app.get("/api/movies")
     def movies_api():

@@ -26,7 +26,7 @@
     <section class="movie-grid" id="movie-grid" aria-live="polite">
       {% for movie in movies %}
       <article class="movie-card" data-title="{{ (movie.title ~ ' ' ~ movie.genres|join(' '))|lower }}">
-        <a href="{{ url_for('detail', movie_id=movie.id) }}" aria-label="View {{ movie.title }}">
+        <a href="{{ url_for('detail', movie_id=movie.id, mode='tv') if tv_mode else url_for('detail', movie_id=movie.id) }}" aria-label="View {{ movie.title }}">
           <div class="poster" style="--poster-a:{{ movie.colors[0] }};--poster-b:{{ movie.colors[1] }}">
             <span class="poster-mark">{{ movie.title[0] }}</span>
             <span class="poster-title">{{ movie.title }}</span>
