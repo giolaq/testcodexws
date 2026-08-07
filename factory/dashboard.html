@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Software (re)-Factory · Live floor</title>
+  <style>
+    :root{color-scheme:dark;--paper:#0a0b0f;--panel:#12141a;--line:#252832;--ink:#f5f2eb;--muted:#8d929f;--acid:#c9f75f;--red:#ff726f;--blue:#7ba7ff}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,sans-serif}
+    header{min-height:112px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:linear-gradient(110deg,#11141a,#0a0b0f 70%)}
+    .wordmark{display:flex;gap:14px;align-items:center}.mark{width:48px;height:48px;display:grid;place-items:center;border-radius:12px;background:var(--acid);color:#10120b;font:900 23px/1 ui-monospace,monospace;transform:rotate(-2deg)}
+    h1{margin:0;font-size:22px;letter-spacing:-.035em}.subtitle{margin:3px 0 0;color:var(--muted)}.status{display:flex;gap:22px;align-items:center}.metric strong{display:block;font-size:20px}.metric span{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.09em}
+    .live{display:flex;align-items:center;gap:8px;color:var(--acid);font-size:12px;font-weight:750}.live i{width:8px;height:8px;background:currentColor;border-radius:50%;box-shadow:0 0 0 5px #c9f75f1c}.live.error{color:var(--red)}
+    .legend{padding:14px 28px;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}.legend b{color:var(--ink)}.legend code{padding:3px 7px;background:#1a1d25;border-radius:5px;color:var(--blue)}
+    .board{height:calc(100vh - 161px);padding:20px 24px 30px;display:grid;grid-template-columns:repeat(7,minmax(230px,1fr));gap:12px;overflow-x:auto;align-items:start}
+    .column{min-height:calc(100vh - 215px);border:1px solid var(--line);border-radius:12px;background:#0e1015}.column-head{height:51px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);position:sticky;top:0;background:#0e1015;border-radius:12px 12px 0 0;z-index:2}.column-head h2{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.09em}.count{min-width:23px;height:23px;padding:0 7px;display:grid;place-items:center;background:#22252e;border-radius:20px;color:var(--muted);font-size:11px}
+    .cards{padding:9px;display:grid;gap:9px}.card{padding:13px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 7px 18px #0002}.card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.issue{color:var(--acid);font:700 12px ui-monospace,monospace}.agent{padding:3px 7px;border:1px solid #323641;border-radius:20px;color:#b5bac6;font:10px ui-monospace,monospace}.card h3{margin:0 0 11px;font-size:14px;line-height:1.28;letter-spacing:-.015em}.meta{display:grid;gap:5px;color:var(--muted);font-size:11px}.meta-row{display:flex;gap:6px;min-width:0}.meta-row b{color:#c8cbd2;font-weight:600;min-width:49px}.meta-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.deps i{display:inline-block;padding:1px 5px;margin-right:3px;border-radius:4px;background:#242832;color:#c5cad4;font-style:normal}.pr{display:block;margin-top:10px;padding-top:9px;border-top:1px solid var(--line);color:#8db1ff;font-size:11px}.failure{margin:10px 0 0;padding:8px;border-left:2px solid var(--red);background:#301a1c;color:#ffaaa7;font:10px/1.35 ui-monospace,monospace;white-space:pre-wrap;max-height:92px;overflow:hidden}.empty{padding:24px 12px;text-align:center;color:#4f535e;font-size:11px}.Blocked .column-head h2{color:var(--red)}.Done .column-head h2{color:var(--acid)}
+    @media(max-width:700px){header{align-items:flex-start;padding:18px;gap:20px}.status .metric{display:none}.legend{padding:12px 18px;overflow:auto;white-space:nowrap}.board{padding:14px;grid-template-columns:repeat(7,82vw);scroll-snap-type:x mandatory}.column{scroll-snap-align:start}.subtitle{max-width:210px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wordmark"><div class="mark">R</div><div><h1>Software (re)-Factory</h1><p class="subtitle">Live agent production floor</p></div></div>
+    <div class="status"><div class="metric"><strong id="done">0</strong><span>Completed</span></div><div class="metric"><strong id="active">0</strong><span>Active agents</span></div><div class="live" id="connection"><i></i><span>Connecting</span></div></div>
+  </header>
+  <div class="legend"><b>Workshop run</b><span id="mode">—</span><span>Refreshes every 2 seconds</span><span>Source <code>.factory/state.json</code></span><span id="updated">Waiting for first state…</span></div>
+  <main class="board" id="board" aria-live="polite"></main>
+  <script>
+    const states=['Backlog','Ready','In Progress','Verifying','In Review','Done','Blocked'];
+    const board=document.querySelector('#board');
+    const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function render(data){
+      const tickets=data.tickets||[];
+      board.innerHTML=states.map(state=>{
+        const items=tickets.filter(t=>t.status===state);
+        const cards=items.map(t=>`<article class="card"><div class="card-top"><span class="issue">#${t.number}</span><span class="agent">${esc(t.agent)}</span></div><h3>${esc(t.title)}</h3><div class="meta"><div class="meta-row"><b>Attempt</b><span>${t.attempt||0}</span></div>${t.branch?`<div class="meta-row"><b>Branch</b><span>${esc(t.branch)}</span></div>`:''}<div class="meta-row deps"><b>Needs</b><span>${t.dependencies?.length?t.dependencies.map(n=>`<i>#${n}</i>`).join(''):'None'}</span></div></div>${t.pr_url?`<a class="pr" href="${esc(t.pr_url)}" target="_blank" rel="noreferrer">Open pull request ↗</a>`:''}${state==='Blocked'&&t.failure?`<pre class="failure">${esc(t.failure)}</pre>`:''}</article>`).join('');
+        return `<section class="column ${state.replace(' ','-')}"><div class="column-head"><h2>${state}</h2><span class="count">${items.length}</span></div><div class="cards">${cards||'<p class="empty">No tickets</p>'}</div></section>`;
+      }).join('');
+      document.querySelector('#done').textContent=tickets.filter(t=>t.status==='Done').length;
+      document.querySelector('#active').textContent=tickets.filter(t=>['In Progress','Verifying'].includes(t.status)).length;
+      document.querySelector('#mode').textContent=data.mode==='mock'?'Mock rehearsal':'GitHub production';
+      document.querySelector('#updated').textContent=`Updated ${new Date(data.updated_at).toLocaleTimeString()}`;
+      const connection=document.querySelector('#connection'); connection.className='live'; connection.lastElementChild.textContent='Live';
+    }
+    async function poll(){
+      try{const response=await fetch('../.factory/state.json',{cache:'no-store'});if(!response.ok)throw Error(response.status);render(await response.json())}
+      catch(error){const el=document.querySelector('#connection');el.className='live error';el.lastElementChild.textContent='Waiting for factory'}
+    }
+    poll();setInterval(poll,2000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+name: Factory rehearsal
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  mock-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: ./setup_demo.sh
+      - run: ./factory/factory run --mock --once --max-parallel 4
+      - name: Assert workshop outcomes
+        run: |
+          .factory/venv/bin/python - <<'PY'
+          import json
+          state = json.load(open('.factory/state.json'))
+          tickets = {ticket['number']: ticket for ticket in state['tickets']}
+          assert sum(t['status'] == 'Done' for t in tickets.values()) == 7
+          assert [t['number'] for t in tickets.values() if t['status'] == 'Blocked'] == [8]
+          assert tickets[7].get('merge_conflict_path')
+          assert tickets[8]['failure']
+          PY

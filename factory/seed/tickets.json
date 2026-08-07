@@ -1,0 +1,59 @@
+[
+  {
+    "number": 1,
+    "title": "Add a device-mode switch",
+    "labels": ["agent-ready"],
+    "mock_action": "device-mode",
+    "body": "## Spec\nDetect TV mode through `?mode=tv` or a recognised TV user-agent hint and expose a `tv` body class. Groundwork only.\n\n## Acceptance criteria\n- [ ] `?mode=tv` renders a `tv` class\n- [ ] Smart-TV user agents render the same class\n- [ ] Mobile remains the default\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 2,
+    "title": "Create the 10-foot TV theme",
+    "labels": ["agent-ready"],
+    "mock_action": "tv-theme",
+    "body": "## Spec\nAdd TV typography, spacing, a dark theme, and safe-area margins without changing mobile mode.\n\n## Acceptance criteria\n- [ ] TV type is readable at distance\n- [ ] Content respects TV safe areas\n- [ ] Mobile CSS is unchanged\n\n## Dependencies\nDepends-on: #1\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 3,
+    "title": "Build the spatial focus engine",
+    "labels": ["agent-ready"],
+    "mock_action": "focus-engine",
+    "body": "## Spec\nCreate a pure JavaScript grid focus function that maps an index and arrow key to the next valid target.\n\n## Acceptance criteria\n- [ ] All four arrows work\n- [ ] Focus never escapes the grid\n- [ ] Node tests cover edges and partial rows\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 4,
+    "title": "Wire D-pad navigation to the movie grid",
+    "labels": ["agent-ready"],
+    "mock_action": "dpad-grid",
+    "body": "## Spec\nUse the focus engine in TV mode so arrows move between film cards and Enter opens the focused film.\n\n## Acceptance criteria\n- [ ] First card receives initial focus\n- [ ] Arrow keys use the pure focus engine\n- [ ] Enter opens details\n\n## Dependencies\nDepends-on: #1, #3\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 5,
+    "title": "Replace the TV home grid with rails",
+    "labels": ["agent-ready"],
+    "mock_action": "tv-rails",
+    "body": "## Spec\nIn TV mode, organise films into horizontal Trending, Watchlist, Science Fiction, and Mystery rails.\n\n## Acceptance criteria\n- [ ] TV mode shows named horizontal rails\n- [ ] Mobile keeps the vertical grid\n- [ ] Rails use the local API\n\n## Dependencies\nDepends-on: #2\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 6,
+    "title": "Create the TV detail view",
+    "labels": ["agent-ready"],
+    "mock_action": "tv-detail",
+    "body": "## Spec\nBuild a full-screen TV film detail with focusable actions and remote-friendly Back/Escape behavior.\n\n## Acceptance criteria\n- [ ] TV detail fills the viewport\n- [ ] Actions have visible focus\n- [ ] Escape and Backspace return to browse\n\n## Dependencies\nDepends-on: #4\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 7,
+    "title": "Add the curated rails API",
+    "labels": ["agent-ready"],
+    "mock_action": "rails-api",
+    "simulate_merge_conflict": true,
+    "body": "## Spec\nAdd `/api/rails` returning curated rows for Trending, Watchlist, Science Fiction, and Mysteries.\n\n## Acceptance criteria\n- [ ] Endpoint returns stable named rows\n- [ ] Every ID exists in the catalog\n- [ ] Watchlist rail reflects current state\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 8,
+    "title": "Make it feel like a real TV app",
+    "labels": ["agent-ready"],
+    "mock_action": "vague-trap",
+    "body": "## Spec\nMake it feel like a real TV app.\n\n## Acceptance criteria\n- [ ] It feels right\n\n## Agent\nagent: mock"
+  }
+]

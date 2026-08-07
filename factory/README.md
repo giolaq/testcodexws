@@ -1,0 +1,120 @@
+# Software (re)-Factory
+
+Software (re)-Factory is a legible control layer for running several coding
+agents against a dependency-mapped backlog. GitHub Issues are tickets, Projects
+v2 is the audited board, Git worktrees isolate changes, and ordered gates decide
+whether a ticket is retried, reviewed, or blocked. The included Pocket Cinema
+app makes the refactor visible: eight tickets turn a mobile film browser into a
+keyboard-driven TV experience.
+
+## One-minute mock quickstart
+
+Mock mode needs Python 3.11+, Git, Node 20+, and no credentials or agent tokens.
+
+```sh
+./setup_demo.sh
+./factory/factory run --mock --once
+./factory/factory status
+```
+
+In another terminal, serve the live board:
+
+```sh
+python3 -m http.server 8000
+```
+
+Open <http://localhost:8000/factory/dashboard.html>. The rehearsal runs tickets
+in dependency waves, performs real Git worktree isolation and real verification,
+merges seven tickets locally, exercises the merge-conflict handling story, and
+blocks only the deliberately vague ticket #8 after its retries.
+
+To use the shorter `factory run` spelling during a workshop:
+
+```sh
+export PATH="$PWD/factory:$PATH"
+factory run --mock --once
+```
+
+Reset between sessions with `./setup_demo.sh`. It removes only rehearsal
+worktrees and `factory/*` branches, restores `demo-app/` from the baseline tag,
+and clears runtime state. A Blocked worktree is otherwise preserved for review.
+
+## What attendees can read in one sitting
+
+`orchestrator.py` is the complete pipeline and stays close to 400 lines. Its
+flow is intentionally direct:
+
+1. Load issues and parse `Depends-on: #…` plus `agent: …` from each body.
+2. Move dependency-complete, `agent-ready` tickets to Ready.
+3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and run its agent adapter.
+4. Execute configured gates in order; feed the last 3,000 failure characters
+   back to the agent for up to two retries.
+5. On green gates, push and open a PR. Humans merge; the next poll marks Done.
+6. Mirror every transition to `.factory/state.json` for the two-second dashboard.
+
+The ticket backend is isolated in `github_backend.py`; adapter commands and gates
+are all in `factory.toml`. That makes swapping a CLI, model wrapper, remote
+execution command, test suite, or lint policy a small workshop-2 exercise.
+
+## Real GitHub and agent mode
+
+Use a clean GitHub repository with `origin` configured. Install and authenticate
+the GitHub CLI, including Projects permission:
+
+```sh
+gh auth login
+gh auth refresh -s project
+python3 factory/seed_github.py --agent codex
+./factory/factory run --agent codex --max-parallel 4
+```
+
+The first run creates or reuses a **Software (re)-Factory** Projects v2 project,
+normalizes its Status options, adds the issues, mirrors state labels, and opens
+PRs after required gates pass. Supply `--project-number N` to use an existing
+project. Use `--once` for one scheduler sweep; without it, the factory polls for
+newly merged PRs every 20 seconds.
+
+Run a no-write dependency preview before dispatch:
+
+```sh
+./factory/factory run --dry-run --agent codex
+```
+
+When a ticket is Blocked, edit its issue spec or acceptance criteria and then:
+
+```sh
+./factory/factory retry 8
+```
+
+Per-ticket `agent: claude`, `agent: codex`, or `agent: cursor` overrides the
+default. Before a live session, smoke-test each installed CLI because flags can
+change; update only its template in `factory.toml` if needed.
+
+## Pocket Cinema payoff
+
+Before the run, start the mobile baseline with:
+
+```sh
+.factory/venv/bin/python demo-app/app.py
+```
+
+After the seven successful mock merges, open <http://localhost:5000/?mode=tv>.
+Use arrow keys and Enter on the home rails, then Escape or Backspace in film
+details. The data and gradient poster artwork are bundled and fictional, so the
+demo works offline.
+
+## Operator reference
+
+```text
+factory run [--repo PATH] [--agent NAME] [--max-parallel N]
+            [--project-number N] [--once] [--dry-run] [--mock]
+factory status [--repo PATH]
+factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
+```
+
+Runtime artifacts are under `.factory/`: `state.json`, prompts, and one log per
+ticket attempt. Required gate failure blocks progress; optional gate failure is
+recorded in the ticket's `warnings`. Killing and restarting the loop replays an
+interrupted active ticket from a clean worktree and reuses any already-open PR.
+
+See `FACILITATOR.md` for the live-demo sequence and recovery notes.

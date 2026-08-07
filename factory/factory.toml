@@ -1,0 +1,26 @@
+[factory]
+max_retries = 2
+poll_interval = 20
+agent_timeout = 900
+gate_timeout = 300
+
+[agents]
+claude = 'claude -p "$(cat {prompt})" --permission-mode acceptEdits'
+codex = 'codex exec "$(cat {prompt})"'
+cursor = 'cursor-agent -p "$(cat {prompt})"'
+mock = '{python} factory/mock_agent.py {ticket}'
+
+[[gate]]
+name = "api-tests"
+cmd = '{python} -m pytest -q demo-app/tests'
+required = true
+
+[[gate]]
+name = "ui-logic-tests"
+cmd = 'node --test demo-app/static/tests/*.test.js'
+required = true
+
+[[gate]]
+name = "python-compile"
+cmd = '{python} -m compileall -q factory demo-app'
+required = false
