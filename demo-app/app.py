@@ -8,12 +8,6 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, render_template, request
 
 ROOT = Path(__file__).parent
-TV_USER_AGENTS = ("smart-tv", "smarttv", "hbbtv", "appletv", "googletv")
-
-
-def is_tv_mode() -> bool:
-    user_agent = request.headers.get("User-Agent", "").lower()
-    return request.args.get("mode") == "tv" or any(hint in user_agent for hint in TV_USER_AGENTS)
 
 
 def load_catalog() -> list[dict]:
@@ -28,14 +22,14 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.get("/")
     def index():
-        return render_template("index.html", movies=catalog, tv_mode=is_tv_mode())
+        return render_template("index.html", movies=catalog)
 
     @app.get("/movie/<movie_id>")
     def detail(movie_id: str):
         movie = by_id.get(movie_id)
         if not movie:
             abort(404)
-        return render_template("detail.html", movie=movie, tv_mode=is_tv_mode())
+        return render_template("detail.html", movie=movie)
 
     @app.get("/api/movies")
     def movies_api():
@@ -64,18 +58,6 @@ def create_app(testing: bool = False) -> Flask:
     def remove_watchlist(movie_id: str):
         app.config["WATCHLIST"].discard(movie_id)
         return jsonify({"ids": sorted(app.config["WATCHLIST"])})
-
-    @app.get("/api/rails")
-    def rails_api():
-        def ids(predicate):
-            return [movie["id"] for movie in catalog if predicate(movie)][:8]
-        watchlist = app.config["WATCHLIST"]
-        return jsonify([
-            {"title": "Trending now", "movie_ids": [movie["id"] for movie in catalog[:8]]},
-            {"title": "My watchlist", "movie_ids": ids(lambda movie: movie["id"] in watchlist)},
-            {"title": "Science fiction", "movie_ids": ids(lambda movie: "Sci-Fi" in movie["genres"])},
-            {"title": "Mysteries", "movie_ids": ids(lambda movie: "Mystery" in movie["genres"])},
-        ])
 
     return app
 

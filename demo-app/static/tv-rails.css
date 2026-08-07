@@ -1,4 +1,0 @@
-body.tv .section-heading,body.tv #movie-grid { display:none; }
-.rails { display:grid; gap:3vh; }.rail h2 { margin:0 0 1.3vh; font-size:1.6vw; }
-.rail-track { display:grid; grid-auto-flow:column; grid-auto-columns:14vw; gap:1.5vw; overflow:hidden; padding:1vh .4vw 2vh; }
-.rail .movie-card:nth-child(n+7) { display:none; }
