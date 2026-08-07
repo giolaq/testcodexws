@@ -6,6 +6,7 @@
   <title>Pocket Cinema</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tv-nav.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tv-rails.css') }}">
 </head>
 <body class="{{ 'tv' if tv_mode else 'mobile' }}">
   <header class="topbar">
@@ -43,5 +44,6 @@
   <nav class="tabbar" aria-label="Primary"><a class="active" href="/">Browse</a><a href="#watchlist">Watchlist</a><a href="#profile">Profile</a></nav>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='tv-nav.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='rails.js') }}"></script>
 </body>
 </html>
