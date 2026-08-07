@@ -113,6 +113,7 @@ class Factory:
         self.tickets: dict[int, dict] = {}
         self.transition_lock = threading.RLock()
         self.merge_lock = threading.Lock()
+        self.last_deadlock = None
         self.backend = None if args.mock else GitHubBackend(self.repo, args.project_number)
 
     def load_tickets(self):
@@ -132,10 +133,13 @@ class Factory:
                 "history": old.get("history", []), "mock_action": raw.get("mock_action", ""),
                 "simulate_merge_conflict": raw.get("simulate_merge_conflict", False),
             }
-            if ticket["status"] in ACTIVE:
+            recovered = ticket["status"] in ACTIVE
+            if recovered:
                 ticket["status"] = "Backlog"  # safely replay interrupted work
                 ticket["history"].append({"at": now(), "status": "Backlog", "note": "Recovered after restart"})
             self.tickets[number] = ticket
+            if recovered and self.backend and not self.args.dry_run:
+                self.backend.set_status(ticket, "Backlog", "Recovered after restart")
         self._sync_store(save=not self.args.dry_run)
 
     def _sync_store(self, save=True):
@@ -270,8 +274,8 @@ class Factory:
         return False
 
     def publish(self, ticket: dict, worktree: Path):
-        self.transition(ticket, "In Review", "Verification passed")
         if self.args.mock:
+            self.transition(ticket, "In Review", "Verification passed")
             if ticket.get("simulate_merge_conflict"):
                 ticket["merge_conflict_path"] = "A competing integration was detected; the merge lock serialized it safely."
                 ticket["history"].append({"at": now(), "status": "In Review", "note": "Merge-conflict rehearsal exercised"})
@@ -289,7 +293,7 @@ class Factory:
             return
         pr_url = self.backend.publish(ticket, worktree)
         ticket["pr_url"] = pr_url
-        self._sync_store()
+        self.transition(ticket, "In Review", "PR opened after verification")
 
     def process(self, ticket: dict):
         self.transition(ticket, "In Progress", f"Running {ticket['agent']}")
@@ -322,7 +326,11 @@ class Factory:
                     continue
                 return
             ticket["failure"] = ""
-            self.publish(ticket, worktree)
+            try:
+                self.publish(ticket, worktree)
+            except Exception as exc:
+                ticket["failure"] = str(exc)[-3000:]
+                self.transition(ticket, "Blocked", "Publishing failed; worktree preserved")
             return
 
     def sync_merged(self):
@@ -352,9 +360,12 @@ class Factory:
                     list(pool.map(self.process, ready))
                 continue
             unfinished = [t for t in self.tickets.values() if t["status"] not in TERMINAL | {"In Review"}]
+            if unfinished:
+                deadlock = tuple((t["number"], tuple(t["dependencies"])) for t in unfinished)
+                if deadlock != self.last_deadlock:
+                    print("Deadlock: " + ", ".join(f"#{t['number']} waits for {t['dependencies']}" for t in unfinished), flush=True)
+                    self.last_deadlock = deadlock
             if self.args.mock and self.args.once:
-                if unfinished:
-                    print("Deadlock: " + ", ".join(f"#{t['number']} waits for {t['dependencies']}" for t in unfinished))
                 return
             if self.args.once:
                 return

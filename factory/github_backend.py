@@ -64,20 +64,24 @@ class GitHubBackend:
                 "--data-type", "SINGLE_SELECT", "--single-select-options", ",".join(STATES), "--format", "json",
             )
         if [o["name"] for o in field.get("options", [])] != STATES:
-            self._set_status_options(field["id"])
+            self._set_status_options(field["id"], field.get("options", []))
             fields = self.json("project", "field-list", self.project_number, "--owner", self.owner, "--format", "json").get("fields", [])
             field = next(f for f in fields if f.get("name") == "Status")
         self.field_id = field["id"]
         self.options = {o["name"]: o["id"] for o in field["options"]}
 
-    def _set_status_options(self, field_id):
+    def _set_status_options(self, field_id, existing):
         query = """mutation($field:ID!,$options:[ProjectV2SingleSelectFieldOptionInput!]!){
           updateProjectV2Field(input:{fieldId:$field,singleSelectOptions:$options}){projectV2Field{... on ProjectV2SingleSelectField{id}}}}
         """
-        payload = {"query": query, "variables": {"field": field_id, "options": [
-            {"name": name, "color": color, "description": "Factory pipeline state"}
-            for name, color in zip(STATES, COLORS)
-        ]}}
+        existing_ids = {option["name"]: option["id"] for option in existing}
+        options = []
+        for name, color in zip(STATES, COLORS):
+            option = {"name": name, "color": color, "description": "Factory pipeline state"}
+            if name in existing_ids:
+                option["id"] = existing_ids[name]
+            options.append(option)
+        payload = {"query": query, "variables": {"field": field_id, "options": options}}
         self.gh("api", "graphql", "--input", "-", input_data=payload)
 
     def load(self, read_only=False):
