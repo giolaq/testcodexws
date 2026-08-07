@@ -37,3 +37,15 @@ main { padding:0 18px 92px; max-width:720px; margin:auto; }
 .detail-shell h1 { font-size:48px; margin-top:12px; }.synopsis { color:#d3d0ca; font-size:17px; }
 .primary { position:static; width:100%; height:52px; border-radius:12px; margin-top:12px; font-size:15px; font-weight:750; }
 @media (min-width:560px) { .movie-grid { grid-template-columns:repeat(3,1fr); } }
+
+/* ticket-2-tv-theme */
+body.tv { --paper:#08090d; --card:#171922; font-size:22px; padding:4.5vh 5vw; }
+body.tv .topbar { position:static; height:8vh; padding:0; background:transparent; }
+body.tv main { max-width:none; padding:2vh 0 8vh; }
+body.tv .hero { padding:3vh 0; }
+body.tv .hero h1 { font-size:7.5vw; max-width:11ch; }
+body.tv .search { max-width:38vw; height:64px; }
+body.tv .movie-grid { grid-template-columns:repeat(6,minmax(0,1fr)); gap:2vw; }
+body.tv .movie-card h3 { font-size:1.1vw; }
+body.tv .movie-card p { font-size:.85vw; }
+body.tv .tabbar { display:none; }
