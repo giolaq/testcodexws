@@ -59,6 +59,18 @@ def create_app(testing: bool = False) -> Flask:
         app.config["WATCHLIST"].discard(movie_id)
         return jsonify({"ids": sorted(app.config["WATCHLIST"])})
 
+    @app.get("/api/rails")
+    def rails_api():
+        def ids(predicate):
+            return [movie["id"] for movie in catalog if predicate(movie)][:8]
+        watchlist = app.config["WATCHLIST"]
+        return jsonify([
+            {"title": "Trending now", "movie_ids": [movie["id"] for movie in catalog[:8]]},
+            {"title": "My watchlist", "movie_ids": ids(lambda movie: movie["id"] in watchlist)},
+            {"title": "Science fiction", "movie_ids": ids(lambda movie: "Sci-Fi" in movie["genres"])},
+            {"title": "Mysteries", "movie_ids": ids(lambda movie: "Mystery" in movie["genres"])},
+        ])
+
     return app
 
 
