@@ -1,0 +1,3 @@
+body.tv .movie-card > a:focus { outline:0; }
+body.tv .movie-card > a:focus .poster { transform:scale(1.06); box-shadow:0 0 0 5px var(--lime),0 24px 55px #000b; }
+body.tv .poster { transition:transform 150ms ease,box-shadow 150ms ease; }
