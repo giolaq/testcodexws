@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ movie.title }} · Pocket Cinema</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='tv-detail.css') }}">
 </head>
-<body class="detail-page {{ 'tv' if tv_mode else 'mobile' }}">
+<body class="detail-page">
   <main class="detail-shell">
     <a class="back" href="/">← Browse</a>
     <div class="detail-poster poster" style="--poster-a:{{ movie.colors[0] }};--poster-b:{{ movie.colors[1] }}">
@@ -21,6 +20,5 @@
     <button class="primary watchlist" data-movie-id="{{ movie.id }}">+ Add to watchlist</button>
   </main>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
-  <script type="module" src="{{ url_for('static', filename='tv-detail.js') }}"></script>
 </body>
 </html>

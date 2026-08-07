@@ -1,6 +1,0 @@
-body.tv.detail-page { padding:0; background:radial-gradient(circle at 20% 30%,#25233e,#08090d 56%); }
-body.tv .detail-shell { max-width:none; min-height:100vh; padding:8vh 8vw 8vh 49vw; display:flex; flex-direction:column; justify-content:center; }
-body.tv .detail-poster { position:absolute; left:9vw; top:10vh; width:29vw; height:78vh; }
-body.tv .detail-shell h1 { font-size:5vw; }.detail-page.tv .synopsis { max-width:42vw; font-size:1.4vw; }
-body.tv .detail-shell .primary { width:20vw; font-size:1.2vw; }
-body.tv a:focus,body.tv button:focus { outline:5px solid var(--lime); outline-offset:5px; }
