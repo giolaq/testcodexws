@@ -6,7 +6,7 @@
   <title>Pocket Cinema</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
+<body class="{{ 'tv' if tv_mode else 'mobile' }}">
   <header class="topbar">
     <a class="brand" href="/" aria-label="Pocket Cinema home"><span>PC</span>Pocket Cinema</a>
     <button class="avatar" aria-label="Open profile">GA</button>
