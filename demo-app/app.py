@@ -8,6 +8,12 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, render_template, request
 
 ROOT = Path(__file__).parent
+TV_USER_AGENTS = ("smart-tv", "smarttv", "hbbtv", "appletv", "googletv")
+
+
+def is_tv_mode() -> bool:
+    user_agent = request.headers.get("User-Agent", "").lower()
+    return request.args.get("mode") == "tv" or any(hint in user_agent for hint in TV_USER_AGENTS)
 
 
 def load_catalog() -> list[dict]:
@@ -22,7 +28,7 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.get("/")
     def index():
-        return render_template("index.html", movies=catalog)
+        return render_template("index.html", movies=catalog, tv_mode=is_tv_mode())
 
     @app.get("/movie/<movie_id>")
     def detail(movie_id: str):
