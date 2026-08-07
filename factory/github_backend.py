@@ -43,7 +43,14 @@ class GitHubBackend:
             raise GitHubError("GitHub CLI not found. Install `gh`, then run `gh auth login`.")
         if self.gh("auth", "status", check=False).returncode:
             raise GitHubError("GitHub CLI is not authenticated. Run `gh auth login`.")
-        repo = self.json("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+        result = self.gh("repo", "view", "--json", "nameWithOwner", check=False)
+        if result.returncode:
+            if "no git remotes found" in (result.stderr + result.stdout).lower():
+                raise GitHubError(
+                    "No GitHub repository is connected. Add an origin remote before running the factory."
+                )
+            raise GitHubError(result.stderr.strip() or result.stdout.strip())
+        repo = json.loads(result.stdout)["nameWithOwner"]
         self.owner, self.name = repo.split("/", 1)
 
     def ensure_project(self):

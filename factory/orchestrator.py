@@ -32,7 +32,7 @@ ACTIVE = {"In Progress", "Verifying"}
 TERMINAL = {"Done", "Blocked"}
 DEFAULT_AGENTS = {
     "claude": 'claude -p "$(cat {prompt})" --permission-mode acceptEdits',
-    "codex": 'codex exec "$(cat {prompt})"',
+    "codex": '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"',
     "cursor": 'cursor-agent -p "$(cat {prompt})"',
     "mock": "{python} factory/mock_agent.py {ticket}",
 }
@@ -83,6 +83,45 @@ def slugify(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:42] or "ticket"
 
 
+def resolve_codex_cli() -> str:
+    """Find a current, ChatGPT-authenticated Codex CLI, skipping legacy binaries."""
+    override = os.environ.get("FACTORY_CODEX_BIN")
+    candidates = [override] if override else [
+        shutil.which("codex"),
+        "/Applications/ChatGPT.app/Contents/Resources/codex",
+    ]
+    compatible = []
+    for candidate in dict.fromkeys(c for c in candidates if c):
+        try:
+            help_result = subprocess.run(
+                [candidate, "exec", "--help"], text=True, capture_output=True, timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        help_text = help_result.stdout + help_result.stderr
+        if help_result.returncode or "codex exec" not in help_text.lower():
+            continue
+        compatible.append(candidate)
+        try:
+            status = subprocess.run(
+                [candidate, "login", "status"], text=True, capture_output=True, timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if status.returncode == 0:
+            return candidate
+    if compatible:
+        raise RuntimeError(
+            f"Codex CLI is not signed in. Run `{shlex.quote(compatible[0])} login`, then retry."
+        )
+    if override:
+        raise RuntimeError(f"FACTORY_CODEX_BIN does not point to a current Codex CLI: {override}")
+    raise RuntimeError(
+        "No current Codex CLI was found. Install/update Codex or set FACTORY_CODEX_BIN "
+        "to the Codex binary bundled with the ChatGPT app."
+    )
+
+
 class StateStore:
     def __init__(self, repo: Path):
         self.path = repo / ".factory" / "state.json"
@@ -114,6 +153,7 @@ class Factory:
         self.transition_lock = threading.RLock()
         self.merge_lock = threading.Lock()
         self.last_deadlock = None
+        self.codex_bin = None
         self.backend = None if args.mock else GitHubBackend(self.repo, args.project_number)
 
     def load_tickets(self):
@@ -230,7 +270,10 @@ class Factory:
         template = self.cfg["agents"].get(ticket["agent"])
         if not template:
             return 2, f"Unknown agent adapter: {ticket['agent']}"
-        command = template.format(prompt=shlex.quote(str(prompt)), ticket=ticket["number"], python=shlex.quote(self.python))
+        command = template.format(
+            prompt=shlex.quote(str(prompt)), ticket=ticket["number"],
+            python=shlex.quote(self.python), codex=shlex.quote(self.codex_bin or "codex"),
+        )
         log = self.repo / ".factory/logs" / f"{ticket['number']}-attempt{ticket['attempt']}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -346,6 +389,9 @@ class Factory:
         self.load_tickets()
         if self.args.dry_run:
             self.dry_plan(); return
+        if any(ticket["agent"] == "codex" and ticket["status"] != "Done" for ticket in self.tickets.values()):
+            self.codex_bin = resolve_codex_cli()
+            print(f"Codex adapter: {self.codex_bin}", flush=True)
         for cycle in self.detect_cycles():
             note = "Dependency cycle: " + " → ".join(f"#{n}" for n in cycle)
             for n in set(cycle[:-1]):

@@ -6,7 +6,7 @@ gate_timeout = 300
 
 [agents]
 claude = 'claude -p "$(cat {prompt})" --permission-mode acceptEdits'
-codex = 'codex exec "$(cat {prompt})"'
+codex = '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"'
 cursor = 'cursor-agent -p "$(cat {prompt})"'
 mock = '{python} factory/mock_agent.py {ticket}'
 

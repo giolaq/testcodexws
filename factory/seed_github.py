@@ -17,9 +17,26 @@ def gh(*args, cwd: Path, check=True):
     return result
 
 
+def resolve_repository(repo: Path, supplied: str | None) -> str:
+    command = ["repo", "view"]
+    if supplied:
+        command.append(supplied)
+    result = gh(*command, "--json", "nameWithOwner", cwd=repo, check=False)
+    if result.returncode:
+        if not supplied and "no git remotes found" in (result.stderr + result.stdout).lower():
+            raise SystemExit(
+                "No GitHub repository is connected to this checkout.\n"
+                "Either add an origin remote, or rerun with "
+                "`--github-repo OWNER/REPOSITORY`."
+            )
+        raise SystemExit(result.stderr.strip() or result.stdout.strip())
+    return json.loads(result.stdout)["nameWithOwner"]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Seed the Pocket Cinema TV-refactor issues")
     parser.add_argument("--repo", default=".")
+    parser.add_argument("--github-repo", metavar="OWNER/REPOSITORY")
     parser.add_argument("--agent", choices=["claude", "codex", "cursor"], default="codex")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -30,7 +47,7 @@ def main():
             print(f"#{ticket['number']} {ticket['title']}")
         return
     gh("auth", "status", cwd=repo)
-    repository = json.loads(gh("repo", "view", "--json", "nameWithOwner", cwd=repo).stdout)["nameWithOwner"]
+    repository = resolve_repository(repo, args.github_repo)
     gh("label", "create", "agent-ready", "--repo", repository, "--color", "c9f75f", "--description", "Ready for factory dispatch", "--force", cwd=repo)
     existing = json.loads(gh("issue", "list", "--repo", repository, "--state", "all", "--limit", "200", "--json", "number,title", cwd=repo).stdout)
     by_title = {issue["title"]: int(issue["number"]) for issue in existing}

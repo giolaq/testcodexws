@@ -58,14 +58,35 @@ execution command, test suite, or lint policy a small workshop-2 exercise.
 
 ## Real GitHub and agent mode
 
-Use a clean GitHub repository with `origin` configured. Install and authenticate
-the GitHub CLI, including Projects permission:
+Use a clean GitHub repository. If this checkout is not connected to GitHub yet,
+create and attach a private repository first (choose your own repository name):
+
+```sh
+gh repo create software-refactory-workshop --private --source=. --remote=origin --push
+```
+
+Then authenticate the GitHub CLI with Projects permission and seed the backlog:
 
 ```sh
 gh auth login
 gh auth refresh -s project
 python3 factory/seed_github.py --agent codex
 ./factory/factory run --agent codex --max-parallel 4
+```
+
+You can seed an existing repository before attaching a remote by identifying it
+explicitly:
+
+```sh
+python3 factory/seed_github.py --agent codex --github-repo OWNER/REPOSITORY
+```
+
+The factory itself pushes ticket branches, so attach that repository as `origin`
+before `factory run`:
+
+```sh
+git remote add origin https://github.com/OWNER/REPOSITORY.git
+./factory/factory run --agent codex
 ```
 
 The first run creates or reuses a **Software (re)-Factory** Projects v2 project,
@@ -89,6 +110,16 @@ When a ticket is Blocked, edit its issue spec or acceptance criteria and then:
 Per-ticket `agent: claude`, `agent: codex`, or `agent: cursor` overrides the
 default. Before a live session, smoke-test each installed CLI because flags can
 change; update only its template in `factory.toml` if needed.
+
+For Codex, the factory selects a current CLI with a valid saved ChatGPT login
+and skips legacy `codex` executables that only support `OPENAI_API_KEY`. On
+macOS it also checks the CLI bundled with the ChatGPT app. Override discovery
+when needed:
+
+```sh
+export FACTORY_CODEX_BIN=/path/to/current/codex
+"$FACTORY_CODEX_BIN" login status
+```
 
 ## Pocket Cinema payoff
 
