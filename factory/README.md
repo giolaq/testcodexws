@@ -46,11 +46,14 @@ flow is intentionally direct:
 
 1. Load issues and parse `Depends-on: #…` plus `agent: …` from each body.
 2. Move dependency-complete, `agent-ready` tickets to Ready.
-3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and run its agent adapter.
-4. Execute configured gates in order; feed the last 3,000 failure characters
+3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and ask the independent
+   QA agent to add ticket-numbered acceptance tests only.
+4. Commit and protect the QA tests, then run the implementation agent. The
+   factory rejects any implementation that modifies or deletes a protected test.
+5. Execute configured gates in order; feed the last 3,000 failure characters
    back to the agent for up to two retries.
-5. On green gates, push and open a PR. Humans merge; the next poll marks Done.
-6. Mirror every transition to `.factory/state.json` for the two-second dashboard.
+6. On green gates, push and open a PR. Humans merge; the next poll marks Done.
+7. Mirror every transition to `.factory/state.json` for the two-second dashboard.
 
 The ticket backend is isolated in `github_backend.py`; adapter commands and gates
 are all in `factory.toml`. That makes swapping a CLI, model wrapper, remote
@@ -95,6 +98,44 @@ Inspect the GitHub board, then deliberately start implementation:
 ```sh
 ./factory/factory run --agent codex --max-parallel 4
 ```
+
+## Independent QA acceptance-test phase
+
+Real factory runs use a dedicated QA agent before the implementation agent for
+every ticket. The default is Codex and can be changed in `factory/factory.toml`:
+
+```toml
+[qa]
+agent = "codex"
+max_retries = 1
+test_roots = ["demo-app/tests", "demo-app/static/tests"]
+```
+
+You can select a different QA CLI for one run or disable the phase explicitly:
+
+```sh
+./factory/factory run --agent codex --qa-agent claude --max-parallel 4
+./factory/factory run --agent codex --no-qa --max-parallel 4
+```
+
+For each issue, QA receives the full spec and acceptance criteria. It may only
+add new files named `test_ticket_ISSUE[_topic].py` or
+`ticket-ISSUE[-topic].test.js` inside the configured test roots. The factory
+commits those files before implementation and records their Git blob hashes.
+The implementation agent sees the protected-file list in its prompt and may add
+more tests, but changing, renaming, or deleting a QA test fails verification and
+is fed back into the normal retry loop.
+
+QA prompts and logs are separate from implementation artifacts:
+
+```text
+.factory/prompts/ISSUE-qa-attemptN.md
+.factory/logs/ISSUE-qa-attemptN.log
+```
+
+The default `--mock` rehearsal skips QA so it remains credential-free and fully
+deterministic. Passing `--qa-agent` explicitly with `--mock` opts into a real QA
+CLI for that rehearsal.
 
 ## Real GitHub and agent mode
 
@@ -177,7 +218,8 @@ demo works offline.
 ## Operator reference
 
 ```text
-factory run [--repo PATH] [--agent NAME] [--max-parallel N]
+factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
+            [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
 factory plan PRD.md [--output PLAN.json] [--default-agent NAME]
                     [--min-tickets N] [--max-tickets N]
@@ -186,9 +228,10 @@ factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
 ```
 
-Runtime artifacts are under `.factory/`: `state.json`, prompts, and one log per
-ticket attempt. Required gate failure blocks progress; optional gate failure is
-recorded in the ticket's `warnings`. Killing and restarting the loop replays an
-interrupted active ticket from a clean worktree and reuses any already-open PR.
+Runtime artifacts are under `.factory/`: `state.json`, QA and implementation
+prompts, and one log per phase attempt. Required gate failure blocks progress;
+optional gate failure is recorded in the ticket's `warnings`. Killing and
+restarting the loop replays an interrupted active ticket from a clean worktree
+and reuses any already-open PR.
 
 See `FACILITATOR.md` for the live-demo sequence and recovery notes.

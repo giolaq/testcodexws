@@ -10,6 +10,11 @@ codex = '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"'
 cursor = 'cursor-agent -p "$(cat {prompt})"'
 mock = '{python} factory/mock_agent.py {ticket}'
 
+[qa]
+agent = "codex"
+max_retries = 1
+test_roots = ["demo-app/tests", "demo-app/static/tests"]
+
 [[gate]]
 name = "api-tests"
 cmd = '{python} -m pytest -q demo-app/tests'
