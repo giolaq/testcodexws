@@ -1,0 +1,54 @@
+{
+  "plan_version": 1,
+  "plan_id": "recipe-demo-v1",
+  "source_prd": "recipe-app-prd.md",
+  "created_at": "2026-08-10T00:00:00+00:00",
+  "planning_agent": "workshop-fixture",
+  "project": {
+    "name": "TableStory Recipe App Rebrand",
+    "summary": "Transform Pocket Cinema into a responsive recipe product with a recipe-domain API, mobile experience, TV navigation, and complete verification."
+  },
+  "open_questions": [],
+  "tickets": [
+    {
+      "key": "T1",
+      "title": "Add the recipe data model and API",
+      "spec": "Add a deterministic recipe collection and recipe-specific API alongside the existing application so frontend work can consume a stable contract.",
+      "acceptance_criteria": ["The collection contains at least 12 complete recipes", "Search includes ingredients and dietary tags", "Cookbook add, list, and remove behavior works", "Rails use recipe_ids"],
+      "dependencies": [],
+      "agent": "codex"
+    },
+    {
+      "key": "T2",
+      "title": "Create the TableStory design system",
+      "spec": "Create reusable brand tokens and responsive recipe-card styling using the approved warm kitchen palette.",
+      "acceptance_criteria": ["All five approved colors are defined", "Recipe cards and artwork respond at mobile widths", "Focus and saved states do not rely only on color"],
+      "dependencies": [],
+      "agent": "codex"
+    },
+    {
+      "key": "T3",
+      "title": "Build the mobile TableStory experience",
+      "spec": "Replace the mobile cinema interface with recipe browse, search, detail, ingredients, steps, and My Cookbook interactions.",
+      "acceptance_criteria": ["Home displays the TableStory identity and exact tagline", "Search matches recipe and ingredient content", "Details show metadata, ingredients, and ordered steps", "My Cookbook controls expose saved state"],
+      "dependencies": ["T1", "T2"],
+      "agent": "codex"
+    },
+    {
+      "key": "T4",
+      "title": "Add the television recipe experience",
+      "spec": "Add TV recipe rails, ten-foot layouts, and keyboard or remote browse and detail navigation while retaining mobile behavior.",
+      "acceptance_criteria": ["TV mode renders four named rails", "Arrow keys and Enter operate browse cards", "Escape and Backspace return from detail", "Focus remains visible at 1920 by 1080"],
+      "dependencies": ["T3"],
+      "agent": "codex"
+    },
+    {
+      "key": "T5",
+      "title": "Complete documentation and terminology verification",
+      "spec": "Document startup and verification, remove obsolete film data, and add an automated partial-rebrand terminology check.",
+      "acceptance_criteria": ["README documents mobile and TV startup", "Obsolete catalog data is removed", "Automated checks reject customer-facing cinema terminology", "All configured gates pass"],
+      "dependencies": ["T4"],
+      "agent": "codex"
+    }
+  ]
+}

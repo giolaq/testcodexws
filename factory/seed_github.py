@@ -34,14 +34,17 @@ def resolve_repository(repo: Path, supplied: str | None) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Seed the Pocket Cinema TV-refactor issues")
+    parser = argparse.ArgumentParser(description="Seed a deterministic Software (re)-Factory scenario")
     parser.add_argument("--repo", default=".")
     parser.add_argument("--github-repo", metavar="OWNER/REPOSITORY")
     parser.add_argument("--agent", choices=["claude", "codex", "cursor"], default="codex")
+    parser.add_argument("--scenario", choices=["tv", "recipe-rebrand"], default="tv")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     repo = Path(args.repo).resolve()
-    tickets = json.loads((repo / "factory/seed/tickets.json").read_text())
+    scenario = repo / "factory/scenarios" / args.scenario / "tickets.json"
+    source = scenario if scenario.is_file() else repo / "factory/seed/tickets.json"
+    tickets = json.loads(source.read_text())
     if args.dry_run:
         for ticket in tickets:
             print(f"#{ticket['number']} {ticket['title']}")

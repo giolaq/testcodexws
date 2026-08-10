@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from planner import approve_plan, issue_body, render_review, validate_plan
+from planner import approve_plan, dependency_waves, issue_body, render_review, validate_plan
 
 
 def sample_plan():
@@ -58,6 +58,12 @@ class PlannerTests(unittest.TestCase):
         self.assertIn("T2 — Add the UI", review)
         self.assertIn("factory approve /tmp/plan.json", review)
         self.assertIn("No issue or coding agent is created", review)
+        self.assertIn("```mermaid", review)
+        self.assertIn("N0 --> N1", review)
+        self.assertIn("## Parallel waves", review)
+
+    def test_dependency_waves_match_scheduler_order(self):
+        self.assertEqual(dependency_waves(sample_plan()), [["T1"], ["T2"]])
 
     def test_open_questions_block_publication_before_github_calls(self):
         plan = sample_plan()
@@ -67,6 +73,10 @@ class PlannerTests(unittest.TestCase):
             path.write_text(json.dumps(plan))
             with self.assertRaisesRegex(ValueError, "resolve and remove"):
                 approve_plan(Path(directory), path, None, True)
+
+    def test_approval_rejects_two_project_selection_modes(self):
+        with self.assertRaisesRegex(ValueError, "either --project-number"):
+            approve_plan(Path("."), Path("missing.json"), 2, True, "Fresh board")
 
 
 if __name__ == "__main__":

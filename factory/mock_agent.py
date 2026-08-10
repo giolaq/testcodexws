@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import argparse
+import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path.cwd()
@@ -256,16 +257,40 @@ def test_watchlist_rail_reflects_session_state(client):
 TICKETS = {1: ticket_1, 2: ticket_2, 3: ticket_3, 4: ticket_4, 5: ticket_5, 6: ticket_6, 7: ticket_7}
 
 
+def recipe_rebrand_ticket(number: int):
+    step = Path(__file__).parent / "scenarios/recipe-rebrand/steps" / str(number)
+    if not step.is_dir():
+        raise RuntimeError(f"No recipe-rebrand snapshot for ticket #{number}")
+    for source in step.rglob("*"):
+        if source.is_dir() or source.name == "delete.txt":
+            continue
+        destination = ROOT / source.relative_to(step)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    delete_manifest = step / "delete.txt"
+    if delete_manifest.is_file():
+        for relative in delete_manifest.read_text().splitlines():
+            if relative.strip():
+                (ROOT / relative.strip()).unlink(missing_ok=True)
+
+
 def main():
-    number = int(sys.argv[1])
-    if number == 8:
-        print("Ticket #8 is not actionable: no measurable acceptance criteria, target screens, or expected behavior.", file=sys.stderr)
-        return 2
-    action = TICKETS.get(number)
-    if not action:
-        print(f"No scripted mock action for ticket #{number}", file=sys.stderr)
-        return 2
-    action()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("ticket", type=int)
+    parser.add_argument("--scenario", choices=["tv", "recipe-rebrand"], default="tv")
+    args = parser.parse_args()
+    number = args.ticket
+    if args.scenario == "recipe-rebrand":
+        recipe_rebrand_ticket(number)
+    else:
+        if number == 8:
+            print("Ticket #8 is not actionable: no measurable acceptance criteria, target screens, or expected behavior.")
+            return 2
+        action = TICKETS.get(number)
+        if not action:
+            print(f"No scripted mock action for ticket #{number}")
+            return 2
+        action()
     status = subprocess.run(["git", "status", "--porcelain"], text=True, capture_output=True, check=True).stdout
     if status:
         subprocess.run(["git", "add", "-A"], check=True)

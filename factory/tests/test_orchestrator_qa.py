@@ -67,6 +67,7 @@ class QaPolicyTests(unittest.TestCase):
 
             args = SimpleNamespace(
                 repo=str(repo), qa_agent="codex", no_qa=False, mock=True, project_number=None,
+                review_qa_tests=False, scenario="tv",
             )
             factory = Factory(args)
             ticket = {
@@ -76,7 +77,7 @@ class QaPolicyTests(unittest.TestCase):
             }
             factory.tickets[42] = ticket
 
-            def fake_qa_adapter(agent, active_ticket, worktree, prompt, log_name):
+            def fake_qa_adapter(agent, active_ticket, worktree, prompt, log_name, phase):
                 test = worktree / "demo-app/tests/test_ticket_42_search.py"
                 test.parent.mkdir(parents=True, exist_ok=True)
                 test.write_text("def test_recipe_search_acceptance():\n    assert True\n")

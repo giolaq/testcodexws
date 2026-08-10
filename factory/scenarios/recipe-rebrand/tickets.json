@@ -1,0 +1,37 @@
+[
+  {
+    "number": 1,
+    "title": "Add the recipe data model and API",
+    "labels": ["agent-ready"],
+    "mock_action": "recipe-api",
+    "body": "## Spec\nAdd a deterministic recipe collection and recipe-specific API alongside the existing application so frontend work can consume a stable contract.\n\n## Acceptance criteria\n- [ ] `/api/recipes` returns at least 12 complete recipes\n- [ ] Search includes ingredients and dietary tags\n- [ ] Cookbook add, list, and remove behavior works\n- [ ] Rails return recipe IDs\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 2,
+    "title": "Create the TableStory design system",
+    "labels": ["agent-ready"],
+    "mock_action": "recipe-brand",
+    "body": "## Spec\nCreate reusable TableStory brand tokens and responsive recipe-card styling using the approved warm kitchen palette.\n\n## Acceptance criteria\n- [ ] All five approved brand colors are defined\n- [ ] Recipe cards and artwork have responsive styles\n- [ ] Focus and saved states do not rely only on color\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 3,
+    "title": "Build the mobile TableStory experience",
+    "labels": ["agent-ready"],
+    "mock_action": "recipe-mobile",
+    "body": "## Spec\nReplace the mobile cinema interface with TableStory browse, search, recipe detail, ingredients, steps, and My Cookbook interactions.\n\n## Acceptance criteria\n- [ ] Home clearly displays the TableStory identity and tagline\n- [ ] Search matches recipe and ingredient content\n- [ ] Recipe details show metadata, ingredients, and ordered steps\n- [ ] My Cookbook controls expose saved state\n\n## Dependencies\nDepends-on: #1, #2\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 4,
+    "title": "Add the television recipe experience",
+    "labels": ["agent-ready"],
+    "mock_action": "recipe-tv",
+    "body": "## Spec\nAdd TV recipe rails, ten-foot layouts, and keyboard/remote browse and detail navigation while retaining the mobile experience.\n\n## Acceptance criteria\n- [ ] `?mode=tv` renders the TV layout\n- [ ] Four named recipe rails use `/api/rails`\n- [ ] Arrow keys and Enter operate browse cards\n- [ ] Escape and Backspace return from recipe detail\n\n## Dependencies\nDepends-on: #3\n\n## Agent\nagent: mock"
+  },
+  {
+    "number": 5,
+    "title": "Complete documentation and terminology verification",
+    "labels": ["agent-ready"],
+    "mock_action": "recipe-verification",
+    "body": "## Spec\nDocument TableStory startup and verification, remove obsolete film data, and add an automated partial-rebrand terminology check.\n\n## Acceptance criteria\n- [ ] README documents mobile and TV startup\n- [ ] Obsolete film catalog is removed\n- [ ] Automated checks reject customer-facing cinema terminology\n- [ ] All Python and JavaScript tests pass\n\n## Dependencies\nDepends-on: #4\n\n## Agent\nagent: mock"
+  }
+]

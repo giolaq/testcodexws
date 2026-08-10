@@ -8,11 +8,13 @@ gate_timeout = 300
 claude = 'claude -p "$(cat {prompt})" --permission-mode acceptEdits'
 codex = '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"'
 cursor = 'cursor-agent -p "$(cat {prompt})"'
-mock = '{python} factory/mock_agent.py {ticket}'
+mock = '{python} factory/mock_agent.py {ticket} --scenario {scenario}'
+mock-qa = '{python} factory/mock_qa_agent.py {ticket} --scenario {scenario}'
 
 [qa]
 agent = "codex"
 max_retries = 1
+require_human_approval = false
 test_roots = ["demo-app/tests", "demo-app/static/tests"]
 
 [[gate]]

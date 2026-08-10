@@ -64,6 +64,22 @@ def validate_plan(plan: dict) -> list[str]:
     return ordered
 
 
+def dependency_waves(plan: dict) -> list[list[str]]:
+    """Group a validated plan into the parallel waves used by the scheduler."""
+    validate_plan(plan)
+    remaining = {ticket["key"]: set(ticket["dependencies"]) for ticket in plan["tickets"]}
+    completed, waves = set(), []
+    while remaining:
+        ready = [key for key, dependencies in remaining.items() if dependencies <= completed]
+        if not ready:  # validate_plan already gives the more specific cycle error
+            raise ValueError("ticket graph cannot be scheduled")
+        waves.append(ready)
+        completed.update(ready)
+        for key in ready:
+            remaining.pop(key)
+    return waves
+
+
 def plan_prompt(prd: str, default_agent: str, minimum: int, maximum: int) -> str:
     return f"""You are the planning agent for a software factory. Read the PRD below and divide it
 into {minimum}-{maximum} small, independently reviewable coding tickets.
@@ -90,7 +106,17 @@ def render_review(plan: dict) -> str:
     lines += [f"Plan ID: `{plan['plan_id']}`", f"Source: `{plan['source_prd']}`", ""]
     if plan["open_questions"]:
         lines += ["## Open questions", ""] + [f"- {question}" for question in plan["open_questions"]] + [""]
-    lines += ["## Proposed tickets", ""]
+    lines += ["## Dependency map", "", "```mermaid", "flowchart LR"]
+    node_ids = {ticket["key"]: f"N{index}" for index, ticket in enumerate(plan["tickets"])}
+    for ticket in plan["tickets"]:
+        title = ticket["title"].replace('"', "'")
+        lines.append(f'  {node_ids[ticket["key"]]}["{ticket["key"]}: {title}"]')
+        for dependency in ticket["dependencies"]:
+            lines.append(f"  {node_ids[dependency]} --> {node_ids[ticket['key']]}")
+    lines += ["```", "", "## Parallel waves", ""]
+    for index, wave in enumerate(dependency_waves(plan), 1):
+        lines.append(f"{index}. " + ", ".join(wave))
+    lines += ["", "## Proposed tickets", ""]
     for ticket in plan["tickets"]:
         dependencies = ", ".join(ticket["dependencies"]) or "None"
         lines += [
@@ -192,7 +218,12 @@ def issue_body(ticket: dict, numbers: dict[str, int], plan_id: str) -> str:
     )
 
 
-def approve_plan(repo: Path, plan_path: Path, project_number: int | None, assume_yes: bool) -> str:
+def approve_plan(
+    repo: Path, plan_path: Path, project_number: int | None, assume_yes: bool,
+    new_project_title: str | None = None,
+) -> str:
+    if project_number is not None and new_project_title:
+        raise ValueError("use either --project-number or --new-project-title, not both")
     plan_path = plan_path.resolve()
     plan = json.loads(plan_path.read_text())
     order = validate_plan(plan)
@@ -208,6 +239,13 @@ def approve_plan(repo: Path, plan_path: Path, project_number: int | None, assume
             raise ValueError("approval cancelled; no GitHub issues were changed")
     backend = GitHubBackend(repo, project_number)
     backend.preflight()
+    if new_project_title:
+        created_project = backend.json(
+            "project", "create", "--owner", backend.owner,
+            "--title", new_project_title, "--format", "json",
+        )
+        backend.project_number = int(created_project["number"])
+        print(f"Created fresh GitHub Project #{backend.project_number}: {new_project_title}")
     repository = f"{backend.owner}/{backend.name}"
     backend.gh(
         "label", "create", "agent-ready", "--repo", repository, "--color", "c9f75f",

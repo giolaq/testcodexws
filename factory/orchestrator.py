@@ -27,17 +27,19 @@ import tomllib
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from doctor import run_doctor
 from github_backend import GitHubBackend, GitHubError
 from planner import approve_plan, plan_prd
 
-STATES = ["Backlog", "Ready", "In Progress", "Verifying", "In Review", "Done", "Blocked"]
+STATES = ["Backlog", "Ready", "In Progress", "QA Review", "Verifying", "In Review", "Done", "Blocked"]
 ACTIVE = {"In Progress", "Verifying"}
 TERMINAL = {"Done", "Blocked"}
 DEFAULT_AGENTS = {
     "claude": 'claude -p "$(cat {prompt})" --permission-mode acceptEdits',
     "codex": '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"',
     "cursor": 'cursor-agent -p "$(cat {prompt})"',
-    "mock": "{python} factory/mock_agent.py {ticket}",
+    "mock": "{python} factory/mock_agent.py {ticket} --scenario {scenario}",
+    "mock-qa": "{python} factory/mock_qa_agent.py {ticket} --scenario {scenario}",
 }
 DEFAULT_QA = {
     "agent": "codex",
@@ -200,20 +202,36 @@ class Factory:
         self.cfg = load_config(self.repo)
         validate_qa_config(self.cfg["qa"], self.cfg["agents"])
         requested_qa = args.qa_agent or self.cfg["qa"]["agent"]
-        self.qa_agent = None if args.no_qa or (args.mock and args.qa_agent is None) else requested_qa
-        if self.qa_agent and (self.qa_agent not in self.cfg["agents"] or self.qa_agent == "mock"):
+        if args.no_qa:
+            self.qa_agent = None
+        elif args.mock and args.qa_agent is None:
+            self.qa_agent = "mock-qa"
+        else:
+            self.qa_agent = requested_qa
+        if self.qa_agent and (
+            self.qa_agent not in self.cfg["agents"]
+            or self.qa_agent == "mock"
+            or (self.qa_agent == "mock-qa" and not args.mock)
+        ):
             raise ValueError("--qa-agent must name a configured claude, codex, or cursor adapter")
+        self.review_qa_tests = bool(args.review_qa_tests or self.cfg["qa"].get("require_human_approval", False))
         self.python = sys.executable
         self.store = StateStore(self.repo)
         self.tickets: dict[int, dict] = {}
         self.transition_lock = threading.RLock()
         self.merge_lock = threading.Lock()
         self.last_deadlock = None
+        self.last_qa_wait = None
         self.codex_bin = None
         self.backend = None if args.mock else GitHubBackend(self.repo, args.project_number)
 
     def load_tickets(self):
-        source = json.loads((self.repo / "factory/seed/tickets.json").read_text()) if self.args.mock else self.backend.load(read_only=self.args.dry_run)
+        if self.args.mock:
+            scenario_path = self.repo / "factory/scenarios" / self.args.scenario / "tickets.json"
+            source_path = scenario_path if scenario_path.is_file() else self.repo / "factory/seed/tickets.json"
+            source = json.loads(source_path.read_text())
+        else:
+            source = self.backend.load(read_only=self.args.dry_run)
         previous = {t["number"]: t for t in self.store.data.get("tickets", [])}
         for raw in source:
             number = int(raw["number"])
@@ -224,16 +242,25 @@ class Factory:
                 "agent": parse_agent(raw.get("body", ""), "mock" if self.args.mock else self.args.agent),
                 "dependencies": parse_dependencies(raw.get("body", "")),
                 "attempt": old.get("attempt", 0), "branch": old.get("branch", ""),
+                "base_sha": old.get("base_sha", ""),
                 "qa_agent": self.qa_agent or "", "qa_attempt": old.get("qa_attempt", 0),
                 "qa_commit": old.get("qa_commit", ""), "qa_tests": old.get("qa_tests", {}),
+                "qa_approved": old.get("qa_approved", False),
                 "pr_url": raw.get("pr_url", old.get("pr_url", "")),
+                "issue_url": raw.get("url", old.get("issue_url", "")),
                 "failure": old.get("failure", ""), "warnings": old.get("warnings", []),
+                "gate_results": old.get("gate_results", []),
+                "changed_files": old.get("changed_files", []),
+                "current_prompt": old.get("current_prompt", ""),
+                "current_log": old.get("current_log", ""),
+                "phase": old.get("phase", ""),
                 "history": old.get("history", []), "mock_action": raw.get("mock_action", ""),
                 "simulate_merge_conflict": raw.get("simulate_merge_conflict", False),
             }
             recovered = ticket["status"] in ACTIVE
             if recovered:
                 ticket["status"] = "Backlog"  # safely replay interrupted work
+                ticket.update(qa_approved=False, qa_commit="", qa_tests={}, base_sha="")
                 ticket["history"].append({"at": now(), "status": "Backlog", "note": "Recovered after restart"})
             self.tickets[number] = ticket
             if recovered and self.backend and not self.args.dry_run:
@@ -242,6 +269,8 @@ class Factory:
 
     def _sync_store(self, save=True):
         self.store.data["mode"] = "mock" if self.args.mock else "github"
+        self.store.data["scenario"] = self.args.scenario
+        self.store.data["qa_review_required"] = self.review_qa_tests
         self.store.data["states"] = STATES
         self.store.data["tickets"] = sorted(self.tickets.values(), key=lambda t: t["number"])
         if save:
@@ -252,6 +281,12 @@ class Factory:
             raise ValueError(status)
         with self.transition_lock:
             ticket["status"] = status
+            if status != "In Progress":
+                ticket["phase"] = status.lower().replace(" ", "-")
+            if status == "In Progress" and not ticket.get("started_at"):
+                ticket["started_at"] = now()
+            if status in TERMINAL | {"In Review"}:
+                ticket["finished_at"] = now()
             ticket["history"].append({"at": now(), "status": status, "note": note})
             if self.backend:
                 self.backend.set_status(ticket, status, note)
@@ -277,13 +312,30 @@ class Factory:
 
     def refresh_readiness(self):
         for ticket in self.tickets.values():
-            if ticket["status"] in TERMINAL | {"In Review"}:
+            if ticket["status"] in TERMINAL | {"In Review", "QA Review"}:
                 continue
             ready_label = self.args.mock or "agent-ready" in ticket["labels"]
             deps_done = all(self.tickets.get(n, {}).get("status") == "Done" for n in ticket["dependencies"])
             wanted = "Ready" if ready_label and deps_done else "Backlog"
             if ticket["status"] != wanted:
                 self.transition(ticket, wanted, "Dependencies satisfied" if wanted == "Ready" else "Waiting for dependencies")
+
+    def apply_qa_approvals(self):
+        approval_dir = self.repo / ".factory/qa-approvals"
+        for ticket in self.tickets.values():
+            marker = approval_dir / str(ticket["number"])
+            if ticket["status"] != "QA Review" or not marker.is_file():
+                continue
+            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            failure = self.verify_qa_tests_unchanged(ticket, worktree)
+            if failure:
+                ticket["failure"] = failure
+                marker.unlink(missing_ok=True)
+                self.transition(ticket, "Blocked", "QA tests changed before human approval")
+                continue
+            marker.unlink(missing_ok=True)
+            ticket["qa_approved"] = True
+            self.transition(ticket, "Ready", "Human approved independent QA tests")
 
     def dry_plan(self):
         remaining = set(self.tickets)
@@ -299,6 +351,24 @@ class Factory:
     def git(self, *args, cwd=None, **kwargs):
         return run(["git", *args], cwd or self.repo, **kwargs)
 
+    def sync_default_branch(self):
+        """Fast-forward the local default branch before dependent work starts."""
+        if not self.backend:
+            return self.git("rev-parse", "HEAD").stdout.strip()
+        branch = self.backend.default_branch
+        current = self.git("branch", "--show-current").stdout.strip()
+        if current != branch:
+            raise RuntimeError(
+                f"Factory must run from the GitHub default branch `{branch}`, not `{current or 'detached HEAD'}`"
+            )
+        dirty = self.git("status", "--porcelain").stdout.strip()
+        if dirty:
+            raise RuntimeError("Default branch has uncommitted changes; commit or stash them before factory run")
+        with self.merge_lock:
+            self.git("fetch", "origin", branch)
+            self.git("merge", "--ff-only", f"origin/{branch}")
+            return self.git("rev-parse", "HEAD").stdout.strip()
+
     def create_worktree(self, ticket: dict):
         branch = f"factory/{ticket['number']}-{slugify(ticket['title'])}"
         worktree = self.repo.parent / f"wt-{ticket['number']}"
@@ -309,6 +379,7 @@ class Factory:
             base_sha = self.git("rev-parse", "HEAD").stdout.strip()
             self.git("worktree", "add", "-b", branch, str(worktree), base_sha)
         ticket["branch"] = branch
+        ticket["base_sha"] = base_sha
         self._sync_store()
         return worktree, base_sha
 
@@ -361,30 +432,59 @@ class Factory:
         )
         return path
 
-    def run_adapter(self, agent: str, ticket: dict, worktree: Path, prompt: Path, log_name: str):
+    def run_adapter(
+        self, agent: str, ticket: dict, worktree: Path, prompt: Path, log_name: str,
+        phase: str,
+    ):
         template = self.cfg["agents"].get(agent)
         if not template:
             return 2, f"Unknown agent adapter: {agent}"
         command = template.format(
             prompt=shlex.quote(str(prompt)), ticket=ticket["number"],
             python=shlex.quote(self.python), codex=shlex.quote(self.codex_bin or "codex"),
+            scenario=shlex.quote(self.args.scenario),
         )
         log = self.repo / ".factory/logs" / log_name
         log.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            result = run(command, worktree, timeout=self.cfg["factory"]["agent_timeout"], check=False, shell=True)
-            output = result.stdout + result.stderr
-            log.write_text(output)
-            return result.returncode, output
-        except subprocess.TimeoutExpired as exc:
-            output = f"Agent timed out after {self.cfg['factory']['agent_timeout']}s\n{exc.stdout or ''}{exc.stderr or ''}"
-            log.write_text(output)
-            return 124, output
+        ticket.update(
+            phase=phase,
+            current_prompt=str(prompt.relative_to(self.repo)),
+            current_log=str(log.relative_to(self.repo)),
+            phase_started_at=now(),
+        )
+        self._sync_store()
+        chunks = []
+        with log.open("w") as stream:
+            process = subprocess.Popen(
+                command, cwd=worktree, text=True, shell=True, executable="/bin/sh",
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+
+            def copy_output():
+                for chunk in iter(process.stdout.readline, ""):
+                    chunks.append(chunk)
+                    stream.write(chunk)
+                    stream.flush()
+
+            reader = threading.Thread(target=copy_output, daemon=True)
+            reader.start()
+            try:
+                returncode = process.wait(timeout=self.cfg["factory"]["agent_timeout"])
+            except subprocess.TimeoutExpired:
+                process.kill()
+                returncode = 124
+                timeout_message = f"Agent timed out after {self.cfg['factory']['agent_timeout']}s\n"
+                chunks.append(timeout_message); stream.write(timeout_message); stream.flush()
+            reader.join(timeout=5)
+        output = "".join(chunks)
+        ticket.update(last_agent_exit=returncode, phase_finished_at=now())
+        self._sync_store()
+        return returncode, output
 
     def run_agent(self, ticket: dict, worktree: Path, prompt: Path):
         return self.run_adapter(
             ticket["agent"], ticket, worktree, prompt,
-            f"{ticket['number']}-attempt{ticket['attempt']}.log",
+            f"{ticket['number']}-attempt{ticket['attempt']}.log", "implementation",
         )
 
     def qa_changes(self, worktree: Path, base_sha: str) -> list[tuple[str, str]]:
@@ -419,7 +519,7 @@ class Factory:
             prompt = self.make_qa_prompt(ticket, failure)
             code, output = self.run_adapter(
                 self.qa_agent, ticket, worktree, prompt,
-                f"{ticket['number']}-qa-attempt{attempt}.log",
+                f"{ticket['number']}-qa-attempt{attempt}.log", "qa",
             )
             if code:
                 failure = output[-3000:]
@@ -464,19 +564,27 @@ class Factory:
         self.git("commit", "-m", message or f"factory(#{ticket['number']}): complete ticket", cwd=worktree)
 
     def verify(self, ticket: dict, worktree: Path):
-        failures, warnings = [], []
+        failures, warnings, gate_results = [], [], []
         for gate in self.cfg["gate"]:
             command = gate["cmd"].format(python=shlex.quote(self.python), repo=shlex.quote(str(self.repo)))
+            started = time.monotonic()
             try:
                 result = run(command, worktree, timeout=self.cfg["factory"]["gate_timeout"], check=False, shell=True)
                 output = (result.stdout + result.stderr)[-3000:]
             except subprocess.TimeoutExpired:
                 result = type("TimedOut", (), {"returncode": 124})()
                 output = f"{gate['name']} timed out after {self.cfg['factory']['gate_timeout']}s"
+            gate_results.append({
+                "name": gate["name"], "required": gate.get("required", True),
+                "exit_code": result.returncode, "output": output,
+                "duration_seconds": round(time.monotonic() - started, 2),
+            })
             if result.returncode:
                 message = f"[{gate['name']}] exit {result.returncode}\n{output}"
                 (failures if gate.get("required", True) else warnings).append(message)
         ticket["warnings"] = warnings
+        ticket["gate_results"] = gate_results
+        self._sync_store()
         return "\n\n".join(failures)
 
     def block_or_retry(self, ticket: dict, failure: str):
@@ -510,29 +618,49 @@ class Factory:
         self.transition(ticket, "In Review", "PR opened after verification")
 
     def process(self, ticket: dict):
-        first_phase = f"Running QA {self.qa_agent}" if self.qa_agent else f"Running {ticket['agent']}"
+        resume_qa = bool(ticket.get("qa_approved") and ticket.get("qa_commit") and ticket.get("branch"))
+        first_phase = (
+            f"Running {ticket['agent']} with approved QA tests"
+            if resume_qa else (f"Running QA {self.qa_agent}" if self.qa_agent else f"Running {ticket['agent']}")
+        )
         self.transition(ticket, "In Progress", first_phase)
-        try:
-            worktree, base_sha = self.create_worktree(ticket)
-        except Exception as exc:
-            ticket["failure"] = str(exc)[-3000:]
-            self.transition(ticket, "Blocked", "Could not create isolated worktree")
-            return
-        implementation_base_sha = base_sha
-        if self.qa_agent:
-            try:
-                qa_failure = self.create_qa_tests(ticket, worktree, base_sha)
-            except Exception as exc:
-                qa_failure = f"QA acceptance-test phase failed:\n{exc}"
-            if qa_failure:
-                ticket["failure"] = qa_failure[-3000:]
-                self.transition(ticket, "Blocked", "Independent QA could not produce valid acceptance tests")
+        if resume_qa:
+            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            base_sha = ticket.get("base_sha", "")
+            if not worktree.is_dir() or self.verify_qa_tests_unchanged(ticket, worktree):
+                ticket["failure"] = "Approved QA worktree or protected tests are missing"
+                self.transition(ticket, "Blocked", "Could not resume approved QA worktree")
                 return
             implementation_base_sha = ticket["qa_commit"]
-            self.transition(
-                ticket, "In Progress",
-                f"QA committed {len(ticket['qa_tests'])} protected test(s); running {ticket['agent']}",
-            )
+        else:
+            try:
+                worktree, base_sha = self.create_worktree(ticket)
+            except Exception as exc:
+                ticket["failure"] = str(exc)[-3000:]
+                self.transition(ticket, "Blocked", "Could not create isolated worktree")
+                return
+            implementation_base_sha = base_sha
+            if self.qa_agent:
+                try:
+                    qa_failure = self.create_qa_tests(ticket, worktree, base_sha)
+                except Exception as exc:
+                    qa_failure = f"QA acceptance-test phase failed:\n{exc}"
+                if qa_failure:
+                    ticket["failure"] = qa_failure[-3000:]
+                    self.transition(ticket, "Blocked", "Independent QA could not produce valid acceptance tests")
+                    return
+                implementation_base_sha = ticket["qa_commit"]
+                if self.review_qa_tests:
+                    ticket["phase"] = "qa-review"
+                    self.transition(
+                        ticket, "QA Review",
+                        f"Review {len(ticket['qa_tests'])} protected test(s), then run factory approve-tests {ticket['number']}",
+                    )
+                    return
+                self.transition(
+                    ticket, "In Progress",
+                    f"QA committed {len(ticket['qa_tests'])} protected test(s); running {ticket['agent']}",
+                )
         failure = ""
         max_attempts = self.cfg["factory"]["max_retries"] + 1
         for attempt in range(1, max_attempts + 1):
@@ -541,6 +669,14 @@ class Factory:
             code, output = self.run_agent(ticket, worktree, prompt)
             try:
                 self.commit_leftovers(ticket, worktree)
+                changed = self.git(
+                    "diff", "--name-status", implementation_base_sha, "HEAD", cwd=worktree,
+                ).stdout.splitlines()
+                ticket["changed_files"] = [
+                    {"status": fields[0], "path": fields[-1]}
+                    for line in changed if len(fields := line.split("\t")) >= 2
+                ]
+                self._sync_store()
                 commits = int(
                     self.git("rev-list", "--count", f"{implementation_base_sha}..HEAD", cwd=worktree).stdout
                 )
@@ -570,16 +706,33 @@ class Factory:
     def sync_merged(self):
         if not self.backend:
             return
+        merged = []
         for ticket in self.tickets.values():
-            if ticket["status"] == "In Review" and self.backend.is_merged(ticket):
-                self.transition(ticket, "Done", "PR merged")
-                worktree = self.repo.parent / f"wt-{ticket['number']}"
-                self.git("worktree", "remove", "--force", str(worktree), check=False)
+            if ticket["status"] == "In Review":
+                pr = self.backend.merged_pr(ticket)
+                if pr:
+                    merged.append((ticket, pr))
+        if not merged:
+            return
+        head = self.sync_default_branch()
+        for ticket, pr in merged:
+            merge_sha = (pr.get("mergeCommit") or {}).get("oid")
+            if merge_sha:
+                reachable = self.git("merge-base", "--is-ancestor", merge_sha, head, check=False)
+                if reachable.returncode:
+                    ticket["failure"] = f"Merged PR commit {merge_sha} is not present in {self.backend.default_branch}"
+                    self.transition(ticket, "Blocked", "Merged dependency is missing from the synchronized base")
+                    continue
+            self.transition(ticket, "Done", "PR merged and synchronized")
+            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            self.git("worktree", "remove", "--force", str(worktree), check=False)
 
     def run_loop(self):
         self.load_tickets()
         if self.args.dry_run:
             self.dry_plan(); return
+        if self.backend:
+            self.sync_default_branch()
         unfinished = any(ticket["status"] != "Done" for ticket in self.tickets.values())
         needs_codex = any(
             ticket["agent"] == "codex" and ticket["status"] != "Done"
@@ -595,14 +748,25 @@ class Factory:
                 self.transition(self.tickets[n], "Blocked", note)
         while True:
             self.sync_merged()
+            self.apply_qa_approvals()
             self.refresh_readiness()
             ready = [t for t in self.tickets.values() if t["status"] == "Ready"][: self.args.max_parallel]
             if ready:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.max_parallel) as pool:
                     list(pool.map(self.process, ready))
                 continue
-            unfinished = [t for t in self.tickets.values() if t["status"] not in TERMINAL | {"In Review"}]
-            if unfinished:
+            unfinished = [
+                t for t in self.tickets.values()
+                if t["status"] not in TERMINAL | {"In Review", "QA Review"}
+            ]
+            waiting_qa = tuple(t["number"] for t in self.tickets.values() if t["status"] == "QA Review")
+            if waiting_qa and waiting_qa != self.last_qa_wait:
+                print(
+                    "Waiting for QA test approval: " + ", ".join(f"#{number}" for number in waiting_qa),
+                    flush=True,
+                )
+                self.last_qa_wait = waiting_qa
+            elif unfinished and not waiting_qa:
                 deadlock = tuple((t["number"], tuple(t["dependencies"])) for t in unfinished)
                 if deadlock != self.last_deadlock:
                     print("Deadlock: " + ", ".join(f"#{t['number']} waits for {t['dependencies']}" for t in unfinished), flush=True)
@@ -635,8 +799,9 @@ def retry_ticket(repo: Path, number: int, mock=False, project_number=None):
                 raise SystemExit(f"#{number} is {ticket['status']}, not Blocked")
             ticket.update(
                 status="Ready", attempt=0, failure="", qa_attempt=0,
-                qa_commit="", qa_tests={}, qa_failure="",
+                qa_commit="", qa_tests={}, qa_failure="", qa_approved=False, base_sha="",
             )
+            (repo / ".factory/qa-approvals" / str(number)).unlink(missing_ok=True)
             ticket.setdefault("history", []).append({"at": now(), "status": "Ready", "note": "Operator retry"})
             if not mock:
                 backend = GitHubBackend(repo, project_number)
@@ -649,17 +814,70 @@ def retry_ticket(repo: Path, number: int, mock=False, project_number=None):
     raise SystemExit(f"Ticket #{number} not found")
 
 
+def approve_qa_tests(repo: Path, number: int, assume_yes=False):
+    store = StateStore(repo)
+    ticket = next((item for item in store.data.get("tickets", []) if item["number"] == number), None)
+    if not ticket:
+        raise ValueError(f"Ticket #{number} not found in factory state")
+    if ticket.get("status") != "QA Review":
+        raise ValueError(f"Ticket #{number} is {ticket.get('status')}, not QA Review")
+    worktree = repo.parent / f"wt-{number}"
+    if not worktree.is_dir():
+        raise ValueError(f"QA worktree is missing: {worktree}")
+    failures = []
+    for path, expected in ticket.get("qa_tests", {}).items():
+        file = worktree / path
+        if not file.is_file():
+            failures.append(f"{path} is missing")
+            continue
+        actual = run(["git", "hash-object", path], worktree).stdout.strip()
+        if actual != expected:
+            failures.append(f"{path} changed after QA committed it")
+    if failures:
+        raise ValueError("; ".join(failures))
+    summary = run(
+        ["git", "show", "--stat", "--oneline", "--decorate", ticket["qa_commit"]],
+        worktree,
+    ).stdout.strip()
+    print(f"\nIndependent QA tests for #{number}: {ticket['title']}\n")
+    print(summary)
+    print("\nProtected files:")
+    for path in sorted(ticket.get("qa_tests", {})):
+        print(f"- {path}")
+    if not assume_yes:
+        try:
+            answer = input("\nApprove these tests and start implementation? Type APPROVE TESTS: ")
+        except EOFError as exc:
+            raise ValueError("interactive approval required; rerun in a terminal or pass --yes") from exc
+        if answer != "APPROVE TESTS":
+            raise ValueError("QA test approval cancelled")
+    marker = repo / ".factory/qa-approvals" / str(number)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(now() + "\n")
+    print(f"Approved QA tests for #{number}. The running factory will resume it automatically.")
+
+
 def parser():
     p = argparse.ArgumentParser(prog="factory", description="Software (re)-Factory orchestrator")
     sub = p.add_subparsers(dest="command", required=True)
     run_p = sub.add_parser("run", help="schedule and execute tickets")
-    run_p.add_argument("--repo", default="."); run_p.add_argument("--agent", choices=DEFAULT_AGENTS, default="codex")
+    run_p.add_argument("--repo", default="."); run_p.add_argument(
+        "--agent", choices=["claude", "codex", "cursor", "mock"], default="codex",
+    )
     run_p.add_argument("--max-parallel", type=int, default=4); run_p.add_argument("--project-number", type=int)
     run_p.add_argument(
         "--qa-agent", choices=["claude", "codex", "cursor"],
         help="independent agent that writes protected acceptance tests before implementation",
     )
     run_p.add_argument("--no-qa", action="store_true", help="skip the independent QA phase")
+    run_p.add_argument(
+        "--review-qa-tests", action="store_true",
+        help="pause each ticket for human approval after QA commits its tests",
+    )
+    run_p.add_argument(
+        "--scenario", choices=["tv", "recipe-rebrand"], default="tv",
+        help="deterministic scenario used by --mock",
+    )
     run_p.add_argument("--once", action="store_true"); run_p.add_argument("--dry-run", action="store_true")
     run_p.add_argument("--mock", action="store_true", help="use seed tickets, mock agent, and local merges")
     status = sub.add_parser("status"); status.add_argument("--repo", default=".")
@@ -672,6 +890,14 @@ def parser():
     approve = sub.add_parser("approve", help="review and publish a ticket plan to GitHub")
     approve.add_argument("plan"); approve.add_argument("--repo", default=".")
     approve.add_argument("--project-number", type=int); approve.add_argument("--yes", action="store_true")
+    approve.add_argument("--new-project-title", help="create and use a fresh GitHub Project")
+    approve_tests = sub.add_parser("approve-tests", help="approve protected QA tests for one ticket")
+    approve_tests.add_argument("issue", type=int); approve_tests.add_argument("--repo", default=".")
+    approve_tests.add_argument("--yes", action="store_true")
+    doctor = sub.add_parser("doctor", help="check workshop prerequisites and safety")
+    doctor.add_argument("--repo", default="."); doctor.add_argument("--full", action="store_true")
+    doctor.add_argument("--agent", choices=["claude", "codex", "cursor"], default="codex")
+    doctor.add_argument("--qa-agent", choices=["claude", "codex", "cursor"])
     return p
 
 
@@ -689,7 +915,19 @@ def main():
                 args.min_tickets, args.max_tickets, resolve_codex_cli(),
             )
         elif args.command == "approve":
-            approve_plan(repo, Path(args.plan), args.project_number, args.yes)
+            approve_plan(
+                repo, Path(args.plan), args.project_number, args.yes,
+                args.new_project_title,
+            )
+        elif args.command == "approve-tests":
+            approve_qa_tests(repo, args.issue, args.yes)
+        elif args.command == "doctor":
+            raise SystemExit(
+                run_doctor(
+                    repo, load_config(repo), full=args.full,
+                    implementation_agent=args.agent, qa_agent=args.qa_agent,
+                )
+            )
         else:
             Factory(args).run_loop()
     except (RuntimeError, GitHubError, FileNotFoundError, ValueError, json.JSONDecodeError) as exc:

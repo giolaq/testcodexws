@@ -5,7 +5,19 @@ on:
   pull_request:
 
 jobs:
-  mock-factory:
+  factory-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 -m unittest discover -s factory/tests -v
+      - run: python3 -m compileall -q factory
+
+  tv-rehearsal:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,9 +29,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: ./setup_demo.sh
-      - run: ./factory/factory run --mock --once --max-parallel 4
-      - name: Assert workshop outcomes
+      - run: ./setup_demo.sh --scenario tv
+      - run: ./factory/factory run --mock --scenario tv --once --max-parallel 4
+      - name: Assert TV workshop outcomes and QA coverage
         run: |
           .factory/venv/bin/python - <<'PY'
           import json
@@ -27,6 +39,35 @@ jobs:
           tickets = {ticket['number']: ticket for ticket in state['tickets']}
           assert sum(t['status'] == 'Done' for t in tickets.values()) == 7
           assert [t['number'] for t in tickets.values() if t['status'] == 'Blocked'] == [8]
+          assert all(tickets[number]['qa_tests'] for number in range(1, 8))
           assert tickets[7].get('merge_conflict_path')
-          assert tickets[8]['failure']
+          assert 'QA acceptance-test phase failed' in tickets[8]['failure']
           PY
+
+  recipe-rebrand-rehearsal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: ./setup_demo.sh --scenario recipe-rebrand
+      - run: ./factory/factory run --mock --scenario recipe-rebrand --once --max-parallel 4
+      - name: Assert TableStory outcomes and QA coverage
+        run: |
+          .factory/venv/bin/python - <<'PY'
+          import json
+          state = json.load(open('.factory/state.json'))
+          tickets = state['tickets']
+          assert len(tickets) == 5
+          assert all(ticket['status'] == 'Done' for ticket in tickets)
+          assert all(ticket['qa_tests'] for ticket in tickets)
+          assert all(ticket['gate_results'] for ticket in tickets)
+          PY
+      - run: .factory/venv/bin/python -m pytest -q demo-app/tests
+      - run: node --test demo-app/static/tests/*.test.js

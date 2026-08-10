@@ -3,17 +3,18 @@
 Software (re)-Factory is a legible control layer for running several coding
 agents against a dependency-mapped backlog. GitHub Issues are tickets, Projects
 v2 is the audited board, Git worktrees isolate changes, and ordered gates decide
-whether a ticket is retried, reviewed, or blocked. The included Pocket Cinema
-app makes the refactor visible: eight tickets turn a mobile film browser into a
-keyboard-driven TV experience.
+whether a ticket is retried, reviewed, or blocked. Two deterministic scenarios
+make the factory visible: the main five-ticket exercise rebrands Pocket Cinema
+as the TableStory recipe app, while an eight-ticket TV exercise demonstrates a
+deliberately blocked requirement.
 
 ## One-minute mock quickstart
 
 Mock mode needs Python 3.11+, Git, Node 20+, and no credentials or agent tokens.
 
 ```sh
-./setup_demo.sh
-./factory/factory run --mock --once
+./setup_demo.sh --scenario recipe-rebrand
+./factory/factory run --mock --scenario recipe-rebrand --once
 ./factory/factory status
 ```
 
@@ -23,41 +24,59 @@ In another terminal, serve the live board:
 python3 -m http.server 8000
 ```
 
-Open <http://localhost:8000/factory/dashboard.html>. The rehearsal runs tickets
-in dependency waves, performs real Git worktree isolation and real verification,
-merges seven tickets locally, exercises the merge-conflict handling story, and
-blocks only the deliberately vague ticket #8 after its retries.
+Open <http://localhost:8000/factory/dashboard.html>. Mock mode now exercises the
+same independent-QA commit and protected-test policy as real mode without using
+credentials. The `recipe-rebrand` scenario runs five deterministic TableStory
+tickets; the original `tv` scenario merges seven tickets and deliberately blocks
+the vague eighth ticket.
 
 To use the shorter `factory run` spelling during a workshop:
 
 ```sh
 export PATH="$PWD/factory:$PATH"
-factory run --mock --once
+factory run --mock --scenario recipe-rebrand --once
 ```
 
-Reset between sessions with `./setup_demo.sh`. It removes only rehearsal
-worktrees and `factory/*` branches, restores `demo-app/` from the baseline tag,
-and clears runtime state. A Blocked worktree is otherwise preserved for review.
+Reset between sessions with `./setup_demo.sh --scenario recipe-rebrand`. It
+removes only rehearsal worktrees and `factory/*` branches, restores `demo-app/`
+from the baseline tag, and clears runtime state. It refuses to overwrite
+uncommitted `demo-app/` changes unless `--force` is supplied. A Blocked
+worktree is otherwise preserved for review.
 
-## What attendees can read in one sitting
+## Architecture tour
 
-`orchestrator.py` is the complete pipeline and stays close to 400 lines. Its
-flow is intentionally direct:
+Start with `ARCHITECTURE.md`, which maps the runtime into a short reading path.
+The orchestration flow is intentionally direct:
 
 1. Load issues and parse `Depends-on: #…` plus `agent: …` from each body.
 2. Move dependency-complete, `agent-ready` tickets to Ready.
 3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and ask the independent
    QA agent to add ticket-numbered acceptance tests only.
-4. Commit and protect the QA tests, then run the implementation agent. The
-   factory rejects any implementation that modifies or deletes a protected test.
-5. Execute configured gates in order; feed the last 3,000 failure characters
+4. Commit and protect the QA tests; optionally pause for explicit human test approval.
+5. Run the implementation agent. The factory rejects any implementation that
+   modifies or deletes a protected test.
+6. Execute configured gates in order; feed the last 3,000 failure characters
    back to the agent for up to two retries.
-6. On green gates, push and open a PR. Humans merge; the next poll marks Done.
-7. Mirror every transition to `.factory/state.json` for the two-second dashboard.
+7. On green gates, push and open a PR. Humans merge; the factory fast-forwards
+   the default branch and verifies the merge commit before unlocking dependants.
+8. Mirror every transition and artifact path to `.factory/state.json` for the dashboard.
 
 The ticket backend is isolated in `github_backend.py`; adapter commands and gates
 are all in `factory.toml`. That makes swapping a CLI, model wrapper, remote
 execution command, test suite, or lint policy a small workshop-2 exercise.
+
+## Preflight every live session
+
+Run the doctor before attendees create or execute tickets:
+
+```sh
+./factory/factory doctor --agent codex --qa-agent codex
+./factory/factory doctor --full --agent codex --qa-agent codex
+```
+
+It checks repository safety and synchronization, GitHub authentication and
+Projects scope, Python/Node and the virtual environment, agent CLIs, ports,
+baseline data, configuration, and optionally the complete test suite.
 
 ## Start from an attendee PRD
 
@@ -77,8 +96,9 @@ It creates two local files under `.factory/plans/`:
 - Markdown is the readable review sheet for the attendee and facilitator.
 
 The plan contains stable ticket keys, specs, testable acceptance criteria,
-dependencies, agent choices, and explicit open questions. Nothing is sent to
-GitHub and no implementation agent starts during planning.
+dependencies, agent choices, explicit open questions, a Mermaid dependency
+graph, and the parallel execution waves. Nothing is sent to GitHub and no
+implementation agent starts during planning.
 
 Review both files. Edit the JSON to split, combine, rewrite, or reorder tickets.
 Resolve and remove every `open_questions` entry, then approve the JSON plan:
@@ -92,6 +112,12 @@ the human to type `APPROVE`. Only then does it create or update GitHub Issues,
 translate plan dependencies into real issue numbers, add them to the Projects
 board, and set dependency-free tickets Ready. Approval is idempotent: rerunning
 the same plan updates its marked issues instead of duplicating them.
+
+For a clean workshop board, create one during approval:
+
+```sh
+./factory/factory approve PLAN.json --new-project-title "TableStory Workshop"
+```
 
 Inspect the GitHub board, then deliberately start implementation:
 
@@ -108,6 +134,7 @@ every ticket. The default is Codex and can be changed in `factory/factory.toml`:
 [qa]
 agent = "codex"
 max_retries = 1
+require_human_approval = false
 test_roots = ["demo-app/tests", "demo-app/static/tests"]
 ```
 
@@ -116,6 +143,7 @@ You can select a different QA CLI for one run or disable the phase explicitly:
 ```sh
 ./factory/factory run --agent codex --qa-agent claude --max-parallel 4
 ./factory/factory run --agent codex --no-qa --max-parallel 4
+./factory/factory run --agent codex --review-qa-tests
 ```
 
 For each issue, QA receives the full spec and acceptance criteria. It may only
@@ -126,6 +154,13 @@ The implementation agent sees the protected-file list in its prompt and may add
 more tests, but changing, renaming, or deleting a QA test fails verification and
 is fed back into the normal retry loop.
 
+With `--review-qa-tests`, a ticket pauses in **QA Review**. Inspect its test diff
+from the dashboard or terminal, then continue it explicitly:
+
+```sh
+./factory/factory approve-tests ISSUE
+```
+
 QA prompts and logs are separate from implementation artifacts:
 
 ```text
@@ -133,9 +168,21 @@ QA prompts and logs are separate from implementation artifacts:
 .factory/logs/ISSUE-qa-attemptN.log
 ```
 
-The default `--mock` rehearsal skips QA so it remains credential-free and fully
-deterministic. Passing `--qa-agent` explicitly with `--mock` opts into a real QA
-CLI for that rehearsal.
+Mock rehearsal uses `mock_qa_agent.py`, so QA commits and protected-test checks
+remain credential-free and deterministic. Passing `--qa-agent` explicitly with
+`--mock` opts into a real QA CLI instead.
+
+## Disposable attendee checkout
+
+Avoid resetting an attendee's working repository by creating a disposable clone:
+
+```sh
+./factory/new_workshop.sh ../software-refactory-attendee live
+```
+
+The command refuses an existing destination and clones `origin`. Use `live` for
+a synchronized real-agent checkout, or `tv`/`recipe-rebrand` to prepare a local
+mock rehearsal from the tagged baseline.
 
 ## Real GitHub and agent mode
 
@@ -151,7 +198,7 @@ Then authenticate the GitHub CLI with Projects permission and seed the backlog:
 ```sh
 gh auth login
 gh auth refresh -s project
-python3 factory/seed_github.py --agent codex
+python3 factory/seed_github.py --agent codex --scenario recipe-rebrand
 ./factory/factory run --agent codex --max-parallel 4
 ```
 
@@ -202,9 +249,26 @@ export FACTORY_CODEX_BIN=/path/to/current/codex
 "$FACTORY_CODEX_BIN" login status
 ```
 
-## Pocket Cinema payoff
+## Product payoff
 
-Before the run, start the mobile baseline with:
+The default recipe rehearsal finishes with a responsive, offline TableStory
+app. Start it with:
+
+```sh
+.factory/venv/bin/python demo-app/app.py
+```
+
+Open <http://localhost:5000/> for the recipe browser and
+<http://localhost:5000/?mode=tv> for its keyboard-driven TV presentation.
+
+To rehearse the original Pocket Cinema TV story instead, reset and run:
+
+```sh
+./setup_demo.sh --scenario tv --force
+./factory/factory run --mock --scenario tv --once
+```
+
+Before that run, the mobile baseline starts with:
 
 ```sh
 .factory/venv/bin/python demo-app/app.py
@@ -219,13 +283,16 @@ demo works offline.
 
 ```text
 factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
+            [--review-qa-tests] [--scenario tv|recipe-rebrand]
             [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
 factory plan PRD.md [--output PLAN.json] [--default-agent NAME]
                     [--min-tickets N] [--max-tickets N]
-factory approve PLAN.json [--project-number N] [--yes]
+factory approve PLAN.json [--project-number N] [--new-project-title TITLE] [--yes]
+factory approve-tests ISSUE [--yes]
 factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
+factory doctor [--repo PATH] [--full] [--agent NAME] [--qa-agent NAME]
 ```
 
 Runtime artifacts are under `.factory/`: `state.json`, QA and implementation
@@ -233,5 +300,9 @@ prompts, and one log per phase attempt. Required gate failure blocks progress;
 optional gate failure is recorded in the ticket's `warnings`. Killing and
 restarting the loop replays an interrupted active ticket from a clean worktree
 and reuses any already-open PR.
+
+Click a dashboard card to inspect its full spec, acceptance criteria, prompt,
+live log, protected tests, changed files, verification output, links, and status
+history.
 
 See `FACILITATOR.md` for the live-demo sequence and recovery notes.

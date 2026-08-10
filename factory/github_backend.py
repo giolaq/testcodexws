@@ -7,8 +7,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-STATES = ["Backlog", "Ready", "In Progress", "Verifying", "In Review", "Done", "Blocked"]
-COLORS = ["GRAY", "BLUE", "YELLOW", "ORANGE", "PURPLE", "GREEN", "RED"]
+STATES = ["Backlog", "Ready", "In Progress", "QA Review", "Verifying", "In Review", "Done", "Blocked"]
+COLORS = ["GRAY", "BLUE", "YELLOW", "PINK", "ORANGE", "PURPLE", "GREEN", "RED"]
 
 
 class GitHubError(RuntimeError):
@@ -19,7 +19,7 @@ class GitHubBackend:
     def __init__(self, repo: Path, project_number=None):
         self.repo = repo
         self.project_number = project_number
-        self.owner = self.name = self.project_id = self.field_id = None
+        self.owner = self.name = self.default_branch = self.project_id = self.field_id = None
         self.options, self.items = {}, {}
 
     def gh(self, *args, input_data=None, check=True, cwd=None):
@@ -43,15 +43,19 @@ class GitHubBackend:
             raise GitHubError("GitHub CLI not found. Install `gh`, then run `gh auth login`.")
         if self.gh("auth", "status", check=False).returncode:
             raise GitHubError("GitHub CLI is not authenticated. Run `gh auth login`.")
-        result = self.gh("repo", "view", "--json", "nameWithOwner", check=False)
+        result = self.gh(
+            "repo", "view", "--json", "nameWithOwner,defaultBranchRef", check=False,
+        )
         if result.returncode:
             if "no git remotes found" in (result.stderr + result.stdout).lower():
                 raise GitHubError(
                     "No GitHub repository is connected. Add an origin remote before running the factory."
                 )
             raise GitHubError(result.stderr.strip() or result.stdout.strip())
-        repo = json.loads(result.stdout)["nameWithOwner"]
+        details = json.loads(result.stdout)
+        repo = details["nameWithOwner"]
         self.owner, self.name = repo.split("/", 1)
+        self.default_branch = (details.get("defaultBranchRef") or {}).get("name") or "main"
 
     def ensure_project(self):
         projects = self.json("project", "list", "--owner", self.owner, "--format", "json").get("projects", [])
@@ -154,7 +158,7 @@ class GitHubBackend:
     def existing_pr(self, number):
         prs = self.json(
             "pr", "list", "--repo", f"{self.owner}/{self.name}", "--state", "all", "--limit", 100,
-            "--json", "number,title,url,state,mergedAt,headRefName",
+            "--json", "number,title,url,state,mergedAt,mergeCommit,headRefName",
         )
         return next((p for p in prs if p["headRefName"].startswith(f"factory/{number}-")), None)
 
@@ -177,9 +181,12 @@ class GitHubBackend:
         self.gh("issue", "comment", ticket["number"], "--repo", f"{self.owner}/{self.name}", "--body", f"Factory opened {url}")
         return url
 
-    def is_merged(self, ticket):
+    def merged_pr(self, ticket):
         pr = self.existing_pr(ticket["number"])
         if not pr or not pr.get("mergedAt"):
-            return False
+            return None
         self.gh("issue", "close", ticket["number"], "--repo", f"{self.owner}/{self.name}", check=False)
-        return True
+        return pr
+
+    def is_merged(self, ticket):
+        return self.merged_pr(ticket) is not None
