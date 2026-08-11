@@ -43,6 +43,20 @@ from the baseline tag, and clears runtime state. It refuses to overwrite
 uncommitted `demo-app/` changes unless `--force` is supplied. A Blocked
 worktree is otherwise preserved for review.
 
+The `factory-baseline` tag must name the mobile workpiece — the
+`chore: establish factory workshop baseline` commit. Setup repoints the tag
+automatically and `factory doctor` fails if it drifts onto a finished
+rehearsal, because a baseline carrying rehearsal-era tests grades fresh
+tickets against a product they replaced and stalls every scenario. Push the
+tag so clones inherit it:
+
+```sh
+git push origin factory-baseline
+```
+
+A checkout with no history for that commit (a downloaded archive rather than a
+clone) cannot be repaired locally; clone from `origin` instead.
+
 ## Architecture tour
 
 Start with `ARCHITECTURE.md`, which maps the runtime into a short reading path.

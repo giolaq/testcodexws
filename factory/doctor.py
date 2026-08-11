@@ -53,6 +53,46 @@ def codex_candidates() -> list[str]:
     ])))
 
 
+BASELINE_SUBJECT = "chore: establish factory workshop baseline"
+
+
+REHEARSAL_ONLY_TESTS = (
+    "demo-app/tests/test_device_mode.py",
+    "demo-app/tests/test_rails.py",
+    "demo-app/tests/test_tv_detail.py",
+)
+
+
+def baseline_check(repo: Path) -> Check:
+    """Confirm factory-baseline holds the mobile workpiece, not a finished rehearsal.
+
+    A baseline carrying rehearsal-era tests grades fresh tickets against a
+    product they legitimately replaced, so every scenario stalls on gate
+    failures the agent cannot fix.
+    """
+    tagged = command(["git", "rev-parse", "--verify", "--quiet", "refs/tags/factory-baseline^{commit}"], repo)
+    revision = tagged.stdout.strip()
+    if tagged.returncode != 0 or not revision:
+        return Check("WARN", "factory baseline", "tag missing; run setup once")
+
+    listing = command(["git", "ls-tree", "-r", "--name-only", revision, "--", "demo-app"], repo)
+    if listing.returncode != 0:
+        return Check("FAIL", "factory baseline", listing.stderr.strip() or "cannot read tagged tree")
+    tracked = set(listing.stdout.split())
+    stale = sorted(path for path in REHEARSAL_ONLY_TESTS if path in tracked)
+    if not stale:
+        return Check("PASS", "factory baseline", f"mobile workpiece at {revision[:7]}")
+
+    recoverable = command(["git", "rev-list", "--max-count=1", f"--grep=^{BASELINE_SUBJECT}$", "HEAD"], repo)
+    wanted = recoverable.stdout.strip()
+    remedy = (
+        "rerun setup_demo.sh to repoint it"
+        if wanted and wanted != revision
+        else "re-clone from origin; this checkout has no mobile baseline to restore"
+    )
+    return Check("FAIL", "factory baseline", f"{revision[:7]} still carries {', '.join(stale)}; {remedy}")
+
+
 def run_doctor(repo: Path, cfg: dict, *, full=False, implementation_agent="codex", qa_agent=None) -> int:
     checks: list[Check] = []
 
@@ -69,8 +109,7 @@ def run_doctor(repo: Path, cfg: dict, *, full=False, implementation_agent="codex
         checks.append(Check("PASS" if branch else "FAIL", "current branch", branch or "detached HEAD"))
         origin = command(["git", "remote", "get-url", "origin"], repo)
         checks.append(Check("PASS" if origin.returncode == 0 else "FAIL", "origin remote", origin.stdout.strip() or "not configured"))
-        baseline = command(["git", "rev-parse", "--verify", "refs/tags/factory-baseline"], repo)
-        checks.append(Check("PASS" if baseline.returncode == 0 else "WARN", "factory baseline", "available" if baseline.returncode == 0 else "tag missing; run setup once"))
+        checks.append(baseline_check(repo))
 
     python_ok = sys.version_info >= (3, 11)
     checks.append(Check("PASS" if python_ok else "FAIL", "Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"))

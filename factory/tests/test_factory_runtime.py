@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from doctor import version_tuple
+from doctor import baseline_check, version_tuple
 from orchestrator import Factory, approve_qa_tests
 
 
@@ -83,6 +83,86 @@ class RuntimeTests(unittest.TestCase):
     def test_version_parser_handles_cli_prefixes(self):
         self.assertEqual(version_tuple("v22.4.1"), (22, 4, 1))
         self.assertEqual(version_tuple("3.11.9"), (3, 11, 9))
+
+    def baseline_repo(self, root: Path) -> Path:
+        """Build a repo whose history holds a mobile baseline and a later rehearsal."""
+        repo = root / "repo"
+        repo.mkdir()
+        git(repo, "init", "-q", "-b", "main")
+        git(repo, "config", "user.name", "Factory Test")
+        git(repo, "config", "user.email", "factory@example.test")
+        (repo / "demo-app").mkdir()
+        (repo / "demo-app/tests").mkdir()
+        (repo / "demo-app/tests/test_app.py").write_text("def test_app():\n    assert True\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-qm", "chore: establish factory workshop baseline")
+        for name in ("test_device_mode.py", "test_rails.py", "test_tv_detail.py"):
+            (repo / "demo-app/tests" / name).write_text("def test_tv():\n    assert True\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-qm", "feat: finish the TV rehearsal")
+        return repo
+
+    def test_baseline_check_rejects_tag_left_on_a_finished_rehearsal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.baseline_repo(Path(directory))
+            git(repo, "tag", "factory-baseline", "HEAD")
+            result = baseline_check(repo)
+            self.assertEqual(result.level, "FAIL")
+            self.assertIn("test_device_mode.py", result.detail)
+            self.assertIn("rerun setup_demo.sh", result.detail)
+
+    def test_baseline_check_accepts_the_mobile_workpiece(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.baseline_repo(Path(directory))
+            baseline = git(repo, "rev-list", "--max-count=1", "--grep=^chore: establish", "HEAD")
+            git(repo, "tag", "factory-baseline", baseline)
+            self.assertEqual(baseline_check(repo).level, "PASS")
+
+    def test_baseline_check_reports_an_unrecoverable_checkout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            git(repo, "init", "-q", "-b", "main")
+            git(repo, "config", "user.name", "Factory Test")
+            git(repo, "config", "user.email", "factory@example.test")
+            (repo / "demo-app/tests").mkdir(parents=True)
+            (repo / "demo-app/tests/test_rails.py").write_text("def test_tv():\n    assert True\n")
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "chore: import workshop without history")
+            git(repo, "tag", "factory-baseline", "HEAD")
+            result = baseline_check(repo)
+            self.assertEqual(result.level, "FAIL")
+            self.assertIn("re-clone", result.detail)
+
+    def test_setup_repoints_a_baseline_tag_left_on_a_rehearsal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.baseline_repo(Path(directory))
+            (repo / "factory").mkdir()
+            (repo / "factory/orchestrator.py").write_text("")
+            (repo / "demo-app/app.py").write_text("")
+            (repo / "demo-app/requirements.txt").write_text("")
+            # The script resolves its repository from its own location, so it has
+            # to run from a copy inside the fixture rather than from the checkout.
+            script = repo / "factory/setup_demo.sh"
+            script.write_bytes((Path(__file__).parents[1] / "setup_demo.sh").read_bytes())
+            script.chmod(0o755)
+            # A stub interpreter keeps the dependency install out of a unit test.
+            stub = repo / ".factory/venv/bin"
+            stub.mkdir(parents=True)
+            (stub / "python").write_text("#!/bin/sh\nexit 0\n")
+            (stub / "python").chmod(0o755)
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "chore: add factory scaffolding")
+            rehearsal = git(repo, "rev-parse", "HEAD")
+            git(repo, "tag", "factory-baseline", rehearsal)
+            proc = subprocess.run(
+                ["sh", str(script), "--scenario", "recipe-rebrand", "--force"],
+                cwd=repo, text=True, capture_output=True, timeout=120,
+            )
+            tagged = git(repo, "rev-parse", "refs/tags/factory-baseline^{commit}")
+            expected = git(repo, "rev-list", "--max-count=1", "--grep=^chore: establish", "HEAD")
+            self.assertEqual(tagged, expected, proc.stdout + proc.stderr)
+            self.assertNotEqual(tagged, rehearsal)
 
 
 if __name__ == "__main__":
