@@ -305,4 +305,5 @@ Click a dashboard card to inspect its full spec, acceptance criteria, prompt,
 live log, protected tests, changed files, verification output, links, and status
 history.
 
-See `FACILITATOR.md` for the live-demo sequence and recovery notes.
+See `WORKSHOP_OUTLINE.md` for the colleague-facing teaching structure and
+`FACILITATOR.md` for the live-demo sequence and recovery notes.
