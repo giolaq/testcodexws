@@ -17,6 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const socialImages = process.env.VERCEL === "1"
+    ? []
+    : [{ url: "/og.png", width: 1731, height: 909, alt: "Software (re)-Factory self-guided workshop" }];
 
   return {
     metadataBase: new URL(`${protocol}://${host}`),
@@ -28,13 +31,13 @@ export async function generateMetadata(): Promise<Metadata> {
       description:
         "Plan from a PRD, review QA tests, run agents in parallel, and keep humans in control.",
       type: "website",
-      images: [{ url: "/og.png", width: 1731, height: 909, alt: "Software (re)-Factory self-guided workshop" }],
+      images: socialImages,
     },
     twitter: {
       card: "summary_large_image",
       title: "Software (re)-Factory Workshop",
       description: "Run an AI software factory while keeping humans in control.",
-      images: ["/og.png"],
+      images: socialImages.map((image) => image.url),
     },
   };
 }
