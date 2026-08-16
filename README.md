@@ -7,5 +7,7 @@ contracts before a human can publish tickets.
 
 - Start the self-guided experience with the [workshop website](workshop-guide/README.md).
 - Use the [factory quickstart](factory/README.md) for the operator reference.
+- Run the [lights-off control experiment](factory/LIGHTS_OFF_EXPERIMENT.md) to
+  compare one autonomous agent with the planned factory using the same PRD.
 - Read the [planning pipeline guide](factory/PLANNING.md) for prompts, artifacts,
   approvals, traceability, and stale-plan behavior.

@@ -23,7 +23,10 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /Run an AI software factory/);
   assert.match(html, /Choose your workshop path/);
   assert.match(html, /Set up your workspace/);
+  assert.match(html, /Run the lights-off control/);
   assert.match(html, /Review QA tests/);
+  assert.match(html, /Compare and verify both results/);
+  assert.match(html, /This fixture is not a benchmark/);
   assert.match(html, /Troubleshooting/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });

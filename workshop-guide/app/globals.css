@@ -227,6 +227,12 @@ main {
 .primary-button:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
 
 .factory-map { padding: 28px 22px; border: 1px solid #d2e3fc; border-radius: 14px; background: #fff; box-shadow: 0 12px 36px rgba(60, 64, 67, .08); }
+.control-strip { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; border: 1px dashed #f6aea9; border-radius: 7px; background: #fce8e6; color: #8c1d18; font-size: 11px; }
+.control-strip span { margin-right: 3px; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.control-strip b { padding: 5px 7px; border-radius: 4px; background: #fff; color: #5f2120; font-weight: 650; }
+.control-strip i { color: #b06055; font-style: normal; }
+.map-versus { display: flex; align-items: center; gap: 8px; margin: 11px 0; color: #80868b; font-size: 9px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.map-versus::before, .map-versus::after { height: 1px; flex: 1; background: var(--line); content: ""; }
 .map-row { display: flex; align-items: center; justify-content: center; gap: 7px; }
 .map-row i, .map-down { color: #9aa0a6; font-style: normal; }
 .map-down { margin: 7px 0; text-align: center; }
@@ -344,6 +350,13 @@ details summary:hover { text-decoration: underline; }
 .completion-ring::before { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: #f8fbff; content: ""; }
 .completion-ring span { z-index: 1; color: var(--blue-deep); font-size: 13px; font-weight: 750; }
 
+.comparison-table { margin: 22px 0 28px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.comparison-table table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 13px; }
+.comparison-table th, .comparison-table td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.comparison-table th { background: var(--blue-pale); color: var(--blue-deep); font-size: 11px; letter-spacing: .03em; }
+.comparison-table th:first-child, .comparison-table td:first-child { width: 30%; color: var(--ink); font-weight: 650; }
+.comparison-table tr:last-child td { border-bottom: 0; }
+
 .accordion-list { border-top: 1px solid var(--line); }
 .accordion-list > details { border-bottom: 1px solid var(--line); }
 .accordion-list > details > summary { padding: 19px 4px; color: var(--ink); font-size: 16px; }
@@ -401,6 +414,7 @@ footer button { border: 0; background: none; color: var(--blue-dark); cursor: po
   .hero-lede { font-size: 17px; }
   .hero-meta { flex-direction: column; gap: 4px; }
   .factory-map { padding: 18px 12px; }
+  .control-strip { flex-wrap: wrap; }
   .map-node { padding: 8px 4px; font-size: 9px; }
   .intro-grid, .path-grid, .evidence-grid, .verification-grid, .next-links { grid-template-columns: 1fr; gap: 14px; }
   .intro-grid { gap: 28px; }

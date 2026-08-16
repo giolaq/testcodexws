@@ -25,18 +25,18 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(`${protocol}://${host}`),
     title: "Software (re)-Factory Workshop",
     description:
-      "A self-guided workshop for aligning, planning, running, and verifying software changes with multiple AI agents.",
+      "A self-guided workshop comparing lights-off development with a human-gated multi-agent software factory.",
     openGraph: {
       title: "Software (re)-Factory Workshop",
       description:
-        "Align product, architecture, program design, and vertical slices before running coding agents.",
+        "Run the same PRD through a lights-off agent and a planned software factory, then compare their evidence.",
       type: "website",
       images: socialImages,
     },
     twitter: {
       card: "summary_large_image",
       title: "Software (re)-Factory Workshop",
-      description: "Align four expert planning agents, then run an AI software factory with human control.",
+      description: "Compare a direct coding agent with four planning experts, independent QA, and human control.",
       images: socialImages.map((image) => image.url),
     },
   };

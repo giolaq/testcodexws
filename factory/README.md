@@ -43,6 +43,29 @@ from the baseline tag, and clears runtime state. It refuses to overwrite
 uncommitted `demo-app/` changes unless `--force` is supplied. A Blocked
 worktree is otherwise preserved for review.
 
+## Compare with a lights-off control
+
+Run the same TableStory PRD through one autonomous coding agent before starting
+the planned factory. Keep the baseline, model, prompt context, and verification
+criteria fixed; change only the delivery workflow.
+
+```sh
+./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+cd ../software-refactory-control
+git switch -c experiment/lights-off
+python3 factory/run_lights_off.py --agent codex
+```
+
+Do not clarify or redirect the control agent while it runs. Return to the
+factory checkout and continue the guided workshop in parallel. At the end,
+score both results against the same PRD journeys, tests, terminology scan, and
+review-effort measures.
+
+See `LIGHTS_OFF_EXPERIMENT.md` for the complete protocol and the Claude Code and
+Cursor commands. Credential-free sessions can use
+`scenarios/recipe-rebrand/lights-off-sample-report.md`, which is explicitly a
+discussion fixture rather than a model benchmark.
+
 ## Architecture tour
 
 Start with `ARCHITECTURE.md`, which maps the runtime into a short reading path.

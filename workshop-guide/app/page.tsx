@@ -8,11 +8,12 @@ const steps = [
   { id: "setup", label: "Set up your workspace", time: "8 min" },
   { id: "baseline", label: "Inspect the baseline", time: "5 min" },
   { id: "prd", label: "Read the PRD", time: "7 min" },
-  { id: "plan", label: "Approve product intent", time: "15 min" },
+  { id: "control", label: "Run the lights-off control", time: "12 min" },
+  { id: "plan", label: "Approve product intent", time: "12 min" },
   { id: "publish", label: "Align and publish", time: "15 min" },
-  { id: "qa", label: "Review QA tests", time: "12 min" },
-  { id: "factory", label: "Run the factory", time: "25 min" },
-  { id: "finish", label: "Verify the product", time: "13 min" },
+  { id: "qa", label: "Review QA tests", time: "10 min" },
+  { id: "factory", label: "Run the factory", time: "20 min" },
+  { id: "finish", label: "Compare both results", time: "11 min" },
 ] as const;
 
 function CodeBlock({ children, label = "Terminal" }: { children: string; label?: string }) {
@@ -237,8 +238,8 @@ export default function Home() {
             <div className="eyebrow">GUIDED LAB</div>
             <h1>Run an AI software factory</h1>
             <p className="hero-lede">
-              Align product, architecture, program design, and vertical slices before code;
-              then let independent QA and implementation agents work with visible evidence.
+              Compare one lights-off coding agent with a planned software factory, then
+              inspect which workflow makes decisions and evidence easier to control.
             </p>
             <div className="hero-meta">
               <span><b>Level</b> Intermediate</span>
@@ -248,6 +249,10 @@ export default function Home() {
             <a className="primary-button" href="#choose-track">Start the workshop <span aria-hidden="true">→</span></a>
           </div>
           <div className="factory-map" aria-label="Workshop flow from PRD to merged application">
+            <div className="control-strip" aria-label="Lights-off control flow">
+              <span>CONTROL</span><b>One prompt</b><i>→</i><b>One agent</b><i>→</i><b>One final diff</b>
+            </div>
+            <div className="map-versus"><span>compared with</span></div>
             <div className="map-row">
               <span className="map-node node-blue">PRD</span><i>→</i><span className="map-node">Product review</span><i>→</i><span className="map-node node-human">Product gate</span>
             </div>
@@ -279,6 +284,7 @@ export default function Home() {
             <h2>What you’ll learn</h2>
             <ul className="check-list">
               <li>Align four expert planning contracts</li>
+              <li>Compare factory and lights-off delivery</li>
               <li>Trace requirements to QA evidence</li>
               <li>Control safe parallel execution</li>
               <li>Review QA-authored tests</li>
@@ -402,7 +408,43 @@ gh auth refresh -s project
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="plan" number={4} title="Review and approve product intent" time="15 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
+        <StepSection id="control" number={4} title="Run the lights-off control" time="12 min" completed={completed.includes("control")} onComplete={() => toggleStep("control")}>
+          <p className="goal">Create a fair control group: one agent receives the whole PRD and implements it without factory planning, tickets, QA separation, or approval gates.</p>
+          <Callout type="note" title="Compare workflows, not models">
+            Use the same PRD, baseline, model, and verification criteria as the factory run. Do not deliberately weaken the direct prompt or help the control agent while it works.
+          </Callout>
+          {track === "live" ? (
+            <>
+              <p>Open a second terminal and create an independent checkout. Keep your original factory checkout open.</p>
+              <CodeBlock>{`./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+cd ../software-refactory-control
+git switch -c experiment/lights-off`}</CodeBlock>
+              <p>Start one autonomous Codex agent with the complete PRD:</p>
+              <CodeBlock>{`python3 factory/run_lights_off.py --agent codex`}</CodeBlock>
+              <p>Leave it running in that terminal and return to the original checkout. Do not clarify requirements, split work, review tests, or redirect it. Record assumptions later as observations.</p>
+              <Checkpoint>
+                The control agent is running—or has finished—in its own checkout, using the same PRD and model but none of the factory controls.
+              </Checkpoint>
+            </>
+          ) : (
+            <>
+              <p>Rehearsal mode uses a deterministic discussion fixture instead of a live model run. First inspect the exact one-agent prompt:</p>
+              <CodeBlock>{`sed -n '1,200p' \
+  factory/scenarios/recipe-rebrand/lights-off-prompt.md`}</CodeBlock>
+              <p>Then read the representative result and its incomplete scorecard:</p>
+              <CodeBlock>{`sed -n '1,260p' \
+  factory/scenarios/recipe-rebrand/lights-off-sample-report.md`}</CodeBlock>
+              <Callout type="warning" title="This fixture is not a benchmark">
+                It is a stable workshop case study of plausible review findings. It does not claim that a particular model always produces those defects.
+              </Callout>
+              <Checkpoint>
+                You can identify which product decisions, architectural assumptions, and test choices remained hidden until the simulated final review.
+              </Checkpoint>
+            </>
+          )}
+        </StepSection>
+
+        <StepSection id="plan" number={5} title="Review and approve product intent" time="12 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
           <p className="goal">Agree on the problem, behavior, scope, and evidence before any agent makes a technical decision.</p>
           <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Codex CLI agent.</p>
           <CodeBlock>{track === "live"
@@ -434,7 +476,7 @@ gh auth refresh -s project
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="publish" number={5} title="Align architecture, program design, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
+        <StepSection id="publish" number={6} title="Align architecture, program design, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
           <p className="goal">Use three specialist contracts to make implementation predictable and reviewable before publishing tickets.</p>
           <p>Continue the approved plan. The experts run sequentially because each one consumes the previous contract.</p>
           <CodeBlock>{track === "live"
@@ -484,7 +526,7 @@ gh auth refresh -s project
           )}
         </StepSection>
 
-        <StepSection id="qa" number={6} title="Let QA define the evidence" time="12 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
+        <StepSection id="qa" number={7} title="Let QA define the evidence" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
           <p className="goal">Review independent acceptance tests before implementation begins.</p>
           <p>First, serve the live dashboard from a second terminal:</p>
           <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
@@ -522,7 +564,7 @@ gh auth refresh -s project
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="factory" number={7} title="Run and observe the factory" time="25 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
+        <StepSection id="factory" number={8} title="Run and observe the factory" time="20 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
           <p className="goal">Follow parallel implementation, verification, review, and dependency synchronization.</p>
           {track === "live" ? (
             <>
@@ -573,8 +615,8 @@ gh auth refresh -s project
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="finish" number={8} title="Verify the finished product" time="13 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
-          <p className="goal">Connect the factory’s evidence to the user-visible product outcome.</p>
+        <StepSection id="finish" number={9} title="Compare and verify both results" time="11 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
+          <p className="goal">Evaluate both workflows against the same user outcomes, then compare the human effort required to trust each result.</p>
           {track === "rehearsal" && (
             <>
               <p>If you still have paused QA reviews, finish the deterministic run without human pauses:</p>
@@ -606,13 +648,44 @@ gh auth refresh -s project
             <li>TV navigation works entirely from the keyboard.</li>
             <li>The dashboard shows QA tests and green gate evidence.</li>
           </ul>
+          <h3>Score the control with the same evidence</h3>
+          {track === "live" ? (
+            <>
+              <p>Return to the control checkout after its single agent finishes. Run its available gates and inspect the complete review surface:</p>
+              <CodeBlock>{`cd ../software-refactory-control
+.factory/venv/bin/python -m pytest -q demo-app/tests
+node --test demo-app/static/tests/*.test.js
+python3 -m compileall -q demo-app
+git diff --stat
+git status --short`}</CodeBlock>
+              <p>Exercise the same mobile, cookbook, and TV journeys. Search UI, APIs, metadata, tests, and documentation for obsolete cinema terminology.</p>
+            </>
+          ) : (
+            <p>Use the simulated verification in <code>lights-off-sample-report.md</code> as the control column. Keep its “discussion fixture” label visible during the comparison.</p>
+          )}
+          <div className="comparison-table" role="region" aria-label="Lights-off and factory comparison">
+            <table>
+              <thead><tr><th>Measure</th><th>Lights-off control</th><th>Factory</th></tr></thead>
+              <tbody>
+                <tr><td>Requirements fully evidenced</td><td>Record a count</td><td>Read traceability rows</td></tr>
+                <tr><td>Unresolved assumptions found in review</td><td>Inspect the final diff</td><td>Read blocking questions</td></tr>
+                <tr><td>Largest review unit</td><td>Whole implementation</td><td>One vertical slice</td></tr>
+                <tr><td>Independent acceptance evidence</td><td>Agent-authored after or during code</td><td>Protected QA tests first</td></tr>
+                <tr><td>Safe parallel work visible in advance</td><td>No</td><td>Dependency waves and file ownership</td></tr>
+                <tr><td>Human review and rework time</td><td>Measure it</td><td>Measure it</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <Callout type="tip" title="A successful control is still useful">
+            The question is not only whether both apps work. Ask how quickly a reviewer can explain the requirements, assumptions, architecture, test intent, and remaining risk from the evidence each workflow produced.
+          </Callout>
           <div className="activity-card final-reflection">
             <span className="activity-label">Take it back to your team</span>
             <h3>Design your first factory experiment</h3>
-            <p>Choose one repository and write down: the four planning expert prompts, ticket backend, QA policy, required gates, execution boundary, and human approval points you would use.</p>
+            <p>Choose one repository and write down: when a direct one-agent run is sufficient, when the four planning experts add value, the QA policy, required gates, execution boundary, and human approval points you would use.</p>
           </div>
           <Checkpoint>
-            You can explain the five control boundaries: product approval, alignment approval, QA-test approval, verification gates, and human merge.
+            You can explain the five factory control boundaries and use evidence—not a staged failure—to compare them with a lights-off implementation.
           </Checkpoint>
         </StepSection>
 
@@ -659,6 +732,10 @@ git push -u origin main`}</CodeBlock>
               <CodeBlock>{`./factory/factory status`}</CodeBlock>
             </details>
             <details>
+              <summary>The lights-off agent asks a question or stops</summary>
+              <p>Do not answer or redirect it during the control run. Record the ambiguity, stop reason, and elapsed time as evidence. The experiment compares what each workflow exposes without intervention; it does not require the control to finish.</p>
+            </details>
+            <details>
               <summary>A planning artifact is blocked or stale</summary>
               <p>Open its JSON artifact, resolve every blocking question, and rerun <code>continue-plan</code>. Editing Product Review clears product approval; review and approve it again first. The manifest never silently reuses downstream output with changed input hashes.</p>
               <CodeBlock>{`./factory/factory review product PLAN_ID
@@ -698,6 +775,9 @@ git push -u origin main`}</CodeBlock>
             <div role="row"><code>factory retry ISSUE</code><span>Reset a blocked ticket for another attempt.</span></div>
           </div>
           <div className="next-links">
+            <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/LIGHTS_OFF_EXPERIMENT.md" target="_blank" rel="noreferrer">
+              <span>COMPARE</span><b>Run the lights-off control</b><i aria-hidden="true">→</i>
+            </a>
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/ARCHITECTURE.md" target="_blank" rel="noreferrer">
               <span>UNDERSTAND</span><b>Read the architecture map</b><i aria-hidden="true">→</i>
             </a>

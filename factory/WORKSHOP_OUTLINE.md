@@ -18,6 +18,7 @@ By the end of the workshop, you can:
 
 - Convert a PRD into reviewable product, architecture, program-design, and
   vertical-slice contracts.
+- Compare a one-agent lights-off run with the factory under the same conditions.
 - Trace requirements through contracts and code design to tickets and QA evidence.
 - Identify dependencies and safe opportunities for parallel work.
 - Assign different agent CLIs to planning, QA, and implementation tasks.
@@ -43,15 +44,15 @@ Allow 100 minutes for the guided workshop and 10 to 20 minutes for questions.
 
 | Time | Module | Outcome |
 | --- | --- | --- |
-| 0–8 min | Introduce the factory | Understand the control problem and the target product. |
-| 8–18 min | Product Review | Agree on users, behavior, scope, journeys, evidence, and mockup needs. |
-| 18–38 min | Technical alignment | Review architecture, program design, vertical slices, and traceability. |
-| 38–45 min | Publish tickets | Create an auditable GitHub Project after alignment approval. |
-| 45–60 min | Start the factory | Run QA and implementation agents in isolated worktrees. |
-| 60–70 min | Review QA tests | Approve evidence before implementation continues. |
-| 70–82 min | Observe verification | Follow a test failure, repair prompt, and retry. |
-| 82–92 min | Merge and synchronize | Unlock dependent work only after the merged commit is available. |
-| 92–100 min | Extend the system | Map the factory to your team's tools and policies. |
+| 0–8 min | Set up the workshop | Confirm the environment and choose live or rehearsal mode. |
+| 8–13 min | Inspect the baseline | Observe Pocket Cinema before changing it. |
+| 13–20 min | Read the PRD | Agree on the TableStory outcome and risky assumptions. |
+| 20–32 min | Start the lights-off control | Give the same PRD to one autonomous agent in a separate checkout. |
+| 32–44 min | Product Review | Agree on users, behavior, scope, journeys, evidence, and mockup needs. |
+| 44–59 min | Technical alignment and publication | Review three technical contracts, traceability, and GitHub tickets. |
+| 59–69 min | Review QA tests | Approve independent evidence before implementation continues. |
+| 69–89 min | Run and observe the factory | Follow isolated work, verification, retry, merge, and synchronization. |
+| 89–100 min | Compare and extend | Score both results and map the controls to your environment. |
 
 ## Before you begin
 
@@ -90,6 +91,8 @@ Vertical Slices expert divides the outcome into five tickets.
 ```mermaid
 flowchart LR
   PRD["PRD"] --> Product["Product Review"]
+  PRD --> Direct["One lights-off agent"]
+  Direct --> OneDiff["One final diff"]
   Product --> ProductGate["Human product approval"]
   ProductGate --> Architecture["System Architecture"]
   Architecture --> Program["Program Design"]
@@ -104,6 +107,8 @@ flowchart LR
   Gates -->|Pass| PR["Pull request and human merge"]
   PR --> Sync["Synchronize merged commit"]
   Sync --> Board
+  OneDiff --> Compare["Compare evidence and review effort"]
+  Sync --> Compare
 ```
 
 The factory separates proposal, authorization, execution, and verification:
@@ -142,7 +147,44 @@ to integrate.
 Ask: “Which decisions should an agent propose, and which decisions should a
 human authorize?”
 
-## Module 2: Align product intent
+## Module 2: Run the lights-off control
+
+### Goal
+
+Create a fair comparison without manufacturing a weak direct-agent result.
+
+### Run
+
+In a second terminal, create a checkout from the same baseline and start the
+same model that will implement factory tickets:
+
+```sh
+./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+cd ../software-refactory-control
+git switch -c experiment/lights-off
+python3 factory/run_lights_off.py --agent codex
+```
+
+### Explain
+
+Keep the PRD, baseline, model, and final verification fixed. Change only the
+workflow: the control gets one prompt, one branch, no planning contracts, no
+ticket decomposition, no independent QA phase, and no intermediate approval.
+Do not clarify or redirect it. Record questions, stops, and assumptions as
+observations.
+
+For credential-free rehearsal, inspect the exact prompt and deterministic
+discussion fixture:
+
+```sh
+sed -n '1,200p' factory/scenarios/recipe-rebrand/lights-off-prompt.md
+sed -n '1,260p' factory/scenarios/recipe-rebrand/lights-off-sample-report.md
+```
+
+The fixture is not a benchmark or a claim about a model. It ensures the group
+can practice evidence-based comparison when a live agent is unavailable.
+
+## Module 3: Align product intent
 
 ### Goal
 
@@ -171,7 +213,7 @@ GitHub publication, or implementation.
 > **Tip:** If the product contract is vague, stop here. Architecture cannot fix
 > an outcome that the group has not agreed upon.
 
-## Module 3: Align the technical plan and publish tickets
+## Module 4: Align the technical plan and publish tickets
 
 ### Goal
 
@@ -216,7 +258,7 @@ and dependent tickets remain Backlog.
 Approval is the authorization boundary. Until the human approves the plan, no
 issues are published and no implementation agent starts.
 
-## Module 4: Start QA and implementation agents
+## Module 5: Start QA and implementation agents
 
 ### Goal
 
@@ -246,7 +288,7 @@ Git worktrees isolate branches and working files. They are not a security
 boundary. Teams that need stronger isolation can replace the adapter command
 with a container, sandbox, or remote execution environment.
 
-## Module 5: Review acceptance tests
+## Module 6: Review acceptance tests
 
 ### Goal
 
@@ -275,7 +317,7 @@ rename, or delete the QA tests. A protected-test change fails verification.
 > **Warning:** A passing test is useful only when it represents the requirement.
 > Human test review remains important for high-risk or ambiguous work.
 
-## Module 6: Observe verification and retries
+## Module 7: Observe verification and retries
 
 ### Goal
 
@@ -304,7 +346,7 @@ Use the TV scenario to demonstrate an intentional block:
 Ticket 8 is rejected because “It feels right” isn't an objectively testable
 acceptance criterion.
 
-## Module 7: Merge and unlock dependent work
+## Module 8: Merge and unlock dependent work
 
 ### Goal
 
@@ -324,7 +366,7 @@ merge commit is reachable. It doesn't unlock dependent tickets based only on a
 GitHub status change. The next worktree therefore starts from code that includes
 the dependency.
 
-## Module 8: Inspect the finished product
+## Module 9: Inspect and compare the finished products
 
 ### Goal
 
@@ -347,7 +389,13 @@ Review which tickets ran in parallel, where human approval changed the flow,
 which tests protected the requirements, and how the dependency chain shaped the
 final integration order.
 
-## Module 9: Map the factory to your environment
+Return to the control checkout and run the same available test commands and user
+journeys. Compare requirements evidenced, unresolved assumptions, largest review
+unit, independent test evidence, safe parallelism, and human review/rework time.
+A control result that works is still valuable: the discussion is about how
+quickly a reviewer can explain the output and its remaining risk.
+
+## Module 10: Map the factory to your environment
 
 Ask participants to identify one replacement or extension in each category:
 
@@ -386,6 +434,7 @@ merges. Only the external model and GitHub operations are replaced.
 The workshop is complete when participants can explain:
 
 - Why planning experts cannot start implementation or publish tickets.
+- Why a fair control keeps the PRD, baseline, model, and evidence criteria fixed.
 - Where humans approve the plan, acceptance tests, and merged code.
 - How worktrees isolate concurrent tickets.
 - How protected tests constrain implementation agents.
