@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "responsibility": { "type": "string" },
+          "components": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "path", "responsibility", "components"]
+      }
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "module": { "type": "string" },
+          "definition": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "module", "definition", "requirements"]
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "signature": { "type": "string" },
+          "module": { "type": "string" },
+          "calls": { "type": "array", "items": { "type": "string" } },
+          "contracts": { "type": "array", "items": { "type": "string" } },
+          "requirements": { "type": "array", "items": { "type": "string" } },
+          "error_behavior": { "type": "string" }
+        },
+        "required": ["id", "signature", "module", "calls", "contracts", "requirements", "error_behavior"]
+      }
+    },
+    "call_flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "steps", "requirements"]
+      }
+    },
+    "test_seams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "boundary": { "type": "string" },
+          "strategy": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "boundary", "strategy", "requirements"]
+      }
+    },
+    "blocking_questions": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["modules", "types", "functions", "call_flows", "test_seams", "blocking_questions"]
+}

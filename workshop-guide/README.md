@@ -1,9 +1,10 @@
 # Software (re)-Factory workshop guide
 
 The attendee-facing, self-guided website for the Software (re)-Factory
-workshop. It includes two workshop paths, eight guided steps, progress tracking,
-copyable commands, checkpoints, exercises, troubleshooting, and the complete
-factory command reference.
+workshop. It includes two workshop paths, the four-expert planning and
+traceability workflow, eight guided steps, progress tracking, copyable commands,
+checkpoints, exercises, troubleshooting, and the complete factory command
+reference.
 
 ## Local development
 

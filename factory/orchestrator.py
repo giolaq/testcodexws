@@ -29,7 +29,15 @@ from pathlib import Path, PurePosixPath
 
 from doctor import run_doctor
 from github_backend import GitHubBackend, GitHubError
-from planner import approve_plan, plan_prd
+from planner import approve_plan
+from planning_pipeline import (
+    approve_product,
+    continue_plan,
+    mark_published,
+    plan_prd,
+    prepare_publication,
+    review as review_plan,
+)
 
 STATES = ["Backlog", "Ready", "In Progress", "QA Review", "Verifying", "In Review", "Done", "Blocked"]
 ACTIVE = {"In Progress", "Verifying"}
@@ -883,11 +891,21 @@ def parser():
     status = sub.add_parser("status"); status.add_argument("--repo", default=".")
     retry = sub.add_parser("retry"); retry.add_argument("issue", type=int); retry.add_argument("--repo", default=".")
     retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=int)
-    plan = sub.add_parser("plan", help="turn a PRD into an editable ticket plan")
+    plan = sub.add_parser("plan", help="run the Product Review expert on a PRD")
     plan.add_argument("prd"); plan.add_argument("--repo", default="."); plan.add_argument("--output")
     plan.add_argument("--default-agent", choices=["claude", "codex", "cursor"], default="codex")
     plan.add_argument("--min-tickets", type=int, default=3); plan.add_argument("--max-tickets", type=int, default=12)
-    approve = sub.add_parser("approve", help="review and publish a ticket plan to GitHub")
+    plan.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
+    review = sub.add_parser("review", help="open a human review gate for a planning run")
+    review.add_argument("kind", choices=["product", "alignment"]); review.add_argument("plan")
+    review.add_argument("--repo", default=".")
+    approve_product_p = sub.add_parser("approve-product", help="approve product behavior and scope")
+    approve_product_p.add_argument("plan"); approve_product_p.add_argument("--repo", default=".")
+    approve_product_p.add_argument("--yes", action="store_true")
+    continue_p = sub.add_parser("continue-plan", help="run architecture, program design, and vertical-slice experts")
+    continue_p.add_argument("plan"); continue_p.add_argument("--repo", default=".")
+    continue_p.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
+    approve = sub.add_parser("approve", help="approve alignment and publish tickets to GitHub")
     approve.add_argument("plan"); approve.add_argument("--repo", default=".")
     approve.add_argument("--project-number", type=int); approve.add_argument("--yes", action="store_true")
     approve.add_argument("--new-project-title", help="create and use a fresh GitHub Project")
@@ -912,13 +930,24 @@ def main():
         elif args.command == "plan":
             plan_prd(
                 repo, Path(args.prd), args.output, args.default_agent,
-                args.min_tickets, args.max_tickets, resolve_codex_cli(),
+                args.min_tickets, args.max_tickets,
+                "mock" if args.mock else resolve_codex_cli(), args.mock,
             )
+        elif args.command == "review":
+            review_plan(repo, args.kind, args.plan)
+        elif args.command == "approve-product":
+            approve_product(repo, args.plan, args.yes)
+        elif args.command == "continue-plan":
+            continue_plan(repo, args.plan, "mock" if args.mock else resolve_codex_cli(), args.mock)
         elif args.command == "approve":
-            approve_plan(
-                repo, Path(args.plan), args.project_number, args.yes,
-                args.new_project_title,
-            )
+            supplied = Path(args.plan)
+            legacy = supplied.is_file() and supplied.name != "manifest.json" and not (supplied.parent / "manifest.json").is_file()
+            if legacy:
+                approve_plan(repo, supplied, args.project_number, args.yes, args.new_project_title)
+            else:
+                publishable, run_dir = prepare_publication(repo, args.plan, args.yes)
+                url = approve_plan(repo, publishable, args.project_number, True, args.new_project_title)
+                mark_published(repo, run_dir, url)
         elif args.command == "approve-tests":
             approve_qa_tests(repo, args.issue, args.yes)
         elif args.command == "doctor":

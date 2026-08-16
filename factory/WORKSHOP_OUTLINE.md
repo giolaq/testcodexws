@@ -2,11 +2,12 @@
 
 Learn how to coordinate multiple coding agents without giving up human control.
 
-In this workshop, you start with a product requirements document (PRD), turn it
-into a dependency-mapped backlog, and run implementation agents in isolated Git
-worktrees. A separate QA agent writes acceptance tests before implementation.
-You review the plan, tests, pull requests, and verification evidence while a
-live dashboard shows the state of every ticket.
+In this workshop, you start with a product requirements document (PRD), align
+four expert planning agents on product behavior, architecture, program design,
+and vertical slices, then run implementation agents in isolated Git worktrees.
+A separate QA agent writes acceptance tests before implementation. You review
+both planning contracts and delivery evidence while a live dashboard shows the
+state of every planning stage and ticket.
 
 The workshop uses Codex in the examples. The same factory can run Claude Code
 or Cursor by changing the agent adapter.
@@ -15,7 +16,9 @@ or Cursor by changing the agent adapter.
 
 By the end of the workshop, you can:
 
-- Convert a PRD into reviewable tickets with explicit acceptance criteria.
+- Convert a PRD into reviewable product, architecture, program-design, and
+  vertical-slice contracts.
+- Trace requirements through contracts and code design to tickets and QA evidence.
 - Identify dependencies and safe opportunities for parallel work.
 - Assign different agent CLIs to planning, QA, and implementation tasks.
 - Isolate concurrent changes with Git branches and worktrees.
@@ -36,19 +39,19 @@ commands. They don't need prior experience building agent orchestration systems.
 
 ## Duration
 
-Allow 80 minutes for the guided workshop and 10 to 20 minutes for questions.
+Allow 100 minutes for the guided workshop and 10 to 20 minutes for questions.
 
 | Time | Module | Outcome |
 | --- | --- | --- |
 | 0–8 min | Introduce the factory | Understand the control problem and the target product. |
-| 8–18 min | Plan from a PRD | Generate a dependency-mapped ticket proposal. |
-| 18–28 min | Review the plan | Improve scope, acceptance criteria, and execution waves. |
-| 28–35 min | Publish tickets | Create an auditable GitHub Project after human approval. |
-| 35–48 min | Start the factory | Run QA and implementation agents in isolated worktrees. |
-| 48–58 min | Review QA tests | Approve evidence before implementation continues. |
-| 58–68 min | Observe verification | Follow a test failure, repair prompt, and retry. |
-| 68–75 min | Merge and synchronize | Unlock dependent work only after the merged commit is available. |
-| 75–80 min | Extend the system | Map the factory to your team's tools and policies. |
+| 8–18 min | Product Review | Agree on users, behavior, scope, journeys, evidence, and mockup needs. |
+| 18–38 min | Technical alignment | Review architecture, program design, vertical slices, and traceability. |
+| 38–45 min | Publish tickets | Create an auditable GitHub Project after alignment approval. |
+| 45–60 min | Start the factory | Run QA and implementation agents in isolated worktrees. |
+| 60–70 min | Review QA tests | Approve evidence before implementation continues. |
+| 70–82 min | Observe verification | Follow a test failure, repair prompt, and retry. |
+| 82–92 min | Merge and synchronize | Unlock dependent work only after the merged commit is available. |
+| 92–100 min | Extend the system | Map the factory to your team's tools and policies. |
 
 ## Before you begin
 
@@ -79,16 +82,20 @@ mobile and TV experiences.
 
 The change is intentionally larger than a single prompt. It requires data and
 API work, a new visual system, mobile integration, TV navigation, tests, and
-documentation. The planning agent divides that outcome into five tickets and
-identifies which work can run in parallel.
+documentation. Four planning experts establish the aligned contracts before the
+Vertical Slices expert divides the outcome into five tickets.
 
 ## How the factory works
 
 ```mermaid
 flowchart LR
-  PRD["PRD"] --> Plan["Planning agent"]
-  Plan --> Review["Human plan review"]
-  Review --> Board["GitHub Issues and Project"]
+  PRD["PRD"] --> Product["Product Review"]
+  Product --> ProductGate["Human product approval"]
+  ProductGate --> Architecture["System Architecture"]
+  Architecture --> Program["Program Design"]
+  Program --> Slices["Vertical Slices"]
+  Slices --> Alignment["Human alignment approval"]
+  Alignment --> Board["GitHub Issues and Project"]
   Board --> QA["QA agent writes tests"]
   QA --> TestReview["Optional human test review"]
   TestReview --> Build["Implementation agents in worktrees"]
@@ -101,13 +108,14 @@ flowchart LR
 
 The factory separates proposal, authorization, execution, and verification:
 
-1. The planning agent proposes tickets but cannot publish or implement them.
-2. A human reviews and approves the plan before GitHub issues are created.
-3. The QA agent writes ticket-specific acceptance tests first.
-4. The implementation agent cannot modify the protected QA tests.
-5. Required gates must pass before the factory opens a pull request.
-6. A human merges the pull request.
-7. Dependent tickets unlock only after the merged commit is synchronized locally.
+1. Four planning experts create separate, schema-validated contracts.
+2. A human approves product intent before technical planning continues.
+3. A human approves the aligned package before GitHub issues are created.
+4. The QA agent writes ticket-specific acceptance tests first.
+5. The implementation agent cannot modify the protected QA tests.
+6. Required gates must pass before the factory opens a pull request.
+7. A human merges the pull request.
+8. Dependent tickets unlock only after the merged commit is synchronized locally.
 
 ## Module 1: Introduce the control problem
 
@@ -134,55 +142,67 @@ to integrate.
 Ask: “Which decisions should an agent propose, and which decisions should a
 human authorize?”
 
-## Module 2: Create a plan from the PRD
+## Module 2: Align product intent
 
 ### Goal
 
-Turn a product outcome into implementation-sized tickets without changing the
-repository or GitHub.
+Turn the PRD into an explicit statement of product behavior without changing
+the repository or GitHub.
 
 ### Run
 
 ```sh
 ./factory/factory plan recipe-app-prd.md
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
 ```
 
 ### Show
 
-- The generated Markdown review sheet.
-- The editable JSON plan.
-- Ticket specifications and acceptance criteria.
-- The dependency graph and parallel execution waves.
-- Any unresolved open questions.
+- Stable product requirements and success evidence.
+- Users, journeys, edge cases, scope, assumptions, and mockup needs.
+- Blocking questions and the explicit product approval gate.
 
 ### Explain
 
-Planning is a read-only operation. The planning agent can recommend a backlog,
-but the generated files remain local until a human approves them.
+Planning is read-only. Product approval authorizes technical planning, not code,
+GitHub publication, or implementation.
 
-> **Tip:** Spend more review time on acceptance criteria than ticket titles.
-> Verification quality depends on observable, testable outcomes.
+> **Tip:** If the product contract is vague, stop here. Architecture cannot fix
+> an outcome that the group has not agreed upon.
 
-## Module 3: Review and publish tickets
+## Module 3: Align the technical plan and publish tickets
 
 ### Goal
 
-Make the backlog an explicit contract between humans and agents.
+Turn approved behavior into architecture, program design, and safe vertical
+slices, then make the result an explicit contract between humans and agents.
+
+### Run the experts
+
+```sh
+./factory/factory continue-plan PLAN_ID
+./factory/factory review alignment PLAN_ID
+```
 
 ### Review
 
 For each ticket, confirm that:
 
+- Every requirement maps to a component, contract, program element, slice, and
+  QA evidence in the traceability matrix.
 - The scope can be implemented and reviewed independently.
 - Acceptance criteria describe behavior rather than implementation preference.
 - Dependencies represent real integration constraints.
 - Parallel tickets don't modify the same files unnecessarily.
+- Program types, method signatures, layout, and call flows are concrete enough
+  to constrain implementation.
 - Open questions are resolved before publication.
 
 ### Run
 
 ```sh
-./factory/factory approve PLAN.json \
+./factory/factory approve PLAN_ID \
   --new-project-title "TableStory Workshop"
 ```
 
@@ -365,7 +385,7 @@ merges. Only the external model and GitHub operations are replaced.
 
 The workshop is complete when participants can explain:
 
-- Why the planning agent cannot start implementation.
+- Why planning experts cannot start implementation or publish tickets.
 - Where humans approve the plan, acceptance tests, and merged code.
 - How worktrees isolate concurrent tickets.
 - How protected tests constrain implementation agents.

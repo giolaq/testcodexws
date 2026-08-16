@@ -1,0 +1,79 @@
+{
+  "project": {
+    "name": "TableStory Recipe App Rebrand",
+    "summary": "Deliver the recipe-domain foundation, branded mobile journey, TV journey, and proof as five reviewable vertical slices."
+  },
+  "open_questions": [],
+  "tickets": [
+    {
+      "key": "T1",
+      "title": "Deliver searchable recipe data and API contracts",
+      "spec": "Replace the film data foundation with deterministic Recipe and RecipeRail models, recipe lookup/search, rails, and independently testable collection APIs.",
+      "acceptance_criteria": ["The collection contains at least 12 valid recipes", "Search covers names, descriptions, category, dietary tags, and ingredients", "Recipe lookup, rails, and error responses use recipe-domain fields"],
+      "dependencies": [],
+      "agent": "codex",
+      "requirement_ids": ["R2"],
+      "contract_ids": ["CT1"],
+      "program_element_ids": ["MOD1", "TYPE1", "TYPE2", "FN1", "TEST1"],
+      "qa_evidence": ["Recipe model invariant tests", "Collection search and lookup API tests", "Rail payload contract tests"],
+      "file_ownership": ["demo-app/recipes.py", "demo-app/tests/test_recipes.py"],
+      "vertical_outcome": "A client can discover valid recipes through the supported collection contract."
+    },
+    {
+      "key": "T2",
+      "title": "Establish the accessible TableStory mobile shell",
+      "spec": "Create the TableStory tokens, semantic layout, responsive card system, approved identity, and accessible interaction states without depending on external images.",
+      "acceptance_criteria": ["The initial viewport clearly identifies TableStory", "The approved five-color palette and visible focus states are present", "The layout has no horizontal scrolling at 375 CSS pixels"],
+      "dependencies": [],
+      "agent": "codex",
+      "requirement_ids": ["R1"],
+      "contract_ids": ["CT3"],
+      "program_element_ids": ["MOD3"],
+      "qa_evidence": ["Mobile viewport layout check", "Accessible-name and focus-state inspection", "Brand snapshot review"],
+      "file_ownership": ["demo-app/templates/base.html", "demo-app/static/mobile.css"],
+      "vertical_outcome": "A first-time mobile visitor sees a coherent, readable TableStory recipe product shell."
+    },
+    {
+      "key": "T3",
+      "title": "Complete the mobile recipe and My Cookbook journey",
+      "spec": "Wire recipe routes, live client search, detail content, and cookbook add/remove behavior through the approved domain and presentation contracts.",
+      "acceptance_criteria": ["Search updates cards without a reload and shows the exact empty state", "Recipe detail renders metadata, ingredients, and ordered method", "Cookbook controls expose and update their saved state accessibly"],
+      "dependencies": ["T1", "T2"],
+      "agent": "codex",
+      "requirement_ids": ["R2", "R3"],
+      "contract_ids": ["CT1", "CT2", "CT3"],
+      "program_element_ids": ["MOD2", "FN2", "FN3", "FLOW1"],
+      "qa_evidence": ["Mobile browse-to-detail browser test", "Cookbook API add/remove tests", "Unknown-recipe and no-results tests"],
+      "file_ownership": ["demo-app/app.py", "demo-app/templates/mobile.html", "demo-app/static/mobile.js"],
+      "vertical_outcome": "A home cook can find a recipe, understand it, and save or remove it from My Cookbook."
+    },
+    {
+      "key": "T4",
+      "title": "Complete the television recipe journey",
+      "spec": "Add the four recipe rails, ten-foot detail treatment, spatial focus model, Enter actions, and Escape or Backspace return behavior while preserving TV mode.",
+      "acceptance_criteria": ["The four named rails render and non-cookbook rails contain at least two recipes", "Arrow keys and Enter operate browse and detail without a pointer", "Focus remains visible and selected content remains on-screen at 1920 by 1080"],
+      "dependencies": ["T3"],
+      "agent": "codex",
+      "requirement_ids": ["R4"],
+      "contract_ids": ["CT2", "CT3"],
+      "program_element_ids": ["MOD4", "FN4", "FLOW2"],
+      "qa_evidence": ["TV rail keyboard-navigation test", "TV detail action and return test", "1920 by 1080 focus visibility inspection"],
+      "file_ownership": ["demo-app/templates/tv.html", "demo-app/static/tv.css", "demo-app/static/tv.js"],
+      "vertical_outcome": "A hands-busy viewer can complete the recipe journey with remote-equivalent keys only."
+    },
+    {
+      "key": "T5",
+      "title": "Prove and document the complete domain conversion",
+      "spec": "Migrate remaining tests and documentation, remove obsolete film artifacts, and enforce a terminology and end-to-end verification gate from a clean checkout.",
+      "acceptance_criteria": ["README documents mobile and TV startup and verification", "Automated checks reject prohibited customer-facing cinema terminology", "All configured unit and browser gates pass from a clean checkout"],
+      "dependencies": ["T4"],
+      "agent": "codex",
+      "requirement_ids": ["R5"],
+      "contract_ids": ["CT4"],
+      "program_element_ids": ["MOD5", "TEST2"],
+      "qa_evidence": ["README command rehearsal", "Forbidden-terminology test", "Full configured gate report"],
+      "file_ownership": ["demo-app/README.md", "demo-app/tests/test_ui.py", "demo-app/tests/test_terminology.py"],
+      "vertical_outcome": "A reviewer can reproduce the rebrand and obtain objective proof that every supported surface is complete."
+    }
+  ]
+}
