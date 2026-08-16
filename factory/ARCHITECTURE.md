@@ -8,9 +8,13 @@ Use this guide instead of reading every file sequentially.
 
 ```mermaid
 flowchart LR
-  PRD["Attendee PRD"] --> Planner["planner.py"]
-  Planner --> Review["Editable plan + human approval"]
-  Review --> Issues["GitHub Issues + Projects"]
+  PRD["Attendee PRD"] --> Product["Product Review expert"]
+  Product --> ProductGate{"Human product approval"}
+  ProductGate --> Architecture["System Architecture expert"]
+  Architecture --> Program["Program Design expert"]
+  Program --> Slices["Vertical Slices expert"]
+  Slices --> Alignment{"Human alignment approval"}
+  Alignment --> Issues["GitHub Issues + Projects"]
   Issues --> Scheduler["orchestrator.py scheduler"]
   Scheduler --> Worktree["Isolated Git worktree"]
   Worktree --> QA["Independent QA adapter"]
@@ -21,22 +25,28 @@ flowchart LR
   Gates -->|pass| PR["Pull request + human merge"]
   PR --> Sync["Fetch, fast-forward, verify merge commit"]
   Sync --> Scheduler
-  Scheduler --> State["state.json + dashboard"]
+  Scheduler --> State["planning-state.json + state.json + dashboard"]
 ```
 
 ## Reading path
 
 1. `factory/factory.toml` — adapters, QA policy, retry/time limits, and gates.
-2. `factory/planner.py` — structured PRD planning and ticket publication.
-3. `factory/orchestrator.py` — dependency scheduler and ticket lifecycle.
-4. `factory/github_backend.py` — Issues, Projects, PRs, and merge observation.
-5. `factory/doctor.py` — workshop safety and environment diagnostics.
-6. `factory/dashboard.html` — read-only visualization of state and artifacts.
-7. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
+2. `factory/planning_pipeline.py` — four expert contracts, hashes, approvals,
+   traceability, validation, and planning dashboard state.
+3. `factory/planner.py` — ticket-plan validation and GitHub publication.
+4. `factory/orchestrator.py` — CLI, dependency scheduler, and ticket lifecycle.
+5. `factory/github_backend.py` — Issues, Projects, PRs, and merge observation.
+6. `factory/doctor.py` — workshop safety and environment diagnostics.
+7. `factory/dashboard.html` — read-only visualization of planning and execution.
+8. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
 
 ## Control boundaries
 
-- Planning is read-only until a human approves the generated plan.
+- Every planning expert is read-only and receives only the PRD plus approved
+  upstream contracts.
+- Product approval precedes technical planning; alignment approval precedes
+  GitHub publication.
+- Artifact hashes invalidate downstream work after human edits.
 - Each ticket runs in its own worktree and branch.
 - QA may add only new ticket-numbered files under configured test roots.
 - QA test hashes prevent the implementation agent from weakening those tests.

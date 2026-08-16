@@ -8,11 +8,11 @@ const steps = [
   { id: "setup", label: "Set up your workspace", time: "8 min" },
   { id: "baseline", label: "Inspect the baseline", time: "5 min" },
   { id: "prd", label: "Read the PRD", time: "7 min" },
-  { id: "plan", label: "Create the ticket plan", time: "10 min" },
-  { id: "publish", label: "Review and publish", time: "10 min" },
+  { id: "plan", label: "Approve product intent", time: "15 min" },
+  { id: "publish", label: "Align and publish", time: "15 min" },
   { id: "qa", label: "Review QA tests", time: "12 min" },
-  { id: "factory", label: "Run the factory", time: "18 min" },
-  { id: "finish", label: "Verify the product", time: "10 min" },
+  { id: "factory", label: "Run the factory", time: "25 min" },
+  { id: "finish", label: "Verify the product", time: "13 min" },
 ] as const;
 
 function CodeBlock({ children, label = "Terminal" }: { children: string; label?: string }) {
@@ -185,7 +185,7 @@ export default function Home() {
         <span className="header-divider" aria-hidden="true"></span>
         <span className="header-section">Workshop</span>
         <div className="topbar-actions">
-          <span className="duration-pill">80 min</span>
+          <span className="duration-pill">100 min</span>
           <a
             className="github-link"
             href="https://github.com/giolaq/software-refactory-workshop"
@@ -237,27 +237,31 @@ export default function Home() {
             <div className="eyebrow">GUIDED LAB</div>
             <h1>Run an AI software factory</h1>
             <p className="hero-lede">
-              Turn a PRD into tickets, let an independent QA agent define acceptance tests,
-              run coding agents in parallel, and keep humans in control of every critical decision.
+              Align product, architecture, program design, and vertical slices before code;
+              then let independent QA and implementation agents work with visible evidence.
             </p>
             <div className="hero-meta">
               <span><b>Level</b> Intermediate</span>
-              <span><b>Time</b> 80 minutes</span>
+              <span><b>Time</b> 100 minutes</span>
               <span><b>Cost</b> Free in rehearsal mode</span>
             </div>
             <a className="primary-button" href="#choose-track">Start the workshop <span aria-hidden="true">→</span></a>
           </div>
           <div className="factory-map" aria-label="Workshop flow from PRD to merged application">
             <div className="map-row">
-              <span className="map-node node-blue">PRD</span><i>→</i><span className="map-node">Plan</span><i>→</i><span className="map-node node-human">Human review</span>
-            </div>
-            <div className="map-down">↓</div>
-            <div className="map-row map-row-reverse">
-              <span className="map-node node-green">QA tests</span><i>←</i><span className="map-node">Tickets</span><i>←</i><span className="map-node">GitHub Project</span>
+              <span className="map-node node-blue">PRD</span><i>→</i><span className="map-node">Product review</span><i>→</i><span className="map-node node-human">Product gate</span>
             </div>
             <div className="map-down">↓</div>
             <div className="map-row">
-              <span className="map-node node-purple">Agents</span><i>→</i><span className="map-node">Gates</span><i>→</i><span className="map-node node-green">Merge</span>
+              <span className="map-node">Architecture</span><i>→</i><span className="map-node">Program design</span><i>→</i><span className="map-node">Vertical slices</span>
+            </div>
+            <div className="map-down">↓</div>
+            <div className="map-row">
+              <span className="map-node node-human">Alignment gate</span><i>→</i><span className="map-node">GitHub tickets</span><i>→</i><span className="map-node node-green">QA evidence</span>
+            </div>
+            <div className="map-down">↓</div>
+            <div className="map-row">
+              <span className="map-node node-purple">Coding agents</span><i>→</i><span className="map-node">Gates</span><i>→</i><span className="map-node node-green">Merge</span>
             </div>
           </div>
         </section>
@@ -274,7 +278,8 @@ export default function Home() {
           <div>
             <h2>What you’ll learn</h2>
             <ul className="check-list">
-              <li>Plan work from a product brief</li>
+              <li>Align four expert planning contracts</li>
+              <li>Trace requirements to QA evidence</li>
               <li>Control safe parallel execution</li>
               <li>Review QA-authored tests</li>
               <li>Diagnose retries and blocked work</li>
@@ -397,25 +402,53 @@ gh auth refresh -s project
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="plan" number={4} title="Create the ticket plan" time="10 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
-          <p className="goal">Turn the PRD into bounded tickets with explicit dependencies and testable acceptance criteria.</p>
-          {track === "live" ? (
-            <>
-              <p>Ask the authenticated planning agent to create an editable proposal:</p>
-              <CodeBlock>{`./factory/factory plan recipe-app-prd.md`}</CodeBlock>
-              <p>The planner runs read-only. It writes JSON and Markdown under <code>.factory/plans/</code>; it does not create issues or start implementation.</p>
-              <CodeBlock label="Inspect the generated files">{`ls -lt .factory/plans`}</CodeBlock>
-            </>
-          ) : (
-            <>
-              <p>Use the deterministic example plan so this exercise needs no model credentials:</p>
-              <CodeBlock>{`mkdir -p .factory/plans
-cp factory/scenarios/recipe-rebrand/example-plan.json \
-  .factory/plans/table-story-fallback.json
-cat .factory/plans/table-story-fallback.json`}</CodeBlock>
-              <p>This is the same structured output expected from the planning agent.</p>
-            </>
-          )}
+        <StepSection id="plan" number={4} title="Review and approve product intent" time="15 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
+          <p className="goal">Agree on the problem, behavior, scope, and evidence before any agent makes a technical decision.</p>
+          <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Codex CLI agent.</p>
+          <CodeBlock>{track === "live"
+            ? `./factory/factory plan recipe-app-prd.md`
+            : `./factory/factory plan recipe-app-prd.md --mock`}</CodeBlock>
+          <p>Copy the printed <code>PLAN_ID</code>, then open the readable Product Review:</p>
+          <CodeBlock>{`./factory/factory review product PLAN_ID`}</CodeBlock>
+          <h3>Review the Product Review contract</h3>
+          <ol>
+            <li>Does the problem describe a user need rather than a requested feature?</li>
+            <li>Does every <code>R*</code> requirement have observable success evidence and a PRD source?</li>
+            <li>Do journeys include failure, empty, and edge states?</li>
+            <li>Are in-scope and out-of-scope boundaries unambiguous?</li>
+            <li>Are mockup needs, assumptions, and blocking questions explicit?</li>
+          </ol>
+          <div className="activity-card">
+            <span className="activity-label">Product decision</span>
+            <h3>Would two teams build the same product?</h3>
+            <p>Pick one requirement and explain its successful user-visible outcome. If two reasonable interpretations remain, edit <code>01-product-review.json</code> before approval.</p>
+          </div>
+          <p>When the behavior and scope are correct, approve only the product contract:</p>
+          <CodeBlock>{`./factory/factory approve-product PLAN_ID`}</CodeBlock>
+          <p>Type <code>APPROVE PRODUCT</code>. This authorizes technical planning—it does not create tickets or start implementation.</p>
+          <Callout type="warning" title="Approval follows the artifact hash">
+            Editing Product Review later clears this approval and marks every downstream planning artifact stale.
+          </Callout>
+          <Checkpoint>
+            Product Review is approved, no blocking question remains, and System Architecture has not run before your decision.
+          </Checkpoint>
+        </StepSection>
+
+        <StepSection id="publish" number={5} title="Align architecture, program design, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
+          <p className="goal">Use three specialist contracts to make implementation predictable and reviewable before publishing tickets.</p>
+          <p>Continue the approved plan. The experts run sequentially because each one consumes the previous contract.</p>
+          <CodeBlock>{track === "live"
+            ? `./factory/factory continue-plan PLAN_ID`
+            : `./factory/factory continue-plan PLAN_ID --mock`}</CodeBlock>
+          <CodeBlock label="Open the alignment review">{`./factory/factory review alignment PLAN_ID`}</CodeBlock>
+          <div className="evidence-grid planning-evidence">
+            <div><span>01</span><b>Product Review</b><p>Problem, behavior, journeys, scope, and evidence.</p></div>
+            <div><span>02</span><b>System Architecture</b><p>Components, ownership, data models, and contracts.</p></div>
+            <div><span>03</span><b>Program Design</b><p>Modules, types, signatures, calls, errors, and test seams.</p></div>
+            <div><span>04</span><b>Vertical Slices</b><p>End-to-end outcomes, dependencies, file ownership, and QA evidence.</p></div>
+          </div>
+          <h3>Read the traceability matrix</h3>
+          <p>For each <code>R*</code> row, follow the requirement through architecture contracts, program elements, ticket slices, and QA evidence. A blank final column is a reason to stop.</p>
           <h3>Expected execution waves</h3>
           <div className="waves" aria-label="Ticket dependency waves">
             <div><span>Wave 1</span><b>Recipe API</b><b>Design system</b></div>
@@ -426,50 +459,26 @@ cat .factory/plans/table-story-fallback.json`}</CodeBlock>
             <i aria-hidden="true">→</i>
             <div><span>Wave 4</span><b>Docs & terminology</b></div>
           </div>
-          <Callout type="tip" title="Plan for integration, not maximum parallelism">
-            Two tickets should run together only when their inputs are ready and their file ownership is unlikely to collide.
+          <Callout type="tip" title="Check file ownership before parallelism">
+            The validator rejects two parallel tickets that claim the same file. Dependency order is required when shared ownership is intentional.
           </Callout>
-          <Checkpoint>
-            The plan has five tickets. Recipe API and design system can start together; each later wave waits for the previous product capability.
-          </Checkpoint>
-        </StepSection>
-
-        <StepSection id="publish" number={5} title="Review and publish the contract" time="10 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
-          <p className="goal">Make a human responsible for scope before agents are allowed to execute.</p>
-          <h3>Review every ticket</h3>
-          <ol>
-            <li>Can it be implemented and reviewed independently?</li>
-            <li>Do acceptance criteria describe observable behavior?</li>
-            <li>Are its dependencies real integration requirements?</li>
-            <li>Are all open questions resolved?</li>
-          </ol>
-          <div className="activity-card quiz-card">
-            <span className="activity-label">Acceptance-criteria check</span>
-            <h3>Which criterion can a QA agent verify?</h3>
-            <p><b>A.</b> “The TV interface feels polished.”</p>
-            <p><b>B.</b> “Arrow Right moves focus to the next recipe card without moving it off-screen.”</p>
-            <details>
-              <summary>Reveal answer</summary>
-              <p><strong>B.</strong> It defines an input, an observable result, and a failure condition. A is subjective and should block automated execution until rewritten.</p>
-            </details>
-          </div>
           {track === "live" ? (
             <>
-              <p>Replace <code>PLAN.json</code> with the generated JSON path, then publish it:</p>
-              <CodeBlock>{`./factory/factory approve PLAN.json \
+              <p>Approve the whole aligned package and publish its slices:</p>
+              <CodeBlock>{`./factory/factory approve PLAN_ID \
   --new-project-title "TableStory Workshop"`}</CodeBlock>
-              <p>Read the complete plan printed in the terminal. Type <code>APPROVE</code> only when it is correct. Save the Project number printed by the command.</p>
+              <p>Type <code>APPROVE ALIGNMENT</code> only after reviewing all four contracts. Save the Project number printed by the command.</p>
               <Checkpoint>
                 GitHub shows five issues in a new Project. Dependency-free issues are Ready; the others remain Backlog.
               </Checkpoint>
             </>
           ) : (
             <>
-              <p>Rehearsal mode does not write to GitHub. Preview the local ticket set that the mock backend will use:</p>
+              <p>Rehearsal mode stops before the GitHub write. Confirm the deterministic execution set matches the reviewed five slices:</p>
               <CodeBlock>{`./factory/factory run --mock \
   --scenario recipe-rebrand --dry-run`}</CodeBlock>
               <Checkpoint>
-                The preview lists Recipe API and Design system as the first runnable wave. No implementation has started.
+                The alignment review is complete, its traceability rows are populated, and the preview lists Recipe API and Design system as the first wave.
               </Checkpoint>
             </>
           )}
@@ -480,6 +489,7 @@ cat .factory/plans/table-story-fallback.json`}</CodeBlock>
           <p>First, serve the live dashboard from a second terminal:</p>
           <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
           <p>Open <a href="http://localhost:8000/factory/dashboard.html" target="_blank" rel="noreferrer">localhost:8000/factory/dashboard.html <span aria-hidden="true">↗</span></a>.</p>
+          <p>The alignment pipeline appears above the ticket board. Click a planning stage to inspect its readable artifact, hash, status, and blocking questions.</p>
           {track === "live" ? (
             <CodeBlock>{`./factory/factory run \
   --agent codex \
@@ -512,7 +522,7 @@ cat .factory/plans/table-story-fallback.json`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="factory" number={7} title="Run and observe the factory" time="18 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
+        <StepSection id="factory" number={7} title="Run and observe the factory" time="25 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
           <p className="goal">Follow parallel implementation, verification, review, and dependency synchronization.</p>
           {track === "live" ? (
             <>
@@ -563,7 +573,7 @@ cat .factory/plans/table-story-fallback.json`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="finish" number={8} title="Verify the finished product" time="10 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
+        <StepSection id="finish" number={8} title="Verify the finished product" time="13 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
           <p className="goal">Connect the factory’s evidence to the user-visible product outcome.</p>
           {track === "rehearsal" && (
             <>
@@ -599,10 +609,10 @@ cat .factory/plans/table-story-fallback.json`}</CodeBlock>
           <div className="activity-card final-reflection">
             <span className="activity-label">Take it back to your team</span>
             <h3>Design your first factory experiment</h3>
-            <p>Choose one repository and write down: the ticket backend, planning model, QA policy, required gates, execution boundary, and human approval points you would use.</p>
+            <p>Choose one repository and write down: the four planning expert prompts, ticket backend, QA policy, required gates, execution boundary, and human approval points you would use.</p>
           </div>
           <Checkpoint>
-            You can explain the four control boundaries: plan approval, QA-test approval, verification gates, and human merge.
+            You can explain the five control boundaries: product approval, alignment approval, QA-test approval, verification gates, and human merge.
           </Checkpoint>
         </StepSection>
 
@@ -649,6 +659,13 @@ git push -u origin main`}</CodeBlock>
               <CodeBlock>{`./factory/factory status`}</CodeBlock>
             </details>
             <details>
+              <summary>A planning artifact is blocked or stale</summary>
+              <p>Open its JSON artifact, resolve every blocking question, and rerun <code>continue-plan</code>. Editing Product Review clears product approval; review and approve it again first. The manifest never silently reuses downstream output with changed input hashes.</p>
+              <CodeBlock>{`./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
+./factory/factory continue-plan PLAN_ID`}</CodeBlock>
+            </details>
+            <details>
               <summary>A ticket is Blocked</summary>
               <p>Open the ticket drawer and inspect the final prompt, log, and gate output. Improve the issue or implementation, then retry it:</p>
               <CodeBlock>{`./factory/factory retry ISSUE_NUMBER`}</CodeBlock>
@@ -669,8 +686,12 @@ git push -u origin main`}</CodeBlock>
           </div>
           <div className="reference-table" role="table" aria-label="Factory command reference">
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
-            <div role="row"><code>factory plan PRD.md</code><span>Create a local, editable ticket proposal.</span></div>
-            <div role="row"><code>factory approve PLAN.json</code><span>Publish an approved plan to GitHub.</span></div>
+            <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
+            <div role="row"><code>factory review product PLAN_ID</code><span>Inspect behavior, scope, evidence, and blockers.</span></div>
+            <div role="row"><code>factory approve-product PLAN_ID</code><span>Authorize technical planning without publishing tickets.</span></div>
+            <div role="row"><code>factory continue-plan PLAN_ID</code><span>Run Architecture, Program Design, and Vertical Slices.</span></div>
+            <div role="row"><code>factory review alignment PLAN_ID</code><span>Inspect traceability, ownership, evidence, and waves.</span></div>
+            <div role="row"><code>factory approve PLAN_ID</code><span>Approve alignment and publish slices to GitHub.</span></div>
             <div role="row"><code>factory run</code><span>Schedule QA, implementation, gates, and review.</span></div>
             <div role="row"><code>factory approve-tests ISSUE</code><span>Authorize implementation after QA review.</span></div>
             <div role="row"><code>factory status</code><span>Print the current ticket state.</span></div>
@@ -682,6 +703,9 @@ git push -u origin main`}</CodeBlock>
             </a>
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/README.md" target="_blank" rel="noreferrer">
               <span>EXTEND</span><b>Configure agents and gates</b><i aria-hidden="true">→</i>
+            </a>
+            <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/PLANNING.md" target="_blank" rel="noreferrer">
+              <span>ALIGN</span><b>Study the four expert contracts</b><i aria-hidden="true">→</i>
             </a>
           </div>
         </section>

@@ -1,18 +1,19 @@
 # Facilitator runbook
 
-## Recommended 80-minute workshop
+## Recommended 100-minute workshop
 
 | Time | Activity | Teaching point |
 | --- | --- | --- |
 | 0–8 min | Show Pocket Cinema and the target TableStory brief | Agents need an observable product goal. |
-| 8–18 min | Run `factory plan recipe-app-prd.md` | The planner proposes work; it does not authorize work. |
-| 18–28 min | Review the graph, waves, questions, and acceptance criteria | Humans control scope and dependencies. |
-| 28–35 min | Run `factory approve` against a fresh GitHub Project | Tickets become an auditable contract. |
-| 35–48 min | Start the first wave with QA review enabled | Independent agents write tests before implementation. |
-| 48–58 min | Inspect and approve QA tests | Human control is based on evidence, not trust. |
-| 58–68 min | Watch a failure/retry and inspect its log | Verification output becomes the repair prompt. |
-| 68–75 min | Merge a PR and watch a dependant unlock | The merged commit is synchronized before reuse. |
-| 75–80 min | Reveal TableStory and map extension points | Adapters, models, gates, and runtimes are configurable. |
+| 8–18 min | Run Product Review and inspect behavior, scope, and mockup needs | Product intent becomes an explicit contract. |
+| 18–23 min | Approve product, then run the three technical experts | Technical planning cannot outrun product agreement. |
+| 23–38 min | Review architecture, program design, slices, and traceability | Thirty minutes of alignment replaces hours of code review. |
+| 38–45 min | Approve alignment into a fresh GitHub Project | Tickets become an auditable contract. |
+| 45–60 min | Start the first wave with QA review enabled | Independent agents write tests before implementation. |
+| 60–70 min | Inspect and approve QA tests | Human control is based on evidence, not trust. |
+| 70–82 min | Watch a failure/retry and inspect its log | Verification output becomes the repair prompt. |
+| 82–92 min | Merge a PR and watch a dependant unlock | The merged commit is synchronized before reuse. |
+| 92–100 min | Reveal TableStory and map extension points | Agents, models, gates, and runtimes are configurable. |
 
 ## Before the room opens
 
@@ -57,7 +58,11 @@
 
 ```sh
 ./factory/factory plan recipe-app-prd.md
-./factory/factory approve .factory/plans/recipe-app-prd-PLAN_ID.json --new-project-title "TableStory Workshop"
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
+./factory/factory continue-plan PLAN_ID
+./factory/factory review alignment PLAN_ID
+./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ./factory/factory run --agent codex --qa-agent claude --review-qa-tests --project-number NUMBER
 ./factory/factory approve-tests ISSUE
 ```
@@ -76,12 +81,15 @@ If GitHub, Wi-Fi, or a model CLI is slow, switch to the credential-free scenario
 ./factory/factory run --mock --scenario recipe-rebrand --once
 ```
 
-If only the planning model is unavailable, copy the reviewed fallback plan and
-continue with the normal GitHub approval flow:
+If only the planning model is unavailable, run the schema-valid deterministic
+experts and continue with the same two human gates:
 
 ```sh
-cp factory/scenarios/recipe-rebrand/example-plan.json .factory/plans/table-story-fallback.json
-./factory/factory approve .factory/plans/table-story-fallback.json --new-project-title "TableStory Workshop"
+./factory/factory plan recipe-app-prd.md --mock
+./factory/factory approve-product PLAN_ID --yes
+./factory/factory continue-plan PLAN_ID --mock
+./factory/factory review alignment PLAN_ID
+./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ```
 
 This still creates real worktrees, independent QA commits, protected acceptance

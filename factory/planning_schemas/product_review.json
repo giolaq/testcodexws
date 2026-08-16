@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "summary": { "type": "string" },
+        "problem": { "type": "string" },
+        "desired_outcome": { "type": "string" }
+      },
+      "required": ["name", "summary", "problem", "desired_outcome"]
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "need": { "type": "string" }
+        },
+        "required": ["id", "description", "need"]
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "source": { "type": "string" },
+          "success_evidence": { "type": "string" }
+        },
+        "required": ["id", "statement", "source", "success_evidence"]
+      }
+    },
+    "journeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "outcome": { "type": "string" },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "edge_cases": { "type": "array", "items": { "type": "string" } },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "outcome", "steps", "edge_cases", "requirements"]
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": { "type": "array", "items": { "type": "string" } },
+        "out": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["in", "out"]
+    },
+    "mockups": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "blocking_questions": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["project", "users", "requirements", "journeys", "scope", "mockups", "assumptions", "blocking_questions"]
+}

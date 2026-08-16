@@ -1,0 +1,28 @@
+{
+  "modules": [
+    {"id": "MOD1", "path": "demo-app/recipes.py", "responsibility": "Define recipe data, search, lookup, rail selection, and cookbook operations.", "components": ["C1"]},
+    {"id": "MOD2", "path": "demo-app/app.py", "responsibility": "Expose recipe routes and APIs and select a presentation mode.", "components": ["C2"]},
+    {"id": "MOD3", "path": "demo-app/templates/ and demo-app/static/mobile.*", "responsibility": "Render the TableStory brand and mobile recipe journey.", "components": ["C3"]},
+    {"id": "MOD4", "path": "demo-app/static/tv.*", "responsibility": "Render TV rails, detail layout, and spatial key navigation.", "components": ["C4"]},
+    {"id": "MOD5", "path": "demo-app/tests/ and demo-app/README.md", "responsibility": "Verify contracts and document reproducible operation.", "components": ["C5"]}
+  ],
+  "types": [
+    {"id": "TYPE1", "name": "Recipe", "module": "MOD1", "definition": "Mapping with the exact D1 fields and recipe-domain values.", "requirements": ["R2", "R3", "R4"]},
+    {"id": "TYPE2", "name": "RecipeRail", "module": "MOD1", "definition": "Mapping containing a display name and ordered recipe_ids.", "requirements": ["R2", "R4"]}
+  ],
+  "functions": [
+    {"id": "FN1", "signature": "search_recipes(query: str | None) -> list[Recipe]", "module": "MOD1", "calls": [], "contracts": ["CT1"], "requirements": ["R2", "R3"], "error_behavior": "Blank queries return all recipes; comparisons are case-insensitive."},
+    {"id": "FN2", "signature": "update_cookbook(recipe_id: str, action: str) -> list[Recipe]", "module": "MOD2", "calls": ["external:Flask request handlers"], "contracts": ["CT2"], "requirements": ["R2", "R3", "R4"], "error_behavior": "Unknown saves return HTTP 400; repeated removes succeed."},
+    {"id": "FN3", "signature": "render_recipe_page(recipe_id: str, mode: str) -> Response", "module": "MOD2", "calls": ["FN1", "external:Flask render_template"], "contracts": ["CT1", "CT3"], "requirements": ["R1", "R3"], "error_behavior": "Unknown IDs return the recipe-specific HTTP 404 page."},
+    {"id": "FN4", "signature": "moveTvFocus(direction: Direction, state: FocusState) -> FocusState", "module": "MOD4", "calls": ["external:DOM focus and scrollIntoView"], "contracts": ["CT3"], "requirements": ["R4"], "error_behavior": "Clamp to available rails/cards and retain the nearest sensible card index."}
+  ],
+  "call_flows": [
+    {"id": "FLOW1", "name": "Mobile browse to cookbook", "steps": ["FN1", "external:render mobile cards", "FN3", "FN2", "external:update accessible saved state"], "requirements": ["R1", "R2", "R3"]},
+    {"id": "FLOW2", "name": "TV browse to detail and back", "steps": ["external:render rails", "FN4", "FN3", "FN2", "external:return preserving mode=tv"], "requirements": ["R1", "R2", "R4"]}
+  ],
+  "test_seams": [
+    {"id": "TEST1", "boundary": "Recipe domain and Flask JSON APIs", "strategy": "Use deterministic unit and Flask client tests for data invariants, search, errors, cookbook, and rails.", "requirements": ["R2"]},
+    {"id": "TEST2", "boundary": "Rendered mobile/TV behavior and forbidden terminology", "strategy": "Use DOM/browser checks plus a source-and-output terminology scan at both required viewports.", "requirements": ["R1", "R3", "R4", "R5"]}
+  ],
+  "blocking_questions": []
+}

@@ -1,0 +1,26 @@
+{
+  "components": [
+    {"id": "C1", "name": "Recipe domain", "responsibility": "Own deterministic recipes, lookup, search, rails, and in-memory cookbook state.", "requirements": ["R2"], "data_owned": ["Recipe collection", "Cookbook recipe IDs", "Rail definitions"]},
+    {"id": "C2", "name": "Flask delivery layer", "responsibility": "Expose recipe APIs and choose mobile or TV presentation.", "requirements": ["R2", "R3", "R4"], "data_owned": ["Request mode and response status"]},
+    {"id": "C3", "name": "Mobile experience", "responsibility": "Render accessible browse, search, detail, and cookbook interactions.", "requirements": ["R1", "R3"], "data_owned": ["Client search query", "Rendered saved state"]},
+    {"id": "C4", "name": "TV experience", "responsibility": "Render ten-foot layouts and deterministic remote focus navigation.", "requirements": ["R1", "R4"], "data_owned": ["Focused rail and card", "Focused detail action"]},
+    {"id": "C5", "name": "Verification and documentation", "responsibility": "Prove domain behavior, terminology, accessibility-critical interactions, and startup instructions.", "requirements": ["R5"], "data_owned": ["Test fixtures and verification results"]}
+  ],
+  "contracts": [
+    {"id": "CT1", "name": "Recipe collection API", "provider": "C1", "consumers": ["C2", "C3", "C4", "C5"], "input": "Optional case-insensitive q string", "output": "Recipe objects using the approved recipe schema", "errors": ["Unknown recipe returns Recipe not found with HTTP 404"], "requirements": ["R2", "R3", "R4"]},
+    {"id": "CT2", "name": "Cookbook API", "provider": "C1", "consumers": ["C2", "C3", "C4", "C5"], "input": "Recipe ID for save or remove", "output": "Complete saved recipe objects", "errors": ["Unknown save returns a recipe-specific HTTP 400", "Removing an absent recipe remains successful"], "requirements": ["R2", "R3", "R4"]},
+    {"id": "CT3", "name": "Presentation mode contract", "provider": "C2", "consumers": ["C3", "C4", "C5"], "input": "Request URL, mode query, user-agent hint, and recipe data", "output": "Mobile or TV semantic HTML preserving mode in navigation", "errors": ["Unknown recipe renders HTTP 404"], "requirements": ["R1", "R3", "R4"]},
+    {"id": "CT4", "name": "Verification gate contract", "provider": "C5", "consumers": ["C1", "C2", "C3", "C4"], "input": "Clean checkout and documented commands", "output": "Passing unit, browser, and terminology evidence", "errors": ["Any required gate failure blocks completion"], "requirements": ["R5"]}
+  ],
+  "data_models": [
+    {"id": "D1", "name": "Recipe", "fields": ["id", "title", "description", "category", "dietary_tags", "prep_minutes", "cook_minutes", "difficulty", "servings", "ingredients", "steps", "colors", "featured"], "invariants": ["At least 12 unique recipes", "Ingredients are non-empty", "Each recipe has at least three steps"], "requirements": ["R2", "R3", "R4"]},
+    {"id": "D2", "name": "Recipe rail", "fields": ["name", "recipe_ids"], "invariants": ["Non-cookbook rails contain at least two valid IDs"], "requirements": ["R2", "R4"]}
+  ],
+  "decisions": [
+    {"id": "ADR1", "decision": "Keep Flask, server-rendered HTML, CSS, and vanilla JavaScript.", "rationale": "The PRD explicitly constrains the stack and offline workshop operation.", "requirements": ["R3", "R4", "R5"]},
+    {"id": "ADR2", "decision": "Use one recipe-domain source of truth for API, mobile, and TV modes.", "rationale": "Shared data and search semantics prevent a partial rebrand and contract drift.", "requirements": ["R1", "R2", "R3", "R4"]}
+  ],
+  "constraints": ["No frontend framework, database, build service, or external runtime dependency", "The app works offline after dependencies are installed", "Old movie and watchlist endpoints are removed"],
+  "risks": ["Customer-visible terminology can remain in metadata or accessibility labels", "Parallel UI changes can conflict in shared templates", "TV focus can regress when rails have unequal lengths"],
+  "blocking_questions": []
+}
