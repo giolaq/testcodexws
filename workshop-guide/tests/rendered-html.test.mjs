@@ -20,7 +20,10 @@ test("server-renders the self-guided workshop", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Software \(re\)-Factory Workshop<\/title>/i);
-  assert.match(html, /Run an AI software factory/);
+  assert.match(html, /Build software with controlled AI agents/);
+  assert.match(html, /Prepare your development environment/);
+  assert.match(html, /Python 3\.11 or later/);
+  assert.match(html, /No API key is required/);
   assert.match(html, /Choose your workshop path/);
   assert.match(html, /Set up your workspace/);
   assert.match(html, /Run the lights-off control/);

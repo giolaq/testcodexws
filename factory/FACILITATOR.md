@@ -1,80 +1,161 @@
 # Facilitator runbook
 
-## Recommended 100-minute workshop
+Use this runbook to prepare and deliver the 100-minute Software (re)-Factory
+workshop. The attendee website contains the full instructions. Your job is to
+keep time, make the control points visible, and stop the group when evidence is
+weak.
 
-| Time | Activity | Teaching point |
+For the first dry run, use rehearsal mode. It exercises the complete workflow
+without GitHub writes or model latency. Demonstrate live mode only after the
+rehearsal path works from a clean checkout.
+
+## Readiness checklist
+
+Complete this checklist before attendees arrive:
+
+- [ ] macOS, Linux, or WSL 2 is available.
+- [ ] Python 3.11 or later includes the `venv` module.
+- [ ] Node.js 20 or later and Git are on `PATH`.
+- [ ] Ports 5000, 5050, and 8000 are free.
+- [ ] The presentation browser can open localhost pages.
+- [ ] The workshop repository is clean and synchronized with its default branch.
+- [ ] A disposable checkout exists for rehearsal mode.
+- [ ] A second checkout or the sample report is ready for the lights-off control.
+- [ ] The deterministic recipe scenario completes successfully.
+- [ ] The attendee website is open at the prerequisites section.
+
+Live mode also requires:
+
+- [ ] `gh auth status` succeeds.
+- [ ] GitHub authentication includes the `project` scope.
+- [ ] The repository owner can create issues, Projects, branches, and pull requests.
+- [ ] A current Codex CLI is authenticated. No `OPENAI_API_KEY` is required.
+- [ ] Any Claude Code or Cursor adapter used for tickets is also authenticated.
+- [ ] Network access to GitHub and the selected agent provider is stable.
+
+## Prepare the dry run
+
+Create a disposable rehearsal checkout:
+
+```sh
+./factory/new_workshop.sh ../software-refactory-rehearsal recipe-rebrand
+cd ../software-refactory-rehearsal
+```
+
+Run the deterministic preflight and scenario once:
+
+```sh
+python3 --version
+node --version
+git --version
+./factory/factory run --mock --scenario recipe-rebrand --dry-run
+```
+
+Prepare the live checkout only if you plan to demonstrate real agents:
+
+```sh
+./factory/new_workshop.sh ../software-refactory-live live
+cd ../software-refactory-live
+./setup_demo.sh --scenario recipe-rebrand
+git push origin main
+./factory/factory doctor --full --agent codex --qa-agent codex
+```
+
+Continue only when the doctor reports zero failures. A warning is acceptable
+only for an optional adapter that won't be used.
+
+Prepare a separate control checkout:
+
+```sh
+./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+cd ../software-refactory-control
+git switch -c experiment/lights-off
+```
+
+If a live control isn't practical, keep
+`factory/scenarios/recipe-rebrand/lights-off-sample-report.md` open. Always call
+it a discussion fixture, not a benchmark.
+
+## Arrange the presentation workspace
+
+Use four terminals:
+
+| Terminal | Keep visible | Purpose |
 | --- | --- | --- |
-| 0–8 min | Set up live or rehearsal mode | Everyone starts from a known environment. |
-| 8–13 min | Show the Pocket Cinema baseline | Agents need an observable product starting point. |
-| 13–20 min | Read the TableStory PRD | The group sees the same outcome and ambiguities. |
-| 20–32 min | Start the one-agent lights-off control | A fair comparison changes the workflow, not the model or task. |
-| 32–44 min | Run and approve Product Review | Product intent becomes an explicit contract. |
-| 44–59 min | Run technical experts, review traceability, and publish | Alignment creates an auditable ticket contract. |
-| 59–69 min | Inspect and approve QA tests | Human control is based on evidence, not trust. |
-| 69–89 min | Observe implementation, retry, merge, and unlock | Bounded verification and synchronization make concurrency legible. |
-| 89–100 min | Compare both results and map extension points | Judge reviewability as well as whether the app works. |
+| A | Factory checkout | Planning and factory commands |
+| B | `python3 -m http.server 8000` | Dashboard server |
+| C | Control checkout | One autonomous agent |
+| D | Demo application | Pocket Cinema or TableStory |
 
-## Before the room opens
+Prepare these browser tabs:
 
-1. Prefer a disposable checkout:
+1. attendee workshop website;
+2. `http://localhost:8000/factory/dashboard.html`;
+3. `http://localhost:5000`;
+4. the disposable GitHub Project for live mode; and
+5. one pull request for the merge-and-unlock explanation.
 
-   ```sh
-   ./factory/new_workshop.sh ../software-refactory-live live
-   cd ../software-refactory-live
-   ```
+Don't start the application before running the live doctor. An occupied port is
+reported as a warning.
 
-2. Run the complete preflight and fix every failure:
+## Timing and presenter cues
 
-   ```sh
-   ./factory/factory doctor --full
-   ```
+| Time | Attendee action | What to say or show |
+| --- | --- | --- |
+| 0–8 min | Set up the selected mode | Point to the prerequisite list and required readiness result. |
+| 8–13 min | Inspect Pocket Cinema | Ask what must change besides the logo, then stop the server. |
+| 13–20 min | Read the PRD | Identify the user journey, system constraints, and shared-data risk. |
+| 20–32 min | Start the control | Explain that the model and task stay fixed; only the workflow changes. |
+| 32–44 min | Review Product Review | Reject ambiguous behavior before technical planning begins. |
+| 44–59 min | Review technical alignment | Trace one requirement through architecture, program design, slice, and QA evidence. |
+| 59–69 min | Review QA tests | Ask whether the assertions prove behavior before approving them. |
+| 69–89 min | Observe implementation | Follow one ticket through prompt, log, diff, gate, merge, and dependency unlock. |
+| 89–100 min | Compare both results | Compare review effort and evidence, not just whether the app works. |
 
-3. Prepare a second checkout for the live lights-off control:
+## Rehearsal command path
 
-   ```sh
-   ./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
-   cd ../software-refactory-control
-   git switch -c experiment/lights-off
-   ```
+Run Product Review:
 
-   Use the same implementation model and CLI version as the factory. If a live
-   agent is unavailable, keep
-   `factory/scenarios/recipe-rebrand/lights-off-sample-report.md` ready and label
-   it as a discussion fixture, not a benchmark.
+```sh
+./factory/factory plan recipe-app-prd.md --mock
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
+```
 
-4. In another terminal, prepare the deterministic fallback without leaving the
-   live checkout in the first terminal:
+Run and inspect technical planning:
 
-   ```sh
-   ./factory/new_workshop.sh ../software-refactory-fallback recipe-rebrand
-   cd ../software-refactory-fallback
-   ./factory/factory run --mock --scenario recipe-rebrand --dry-run
-   ```
+```sh
+./factory/factory continue-plan PLAN_ID --mock
+./factory/factory review alignment PLAN_ID
+./factory/factory run --mock --scenario recipe-rebrand --dry-run
+```
 
-5. Serve the board from the repository root:
+Pause after the first QA wave:
 
-   ```sh
-   python3 -m http.server 8000
-   ```
+```sh
+./factory/factory run --mock \
+  --scenario recipe-rebrand \
+  --review-qa-tests \
+  --once
+./factory/factory approve-tests 1 --yes
+./factory/factory approve-tests 2 --yes
+```
 
-   Open `http://localhost:8000/factory/dashboard.html` on the presentation display.
+Finish the scenario:
 
-6. For live agents, run a smoke prompt through every CLI you will offer. Confirm
-   `gh auth status` shows the `project` scope.
+```sh
+./factory/factory run --mock --scenario recipe-rebrand --once
+```
 
-7. Use `factory approve --new-project-title "TableStory Workshop"` rather than
-   reusing the previous TV rehearsal board. Note the printed number and pass it
-   to `factory run`.
+## Live command path
 
-## Live commands
-
-Start the control in its prepared checkout, then leave it alone:
+Start the control in Terminal C and don't intervene:
 
 ```sh
 python3 factory/run_lights_off.py --agent codex
 ```
 
-Return to the factory checkout and run:
+Return to Terminal A:
 
 ```sh
 ./factory/factory plan recipe-app-prd.md
@@ -82,62 +163,66 @@ Return to the factory checkout and run:
 ./factory/factory approve-product PLAN_ID
 ./factory/factory continue-plan PLAN_ID
 ./factory/factory review alignment PLAN_ID
-./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
-./factory/factory run --agent codex --qa-agent claude --review-qa-tests --project-number NUMBER
-./factory/factory approve-tests ISSUE
+./factory/factory approve PLAN_ID \
+  --new-project-title "TableStory Workshop"
+./factory/factory run \
+  --agent codex \
+  --qa-agent codex \
+  --review-qa-tests \
+  --max-parallel 4 \
+  --project-number PROJECT_NUMBER
 ```
 
-Click a dashboard ticket during every phase. Show the attendee the specification,
-QA files, prompt, log, changed files, gate output, and history. After a dependency
-PR is merged, point out the “PR merged and synchronized” transition before the
-next ticket becomes Ready.
+Approve a reviewed test set from another terminal:
 
-At the end, return to the control checkout. Test the same user journeys and
-record requirements evidenced, hidden assumptions, review-unit size,
-independent QA evidence, safe parallelism, and review/rework time for both
-workflows. Do not present a successful control run as a problem; ask which
-delivery context makes its smaller control surface sufficient.
+```sh
+./factory/factory approve-tests ISSUE_NUMBER
+```
 
-## Deterministic fallback
+After a green pull request is merged, wait for **PR merged and synchronized**
+before showing the next ticket move to Ready.
 
-If GitHub, Wi-Fi, or a model CLI is slow, switch to the credential-free scenario:
+## Evidence to show for one ticket
+
+Don't click through every field. Use one ticket to show this sequence:
+
+1. **Specification:** the authorized outcome and acceptance criteria.
+2. **QA prompt and test diff:** independent evidence written before implementation.
+3. **Protected test hashes:** the implementation agent can't weaken the evidence.
+4. **Implementation prompt and log:** the current scope and activity.
+5. **Changed files:** the code-review surface.
+6. **Gate output:** the reason for pass, retry, or block.
+7. **History:** merge synchronization and dependency unlock.
+
+## Recovery during the session
+
+| Symptom | Response |
+| --- | --- |
+| GitHub, Wi-Fi, or a model is slow | Switch to the deterministic recipe scenario. |
+| Product Review is blocked | Resolve the blocking question; don't continue to architecture. |
+| QA Review takes too long | Review one test set, then finish without `--review-qa-tests`. |
+| A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
+| A port is occupied | Stop the old process or use a fresh checkout. |
+| The state is stale | Reset only after confirming demo changes can be discarded. |
+| The agenda is late | Show one QA approval and one dependency unlock, then move to comparison. |
+
+Reset a disposable rehearsal only when its demo changes can be discarded:
 
 ```sh
 ./setup_demo.sh --scenario recipe-rebrand --force
-./factory/factory run --mock --scenario recipe-rebrand --once
 ```
 
-If only the planning model is unavailable, run the schema-valid deterministic
-experts and continue with the same two human gates:
+The TV scenario remains available as an optional failure lab. Ticket 8 is
+rejected because “It feels right” isn't an objective acceptance criterion.
 
-```sh
-./factory/factory plan recipe-app-prd.md --mock
-./factory/factory approve-product PLAN_ID --yes
-./factory/factory continue-plan PLAN_ID --mock
-./factory/factory review alignment PLAN_ID
-./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
-```
+## Dry-run acceptance criteria
 
-This still creates real worktrees, independent QA commits, protected acceptance
-tests, implementation commits, verification output, dependency waves, and local
-merges. No part of the control-flow explanation needs to change.
+The workshop is ready when a colleague can use the website without verbal help
+to:
 
-The original failure-oriented TV story remains available:
-
-```sh
-./setup_demo.sh --scenario tv --force
-./factory/factory run --mock --scenario tv --once
-```
-
-Ticket #8 is intentionally rejected by QA because “It feels right” is not
-objectively testable.
-
-## Recovery
-
-- `setup_demo.sh` refuses uncommitted `demo-app/` changes unless `--force` is explicit.
-- A Blocked or QA Review worktree is preserved for inspection.
-- `factory retry ISSUE` resets both QA and implementation attempt state.
-- `factory approve-tests ISSUE` writes a small approval marker; a running factory
-  notices it on the next poll and resumes the preserved worktree.
-- The factory refuses a real run from a dirty or non-default branch and refuses
-  to unlock dependants until merged commits are reachable from the synchronized base.
+- select a mode and verify its prerequisites;
+- reach every checkpoint using the displayed commands;
+- find the dashboard, ticket evidence, and troubleshooting section;
+- explain the two human planning approvals and the QA approval;
+- explain one dependency unlock; and
+- compare the control and factory without assuming the control must fail.

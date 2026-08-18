@@ -213,6 +213,7 @@ export default function Home() {
         <nav>
           <p className="nav-label">Get started</p>
           <a href="#start" onClick={() => setMenuOpen(false)}>Overview</a>
+          <a href="#prerequisites" onClick={() => setMenuOpen(false)}>Prerequisites</a>
           <a href="#choose-track" onClick={() => setMenuOpen(false)}>Choose a path</a>
           <p className="nav-label">Guided lab</p>
           {steps.map((step, index) => (
@@ -236,17 +237,18 @@ export default function Home() {
         <section className="hero" id="start">
           <div className="hero-copy">
             <div className="eyebrow">GUIDED LAB</div>
-            <h1>Run an AI software factory</h1>
+            <h1>Build software with controlled AI agents</h1>
             <p className="hero-lede">
-              Compare one lights-off coding agent with a planned software factory, then
-              inspect which workflow makes decisions and evidence easier to control.
+              Turn a PRD into reviewable plans, tickets, protected tests, isolated
+              changes, and merge evidence. Then compare that workflow with one
+              autonomous coding agent.
             </p>
             <div className="hero-meta">
               <span><b>Level</b> Intermediate</span>
               <span><b>Time</b> 100 minutes</span>
-              <span><b>Cost</b> Free in rehearsal mode</span>
+              <span><b>Modes</b> Rehearsal or live GitHub</span>
             </div>
-            <a className="primary-button" href="#choose-track">Start the workshop <span aria-hidden="true">→</span></a>
+            <a className="primary-button" href="#prerequisites">Check prerequisites <span aria-hidden="true">→</span></a>
           </div>
           <div className="factory-map" aria-label="Workshop flow from PRD to merged application">
             <div className="control-strip" aria-label="Lights-off control flow">
@@ -286,10 +288,65 @@ export default function Home() {
               <li>Align four expert planning contracts</li>
               <li>Compare factory and lights-off delivery</li>
               <li>Trace requirements to QA evidence</li>
-              <li>Control safe parallel execution</li>
+              <li>Run agents in safe parallel waves</li>
               <li>Review QA-authored tests</li>
               <li>Diagnose retries and blocked work</li>
             </ul>
+          </div>
+        </section>
+
+        <section className="prerequisites-section" id="prerequisites">
+          <div className="section-heading">
+            <span className="section-kicker">Prerequisites</span>
+            <h2>Prepare your development environment</h2>
+            <p>Complete these checks before the workshop. Rehearsal mode has no account or model requirement.</p>
+          </div>
+          <div className="prerequisites-grid">
+            <article>
+              <span className="requirement-label">Both modes</span>
+              <h3>Local tools</h3>
+              <ul>
+                <li>macOS, Linux, or Windows with WSL 2</li>
+                <li>Python 3.11 or later with <code>venv</code></li>
+                <li>Node.js 20 or later</li>
+                <li>Git and a current web browser</li>
+                <li>Permission to create sibling directories</li>
+                <li>Ports 5000, 5050, and 8000 available</li>
+              </ul>
+            </article>
+            <article>
+              <span className="requirement-label">Live mode only</span>
+              <h3>Accounts and access</h3>
+              <ul>
+                <li>GitHub CLI authenticated with the <code>project</code> scope</li>
+                <li>A disposable repository you can push to</li>
+                <li>Permission to create issues, Projects, and pull requests</li>
+                <li>A current, authenticated <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI <span aria-hidden="true">↗</span></a> for planning</li>
+                <li>Optional Claude Code or Cursor login for ticket agents</li>
+                <li>Network access to GitHub and the agent provider</li>
+              </ul>
+            </article>
+          </div>
+          <h3>Check the required versions</h3>
+          <CodeBlock>{`python3 --version   # 3.11 or later
+node --version      # 20 or later
+git --version`}</CodeBlock>
+          <p className="install-links">
+            Install a missing tool: <a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer">Python</a>
+            <span aria-hidden="true"> · </span><a href="https://nodejs.org/en/download" target="_blank" rel="noreferrer">Node.js</a>
+            <span aria-hidden="true"> · </span><a href="https://git-scm.com/downloads" target="_blank" rel="noreferrer">Git</a>
+            <span aria-hidden="true"> · </span><a href="https://cli.github.com/" target="_blank" rel="noreferrer">GitHub CLI</a>
+            <span aria-hidden="true"> · </span><a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI</a>
+          </p>
+          <Callout type="note" title="No API key is required">
+            Rehearsal mode uses deterministic local agents. Live mode uses your authenticated Codex CLI session; it does not read <code>OPENAI_API_KEY</code>.
+          </Callout>
+          <h3>Use separate terminals</h3>
+          <div className="terminal-grid">
+            <div><b>Terminal A</b><span>Factory commands</span></div>
+            <div><b>Terminal B</b><span>Dashboard server</span></div>
+            <div><b>Terminal C</b><span>Lights-off control</span></div>
+            <div><b>Terminal D</b><span>Demo app, if needed</span></div>
           </div>
         </section>
 
@@ -310,8 +367,8 @@ export default function Home() {
               <span className="recommended">RECOMMENDED</span>
               <span className="path-icon rehearsal-icon" aria-hidden="true">▶</span>
               <strong>Rehearsal mode</strong>
-              <span>Use deterministic agents and local merges. No GitHub writes or model credentials.</span>
-              <small>Best for first-time attendees</small>
+              <span>Run deterministic planning, QA, implementation, and local merges. No GitHub writes or model credentials.</span>
+              <small>Use this path for the dry run</small>
             </button>
             <button
               className={`path-card ${track === "live" ? "path-selected" : ""}`}
@@ -323,7 +380,7 @@ export default function Home() {
               <span className="path-icon live-icon" aria-hidden="true">⌘</span>
               <strong>Live GitHub mode</strong>
               <span>Use real agent CLIs, GitHub Issues, Projects, worktrees, and pull requests.</span>
-              <small>Requires GitHub and an agent login</small>
+              <small>Requires a disposable repository and Codex login</small>
             </button>
           </div>
           <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub mode" : "Rehearsal mode"}`}>
@@ -332,32 +389,38 @@ export default function Home() {
         </section>
 
         <StepSection id="setup" number={1} title="Set up your workspace" time="8 min" completed={completed.includes("setup")} onComplete={() => toggleStep("setup")}>
-          <p className="goal">Create a clean workshop checkout and confirm the required tools are available.</p>
+          <p className="goal">Create a clean checkout, initialize the demo, and pass the readiness check for your selected mode.</p>
           {track === "rehearsal" ? (
             <>
-              <p>Open a terminal and run:</p>
+              <p>In Terminal A, clone the workshop and prepare the deterministic recipe scenario:</p>
               <CodeBlock>{`git clone https://github.com/giolaq/software-refactory-workshop.git
 cd software-refactory-workshop
 ./setup_demo.sh --scenario recipe-rebrand`}</CodeBlock>
-              <p>The setup script creates a Python environment, installs the small demo dependency set, restores Pocket Cinema, and initializes empty factory state.</p>
+              <p>The script creates the Python environment, installs Flask and pytest, restores Pocket Cinema, and initializes empty factory state. It doesn’t call GitHub or a model.</p>
               <Checkpoint>
                 Your terminal ends with <code>Factory reset complete for scenario: recipe-rebrand</code>.
               </Checkpoint>
             </>
           ) : (
             <>
-              <p>Clone the repository, authenticate GitHub, and run the complete preflight:</p>
+              <p>First, confirm GitHub access. If <code>gh auth status</code> fails, run <code>gh auth login</code> and repeat the check.</p>
+              <CodeBlock>{`gh auth status
+gh auth refresh -s project`}</CodeBlock>
+              <p>Clone the workshop, replace its read-only upstream remote with a private disposable repository, and run the full preflight:</p>
               <CodeBlock>{`git clone https://github.com/giolaq/software-refactory-workshop.git
 cd software-refactory-workshop
-gh auth login
-gh auth refresh -s project
+git remote rename origin upstream
+gh repo create software-refactory-dry-run \
+  --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
+git push origin main
 ./factory/factory doctor --full --agent codex --qa-agent codex`}</CodeBlock>
+              <p>If that repository name already exists, choose another name. The doctor checks the clean branch, remote synchronization, GitHub Projects access, authenticated agent CLIs, ports, QA policy, and all configured gates.</p>
               <Callout type="warning" title="Use a disposable repository">
                 A live run creates branches, worktrees, issues, Projects items, and pull requests. Don’t use a repository that contains unrelated work.
               </Callout>
               <Checkpoint>
-                The doctor reports no blocking failures. Confirm GitHub authentication includes the <code>project</code> scope and your agent CLI is authenticated.
+                The doctor reports <code>0 failures</code>. A warning is acceptable only for an optional agent that you won’t use.
               </Checkpoint>
             </>
           )}
@@ -367,7 +430,7 @@ gh auth refresh -s project
           <p className="goal">Understand the product before an agent changes it.</p>
           <p>Start Pocket Cinema from the repository root:</p>
           <CodeBlock>{`.factory/venv/bin/python demo-app/app.py`}</CodeBlock>
-          <p>Open <a href="http://localhost:5000" target="_blank" rel="noreferrer">localhost:5000 <span aria-hidden="true">↗</span></a>. Browse the film cards, search, and open one detail page.</p>
+          <p>Open <a href="http://localhost:5000" target="_blank" rel="noreferrer">localhost:5000 <span aria-hidden="true">↗</span></a>. Browse the film cards, search, and open one detail page. When you finish, return to the terminal and press <code>Ctrl+C</code> so the final app can use the same port.</p>
           <div className="activity-card">
             <span className="activity-label">30-second activity</span>
             <h3>Predict the rebrand surface</h3>
@@ -378,7 +441,7 @@ gh auth refresh -s project
             </details>
           </div>
           <Checkpoint>
-            You can explain why this is a domain conversion rather than a cosmetic redesign. Leave the app running for comparison later.
+            You can explain why this is a domain conversion rather than a cosmetic redesign, and the baseline server is stopped.
           </Checkpoint>
         </StepSection>
 
@@ -450,7 +513,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           <CodeBlock>{track === "live"
             ? `./factory/factory plan recipe-app-prd.md`
             : `./factory/factory plan recipe-app-prd.md --mock`}</CodeBlock>
-          <p>Copy the printed <code>PLAN_ID</code>, then open the readable Product Review:</p>
+          <p>Copy the printed <code>PLAN_ID</code>. You will use it in every remaining planning command. Then open the readable Product Review:</p>
           <CodeBlock>{`./factory/factory review product PLAN_ID`}</CodeBlock>
           <h3>Review the Product Review contract</h3>
           <ol>
@@ -463,7 +526,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           <div className="activity-card">
             <span className="activity-label">Product decision</span>
             <h3>Would two teams build the same product?</h3>
-            <p>Pick one requirement and explain its successful user-visible outcome. If two reasonable interpretations remain, edit <code>01-product-review.json</code> before approval.</p>
+            <p>Pick one requirement and explain its successful user-visible outcome. If two reasonable interpretations remain, edit <code>.factory/plans/PLAN_ID/01-product-review.json</code>, review it again, and approve only when the ambiguity is resolved.</p>
           </div>
           <p>When the behavior and scope are correct, approve only the product contract:</p>
           <CodeBlock>{`./factory/factory approve-product PLAN_ID`}</CodeBlock>
@@ -516,7 +579,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
             </>
           ) : (
             <>
-              <p>Rehearsal mode stops before the GitHub write. Confirm the deterministic execution set matches the reviewed five slices:</p>
+              <p>Rehearsal mode doesn’t write to GitHub. Preview the five deterministic tickets and their dependency order:</p>
               <CodeBlock>{`./factory/factory run --mock \
   --scenario recipe-rebrand --dry-run`}</CodeBlock>
               <Checkpoint>
@@ -528,9 +591,9 @@ git switch -c experiment/lights-off`}</CodeBlock>
 
         <StepSection id="qa" number={7} title="Let QA define the evidence" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
           <p className="goal">Review independent acceptance tests before implementation begins.</p>
-          <p>First, serve the live dashboard from a second terminal:</p>
+          <p>In Terminal B, serve the dashboard from the repository root and leave it running:</p>
           <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
-          <p>Open <a href="http://localhost:8000/factory/dashboard.html" target="_blank" rel="noreferrer">localhost:8000/factory/dashboard.html <span aria-hidden="true">↗</span></a>.</p>
+          <p>Open <a href="http://localhost:8000/factory/dashboard.html" target="_blank" rel="noreferrer">localhost:8000/factory/dashboard.html <span aria-hidden="true">↗</span></a>. Return to Terminal A before starting the factory.</p>
           <p>The alignment pipeline appears above the ticket board. Click a planning stage to inspect its readable artifact, hash, status, and blocking questions.</p>
           {track === "live" ? (
             <CodeBlock>{`./factory/factory run \
@@ -578,7 +641,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
   --scenario recipe-rebrand \
   --review-qa-tests \
   --once`}</CodeBlock>
-              <p>Repeat the review-and-approve cycle when the next wave reaches QA Review. To run the remaining deterministic scenario without pauses, omit <code>--review-qa-tests</code>.</p>
+              <p>This command resumes the approved first wave and runs the remaining deterministic tickets without another manual QA pause. Independent QA still runs for every ticket.</p>
             </>
           )}
           <div className="evidence-grid">
@@ -714,6 +777,19 @@ git status --short`}</CodeBlock>
           </div>
           <div className="accordion-list">
             <details>
+              <summary>A prerequisite command is missing or too old</summary>
+              <p>Install the required version, open a new terminal, and run the version checks again. Windows users should run the workshop inside WSL 2, not Command Prompt or PowerShell.</p>
+              <CodeBlock>{`python3 --version
+node --version
+git --version`}</CodeBlock>
+            </details>
+            <details>
+              <summary>The live-mode doctor reports a failure</summary>
+              <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. Optional Claude or Cursor warnings are safe only when neither adapter will be used.</p>
+              <CodeBlock>{`./factory/factory doctor --full \
+  --agent codex --qa-agent codex`}</CodeBlock>
+            </details>
+            <details>
               <summary>The factory reports “no git remotes found”</summary>
               <p>Rehearsal mode does not require a remote. For live mode, create or attach a GitHub repository and push <code>main</code> before running the factory.</p>
               <CodeBlock>{`git remote add origin https://github.com/OWNER/REPOSITORY.git
@@ -721,10 +797,10 @@ git push -u origin main`}</CodeBlock>
             </details>
             <details>
               <summary>A ticket says the OpenAI API key is missing</summary>
-              <p>The workshop is designed to use the authenticated Codex CLI, not a direct API key. Confirm you have a current Codex executable with a saved login:</p>
-              <CodeBlock>{`codex login status
-./factory/factory doctor --agent codex --qa-agent codex`}</CodeBlock>
-              <p>If several Codex versions are installed, set <code>FACTORY_CODEX_BIN</code> to the authenticated executable.</p>
+              <p>The workshop uses an authenticated Codex CLI session, not an API key. Run the doctor first; it ignores legacy Codex executables and reports the compatible authenticated CLI it selected.</p>
+              <CodeBlock>{`./factory/factory doctor \
+  --agent codex --qa-agent codex`}</CodeBlock>
+              <p>If no compatible CLI is found, install or update Codex, run <code>codex</code>, and choose <strong>Sign in with ChatGPT</strong>. If several versions are installed, set <code>FACTORY_CODEX_BIN</code> to the authenticated executable.</p>
             </details>
             <details>
               <summary>The scheduler reports a deadlock</summary>
@@ -762,6 +838,7 @@ git push -u origin main`}</CodeBlock>
             <h2>Factory commands</h2>
           </div>
           <div className="reference-table" role="table" aria-label="Factory command reference">
+            <div role="row"><code>run_lights_off.py --agent codex</code><span>Start the one-agent control in its checkout.</span></div>
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
             <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
             <div role="row"><code>factory review product PLAN_ID</code><span>Inspect behavior, scope, evidence, and blockers.</span></div>

@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(`${protocol}://${host}`),
     title: "Software (re)-Factory Workshop",
     description:
-      "A self-guided workshop comparing lights-off development with a human-gated multi-agent software factory.",
+      "A self-guided developer workshop for planning, running, reviewing, and comparing controlled AI coding agents.",
     openGraph: {
       title: "Software (re)-Factory Workshop",
       description:
