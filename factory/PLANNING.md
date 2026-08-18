@@ -1,0 +1,81 @@
+# Four-expert planning pipeline
+
+The factory treats planning as a sequence of reviewable contracts, not a single
+request to generate tickets. A fresh read-only agent owns each stage. Stable IDs
+and hashes make disagreements visible before implementation becomes expensive.
+
+```mermaid
+flowchart LR
+  PRD["PRD"] --> P["1. Product Review"]
+  P --> PG{"Approve product"}
+  PG --> A["2. System Architecture"]
+  A --> D["3. Program Design"]
+  D --> S["4. Vertical Slices"]
+  S --> T["Traceability + validation"]
+  T --> AG{"Approve alignment"}
+  AG --> G["GitHub tickets"]
+```
+
+## Expert responsibilities
+
+| Expert | Decides | Must not decide | Key IDs |
+| --- | --- | --- | --- |
+| Product Review | Problem, users, behavior, journeys, scope, evidence, mockup needs | Components, files, tickets | `R*`, `U*`, `J*` |
+| System Architecture | Components, ownership, contracts, data models, constraints, risks | Function signatures or tickets | `C*`, `CT*`, `D*`, `ADR*` |
+| Program Design | Modules, paths, types, signatures, call flows, errors, test seams | Backlog sequencing | `MOD*`, `TYPE*`, `FN*`, `FLOW*`, `TEST*` |
+| Vertical Slices | End-to-end tickets, dependencies, file ownership, QA evidence | New product scope | `T*` plus upstream IDs |
+
+The exact prompt builders are in `planning_pipeline.stage_prompt`. Their shared
+rules are: preserve scope, keep upstream IDs, surface human decisions as
+blocking questions, and return only schema-valid JSON. The role-specific parts
+make the separation explicit:
+
+- Product Review: clarify the outcome; do not design architecture or tickets.
+- System Architecture: give every requirement an owning component and explicit
+  component contracts; do not write low-level code.
+- Program Design: define modules, types, signatures, calls, error behavior, and
+  test seams; do not create tickets.
+- Vertical Slices: create observable end-to-end changes that map requirements,
+  contracts, program elements, owned files, and QA evidence.
+
+Schemas are under `factory/planning_schemas/`. Every invocation also records the
+rendered prompt and CLI log under `.factory/prompts/` and `.factory/logs/`.
+
+## Human workflow
+
+```sh
+./factory/factory plan PRD.md
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
+./factory/factory continue-plan PLAN_ID
+./factory/factory review alignment PLAN_ID
+./factory/factory approve PLAN_ID --new-project-title "Workshop"
+```
+
+`plan` stops after Product Review. `continue-plan` runs the remaining experts
+sequentially, stopping if any expert has blocking questions. `approve` combines
+the final alignment authorization with publication, so no GitHub issue exists
+before a human accepts the whole package.
+
+For a credential-free rehearsal, add `--mock` to `plan` and `continue-plan`.
+The bundled TableStory artifacts follow the same schemas, validators, manifest,
+approval gates, traceability generation, and dashboard path as live agents.
+
+## Validation and invalidation
+
+Before publication, the factory verifies:
+
+- all stable-ID references resolve;
+- every requirement has an architecture owner and implementing slice;
+- every program element has a ticket owner;
+- every ticket has a vertical outcome, acceptance criteria, file ownership, and
+  QA evidence;
+- dependencies form an acyclic graph;
+- tickets that can run in parallel do not claim the same file;
+- no blocking question remains;
+- every traceability row reaches both a slice and QA evidence.
+
+`manifest.json` records the PRD hash, artifact hashes, input hashes, prompt
+version, expert, timestamps, logs, and approvals. If a person edits an approved
+upstream JSON artifact, downstream stages become stale and the relevant human
+approval is cleared. The next command explains which review must be repeated.

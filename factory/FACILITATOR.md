@@ -1,18 +1,18 @@
 # Facilitator runbook
 
-## Recommended 80-minute workshop
+## Recommended 100-minute workshop
 
 | Time | Activity | Teaching point |
 | --- | --- | --- |
-| 0–8 min | Show Pocket Cinema and the target TableStory brief | Agents need an observable product goal. |
-| 8–18 min | Run `factory plan recipe-app-prd.md` | The planner proposes work; it does not authorize work. |
-| 18–28 min | Review the graph, waves, questions, and acceptance criteria | Humans control scope and dependencies. |
-| 28–35 min | Run `factory approve` against a fresh GitHub Project | Tickets become an auditable contract. |
-| 35–48 min | Start the first wave with QA review enabled | Independent agents write tests before implementation. |
-| 48–58 min | Inspect and approve QA tests | Human control is based on evidence, not trust. |
-| 58–68 min | Watch a failure/retry and inspect its log | Verification output becomes the repair prompt. |
-| 68–75 min | Merge a PR and watch a dependant unlock | The merged commit is synchronized before reuse. |
-| 75–80 min | Reveal TableStory and map extension points | Adapters, models, gates, and runtimes are configurable. |
+| 0–8 min | Set up live or rehearsal mode | Everyone starts from a known environment. |
+| 8–13 min | Show the Pocket Cinema baseline | Agents need an observable product starting point. |
+| 13–20 min | Read the TableStory PRD | The group sees the same outcome and ambiguities. |
+| 20–32 min | Start the one-agent lights-off control | A fair comparison changes the workflow, not the model or task. |
+| 32–44 min | Run and approve Product Review | Product intent becomes an explicit contract. |
+| 44–59 min | Run technical experts, review traceability, and publish | Alignment creates an auditable ticket contract. |
+| 59–69 min | Inspect and approve QA tests | Human control is based on evidence, not trust. |
+| 69–89 min | Observe implementation, retry, merge, and unlock | Bounded verification and synchronization make concurrency legible. |
+| 89–100 min | Compare both results and map extension points | Judge reviewability as well as whether the app works. |
 
 ## Before the room opens
 
@@ -29,7 +29,20 @@
    ./factory/factory doctor --full
    ```
 
-3. In a second terminal, prepare the deterministic fallback without leaving the
+3. Prepare a second checkout for the live lights-off control:
+
+   ```sh
+   ./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+   cd ../software-refactory-control
+   git switch -c experiment/lights-off
+   ```
+
+   Use the same implementation model and CLI version as the factory. If a live
+   agent is unavailable, keep
+   `factory/scenarios/recipe-rebrand/lights-off-sample-report.md` ready and label
+   it as a discussion fixture, not a benchmark.
+
+4. In another terminal, prepare the deterministic fallback without leaving the
    live checkout in the first terminal:
 
    ```sh
@@ -38,7 +51,7 @@
    ./factory/factory run --mock --scenario recipe-rebrand --dry-run
    ```
 
-4. Serve the board from the repository root:
+5. Serve the board from the repository root:
 
    ```sh
    python3 -m http.server 8000
@@ -46,18 +59,30 @@
 
    Open `http://localhost:8000/factory/dashboard.html` on the presentation display.
 
-5. For live agents, run a smoke prompt through every CLI you will offer. Confirm
+6. For live agents, run a smoke prompt through every CLI you will offer. Confirm
    `gh auth status` shows the `project` scope.
 
-6. Use `factory approve --new-project-title "TableStory Workshop"` rather than
+7. Use `factory approve --new-project-title "TableStory Workshop"` rather than
    reusing the previous TV rehearsal board. Note the printed number and pass it
    to `factory run`.
 
 ## Live commands
 
+Start the control in its prepared checkout, then leave it alone:
+
+```sh
+python3 factory/run_lights_off.py --agent codex
+```
+
+Return to the factory checkout and run:
+
 ```sh
 ./factory/factory plan recipe-app-prd.md
-./factory/factory approve .factory/plans/recipe-app-prd-PLAN_ID.json --new-project-title "TableStory Workshop"
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
+./factory/factory continue-plan PLAN_ID
+./factory/factory review alignment PLAN_ID
+./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ./factory/factory run --agent codex --qa-agent claude --review-qa-tests --project-number NUMBER
 ./factory/factory approve-tests ISSUE
 ```
@@ -66,6 +91,12 @@ Click a dashboard ticket during every phase. Show the attendee the specification
 QA files, prompt, log, changed files, gate output, and history. After a dependency
 PR is merged, point out the “PR merged and synchronized” transition before the
 next ticket becomes Ready.
+
+At the end, return to the control checkout. Test the same user journeys and
+record requirements evidenced, hidden assumptions, review-unit size,
+independent QA evidence, safe parallelism, and review/rework time for both
+workflows. Do not present a successful control run as a problem; ask which
+delivery context makes its smaller control surface sufficient.
 
 ## Deterministic fallback
 
@@ -76,12 +107,15 @@ If GitHub, Wi-Fi, or a model CLI is slow, switch to the credential-free scenario
 ./factory/factory run --mock --scenario recipe-rebrand --once
 ```
 
-If only the planning model is unavailable, copy the reviewed fallback plan and
-continue with the normal GitHub approval flow:
+If only the planning model is unavailable, run the schema-valid deterministic
+experts and continue with the same two human gates:
 
 ```sh
-cp factory/scenarios/recipe-rebrand/example-plan.json .factory/plans/table-story-fallback.json
-./factory/factory approve .factory/plans/table-story-fallback.json --new-project-title "TableStory Workshop"
+./factory/factory plan recipe-app-prd.md --mock
+./factory/factory approve-product PLAN_ID --yes
+./factory/factory continue-plan PLAN_ID --mock
+./factory/factory review alignment PLAN_ID
+./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ```
 
 This still creates real worktrees, independent QA commits, protected acceptance

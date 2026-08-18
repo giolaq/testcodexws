@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "responsibility": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } },
+          "data_owned": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "responsibility", "requirements", "data_owned"]
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "provider": { "type": "string" },
+          "consumers": { "type": "array", "items": { "type": "string" } },
+          "input": { "type": "string" },
+          "output": { "type": "string" },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "provider", "consumers", "input", "output", "errors", "requirements"]
+      }
+    },
+    "data_models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "fields": { "type": "array", "items": { "type": "string" } },
+          "invariants": { "type": "array", "items": { "type": "string" } },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "name", "fields", "invariants", "requirements"]
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "decision": { "type": "string" },
+          "rationale": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "decision", "rationale", "requirements"]
+      }
+    },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "blocking_questions": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["components", "contracts", "data_models", "decisions", "constraints", "risks", "blocking_questions"]
+}

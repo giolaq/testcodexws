@@ -22,6 +22,14 @@ Who uses it, and what do they need to accomplish?
 
 1. Describe each important workflow or behavior.
 
+## User journeys and edge cases
+
+Describe the important start-to-finish journeys, failure states, and empty states.
+
+## Mockups and examples
+
+- Link or describe the screens, API examples, or reference behavior that remove ambiguity.
+
 ## Constraints
 
 - Existing stack, compatibility, security, performance, or delivery constraints.
@@ -29,6 +37,10 @@ Who uses it, and what do they need to accomplish?
 ## Definition of done
 
 - End-to-end outcomes a human can verify.
+
+## Success evidence
+
+- Tests, screenshots, measurements, or observations that prove each requirement.
 
 ## Open questions
 

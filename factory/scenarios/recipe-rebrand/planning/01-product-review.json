@@ -1,0 +1,32 @@
+{
+  "project": {
+    "name": "TableStory Recipe App Rebrand",
+    "summary": "Convert Pocket Cinema into a coherent recipe discovery product for mobile and television.",
+    "problem": "The reusable application capabilities are hidden behind a film-domain model, terminology, and visual identity that do not serve home cooks.",
+    "desired_outcome": "A reviewer can discover, inspect, and save recipes on mobile or by TV remote without encountering cinema-domain language."
+  },
+  "users": [
+    {"id": "U1", "description": "Everyday home cook", "need": "Find a suitable recipe and understand what it requires."},
+    {"id": "U2", "description": "Hands-busy kitchen viewer", "need": "Read and navigate recipes from a television without a pointer."},
+    {"id": "U3", "description": "Workshop attendee", "need": "Review an observable transformation with objective evidence."}
+  ],
+  "requirements": [
+    {"id": "R1", "statement": "Every supported surface uses the TableStory brand, recipe terminology, and accessible warm visual system.", "source": "Brand direction; Functional requirements 1 and 9", "success_evidence": "Rendered pages and automated terminology checks contain no prohibited cinema language."},
+    {"id": "R2", "statement": "The app exposes deterministic recipe data, recipe-domain APIs, search semantics, and cookbook persistence in memory.", "source": "Recipe content model; Functional requirements 3, 5, and 6", "success_evidence": "API tests verify 12 recipes, search, lookup, rails, and cookbook add/remove behavior."},
+    {"id": "R3", "statement": "Mobile users can browse, search, open, understand, save, and remove recipes at 375 CSS pixels.", "source": "Functional requirements 2, 3, 4, 5, and 9", "success_evidence": "A browser test completes the mobile browse-to-detail-to-cookbook journey without horizontal scrolling."},
+    {"id": "R4", "statement": "TV users can browse named rails, open a recipe, operate cookbook and back actions using only remote-equivalent keys.", "source": "Functional requirements 7, 8, and 9", "success_evidence": "Keyboard tests complete the TV journey at 1920 by 1080 with visible focus."},
+    {"id": "R5", "statement": "Documentation and automated checks prove the rebrand is complete and locally reproducible.", "source": "Functional requirement 10; Definition of done", "success_evidence": "README startup instructions work and all configured gates pass from a clean checkout."}
+  ],
+  "journeys": [
+    {"id": "J1", "name": "Find and save dinner", "outcome": "A home cook finds a dish by ingredient and saves it to My Cookbook.", "steps": ["Open mobile browse", "Search by ingredient", "Open a matching recipe", "Review ingredients and method", "Save to My Cookbook"], "edge_cases": ["No search matches", "Unknown recipe ID", "Recipe already saved"], "requirements": ["R1", "R2", "R3"]},
+    {"id": "J2", "name": "Cook from the television", "outcome": "A kitchen viewer reaches a recipe and returns using only remote-equivalent keys.", "steps": ["Open TV browse", "Move between rails and cards", "Open focused recipe", "Operate cookbook action", "Return to TV browse"], "edge_cases": ["Cookbook rail is empty", "Selected card begins off-screen"], "requirements": ["R1", "R2", "R4"]},
+    {"id": "J3", "name": "Verify the transformation", "outcome": "A reviewer can reproduce the app and prove obsolete terminology is absent.", "steps": ["Follow README setup", "Run automated gates", "Inspect mobile mode", "Inspect TV mode"], "edge_cases": ["Dependencies are not installed", "A deprecated symbol remains"], "requirements": ["R5"]}
+  ],
+  "scope": {
+    "in": ["Complete TableStory identity and recipe-domain conversion", "At least 12 deterministic recipes", "Mobile browse, search, detail, and My Cookbook", "TV rails and remote navigation", "Recipe APIs, documentation, and verification"],
+    "out": ["Accounts or cross-device sync", "Database persistence", "Recipe authoring or shopping lists", "Third-party services", "Production deployment"]
+  },
+  "mockups": ["Mobile browse at 375 CSS pixels", "Mobile recipe detail and saved-state control", "TV rail browse at 1920 by 1080", "TV recipe detail with focusable primary actions"],
+  "assumptions": ["The existing Flask application remains the runtime foundation", "Saved recipes reset on server restart", "CSS artwork replaces hosted photography"],
+  "blocking_questions": []
+}

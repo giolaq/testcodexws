@@ -57,6 +57,29 @@ git push origin factory-baseline
 A checkout with no history for that commit (a downloaded archive rather than a
 clone) cannot be repaired locally; clone from `origin` instead.
 
+## Compare with a lights-off control
+
+Run the same TableStory PRD through one autonomous coding agent before starting
+the planned factory. Keep the baseline, model, prompt context, and verification
+criteria fixed; change only the delivery workflow.
+
+```sh
+./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
+cd ../software-refactory-control
+git switch -c experiment/lights-off
+python3 factory/run_lights_off.py --agent codex
+```
+
+Do not clarify or redirect the control agent while it runs. Return to the
+factory checkout and continue the guided workshop in parallel. At the end,
+score both results against the same PRD journeys, tests, terminology scan, and
+review-effort measures.
+
+See `LIGHTS_OFF_EXPERIMENT.md` for the complete protocol and the Claude Code and
+Cursor commands. Credential-free sessions can use
+`scenarios/recipe-rebrand/lights-off-sample-report.md`, which is explicitly a
+discussion fixture rather than a model benchmark.
+
 ## Architecture tour
 
 Start with `ARCHITECTURE.md`, which maps the runtime into a short reading path.
@@ -94,8 +117,9 @@ baseline data, configuration, and optionally the complete test suite.
 
 ## Start from an attendee PRD
 
-Copy `factory/PRD_TEMPLATE.md`, fill it in, then ask the read-only planning agent
-to turn it into a dependency-mapped proposal:
+Copy `factory/PRD_TEMPLATE.md`, fill it in, then start the four-expert alignment
+pipeline. Each expert is a fresh, read-only Codex CLI invocation with a distinct
+role, prompt, strict JSON schema, Markdown review artifact, prompt, and log.
 
 ```sh
 cp factory/PRD_TEMPLATE.md workshop-prd.md
@@ -103,34 +127,54 @@ cp factory/PRD_TEMPLATE.md workshop-prd.md
 ./factory/factory plan workshop-prd.md
 ```
 
-The command uses the authenticated Codex CLI but gives it a read-only sandbox.
-It creates two local files under `.factory/plans/`:
-
-- JSON is the editable source of truth.
-- Markdown is the readable review sheet for the attendee and facilitator.
-
-The plan contains stable ticket keys, specs, testable acceptance criteria,
-dependencies, agent choices, explicit open questions, a Mermaid dependency
-graph, and the parallel execution waves. Nothing is sent to GitHub and no
-implementation agent starts during planning.
-
-Review both files. Edit the JSON to split, combine, rewrite, or reorder tickets.
-Resolve and remove every `open_questions` entry, then approve the JSON plan:
+The first command runs only **Product Review**. Inspect the product behavior,
+users, journeys, scope, evidence, assumptions, mockup needs, and blocking
+questions. Nothing technical runs until a human approves this contract:
 
 ```sh
-./factory/factory approve .factory/plans/workshop-prd-PLAN_ID.json
+./factory/factory review product PLAN_ID
+./factory/factory approve-product PLAN_ID
 ```
 
-The factory validates references and cycles, prints the complete plan, and asks
-the human to type `APPROVE`. Only then does it create or update GitHub Issues,
-translate plan dependencies into real issue numbers, add them to the Projects
-board, and set dependency-free tickets Ready. Approval is idempotent: rerunning
-the same plan updates its marked issues instead of duplicating them.
+Approval launches nothing. Continue explicitly to run **System Architecture**,
+**Program Design**, and **Vertical Slices**, in that order:
+
+```sh
+./factory/factory continue-plan PLAN_ID
+./factory/factory review alignment PLAN_ID
+```
+
+The run lives at `.factory/plans/PLAN_ID/` and contains:
+
+- `source-prd.md` and a hash-tracked `manifest.json`.
+- `01-product-review.{json,md}`.
+- `02-system-architecture.{json,md}`.
+- `03-program-design.{json,md}`.
+- `04-vertical-slices.{json,md}`.
+- `traceability.json` and `alignment-review.md`.
+
+The generated traceability matrix connects each product requirement to
+architecture contracts, program elements, vertical slices, and QA evidence.
+Validation rejects unresolved questions, orphan requirements or program
+elements, dependency cycles, missing evidence, and overlapping file ownership
+between parallel tickets. Editing an approved upstream artifact invalidates its
+approval and every downstream artifact; the factory never silently reuses stale
+planning output.
+
+After the alignment review, approve and publish the final slices:
+
+```sh
+./factory/factory approve PLAN_ID
+```
+
+The human types `APPROVE ALIGNMENT`; only then does the factory create or update
+GitHub Issues, translate dependencies into issue numbers, add them to Projects,
+and set dependency-free tickets Ready. Publication remains idempotent.
 
 For a clean workshop board, create one during approval:
 
 ```sh
-./factory/factory approve PLAN.json --new-project-title "TableStory Workshop"
+./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ```
 
 Inspect the GitHub board, then deliberately start implementation:
@@ -300,24 +344,27 @@ factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
             [--review-qa-tests] [--scenario tv|recipe-rebrand]
             [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
-factory plan PRD.md [--output PLAN.json] [--default-agent NAME]
-                    [--min-tickets N] [--max-tickets N]
-factory approve PLAN.json [--project-number N] [--new-project-title TITLE] [--yes]
+factory plan PRD.md [--output RUN_DIRECTORY] [--default-agent NAME]
+                    [--min-tickets N] [--max-tickets N] [--mock]
+factory review product|alignment PLAN_ID
+factory approve-product PLAN_ID [--yes]
+factory continue-plan PLAN_ID [--mock]
+factory approve PLAN_ID [--project-number N] [--new-project-title TITLE] [--yes]
 factory approve-tests ISSUE [--yes]
 factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
 factory doctor [--repo PATH] [--full] [--agent NAME] [--qa-agent NAME]
 ```
 
-Runtime artifacts are under `.factory/`: `state.json`, QA and implementation
-prompts, and one log per phase attempt. Required gate failure blocks progress;
+Runtime artifacts are under `.factory/`: `planning-state.json`, planning runs,
+`state.json`, QA and implementation prompts, and one log per phase attempt.
+Required gate failure blocks progress;
 optional gate failure is recorded in the ticket's `warnings`. Killing and
 restarting the loop replays an interrupted active ticket from a clean worktree
 and reuses any already-open PR.
 
-Click a dashboard card to inspect its full spec, acceptance criteria, prompt,
-live log, protected tests, changed files, verification output, links, and status
-history.
+The dashboard shows the four planning contracts and human gates above the ticket
+board. Click any planning stage or ticket to inspect its artifacts and evidence.
 
 See `WORKSHOP_OUTLINE.md` for the colleague-facing teaching structure and
 `FACILITATOR.md` for the live-demo sequence and recovery notes.

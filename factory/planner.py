@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,8 +14,8 @@ AGENTS = {"claude", "codex", "cursor"}
 
 def validate_plan(plan: dict) -> list[str]:
     """Validate the editable plan and return ticket keys in dependency order."""
-    if plan.get("plan_version") != 1:
-        raise ValueError("plan_version must be 1")
+    if plan.get("plan_version") not in {1, 2}:
+        raise ValueError("plan_version must be 1 or 2")
     project = plan.get("project")
     if not isinstance(project, dict) or not project.get("name") or not project.get("summary"):
         raise ValueError("project requires a name and summary")
@@ -80,27 +78,6 @@ def dependency_waves(plan: dict) -> list[list[str]]:
     return waves
 
 
-def plan_prompt(prd: str, default_agent: str, minimum: int, maximum: int) -> str:
-    return f"""You are the planning agent for a software factory. Read the PRD below and divide it
-into {minimum}-{maximum} small, independently reviewable coding tickets.
-
-Rules:
-- Preserve the PRD's scope; do not invent product requirements.
-- Give every ticket a short stable key such as T1, T2, and T3.
-- Each spec must say what observable change to implement.
-- Each ticket needs concrete, testable acceptance criteria.
-- Express dependencies using ticket keys and keep the graph acyclic.
-- Maximize safe parallel work without creating artificial fragmentation.
-- Put unresolved product decisions in open_questions. Do not hide ambiguity in tickets.
-- Default every ticket's agent to {default_agent}.
-- Return only the JSON required by the supplied schema.
-
-## PRD
-
-{prd}
-"""
-
-
 def render_review(plan: dict) -> str:
     lines = [f"# Ticket plan — {plan['project']['name']}", "", plan["project"]["summary"], ""]
     lines += [f"Plan ID: `{plan['plan_id']}`", f"Source: `{plan['source_prd']}`", ""]
@@ -132,60 +109,6 @@ def render_review(plan: dict) -> str:
         "No issue or coding agent is created until that command is explicitly confirmed.", "",
     ]
     return "\n".join(lines)
-
-
-def plan_prd(repo: Path, prd_path: Path, output: str | None, default_agent: str, minimum: int, maximum: int, codex_bin: str) -> Path:
-    prd_path = prd_path.resolve()
-    if not prd_path.is_file():
-        raise FileNotFoundError(f"PRD not found: {prd_path}")
-    if minimum < 1 or maximum < minimum or maximum > 30:
-        raise ValueError("ticket limits must satisfy 1 <= min <= max <= 30")
-    prd = prd_path.read_text()
-    plan_id = hashlib.sha256(prd.encode()).hexdigest()[:12]
-    plan_dir = repo / ".factory/plans"
-    plan_dir.mkdir(parents=True, exist_ok=True)
-    slug = re.sub(r"[^a-z0-9]+", "-", prd_path.stem.lower()).strip("-") or "prd"
-    destination = Path(output).resolve() if output else plan_dir / f"{slug}-{plan_id}.json"
-    raw = plan_dir / f".{slug}-{plan_id}-raw.json"
-    schema = repo / "factory/plan_schema.json"
-    command = [
-        codex_bin, "exec", "--sandbox", "read-only", "--ephemeral",
-        "--ignore-user-config", "--ignore-rules",
-        "--output-schema", str(schema), "-o", str(raw), "-",
-    ]
-    result = subprocess.run(
-        command, cwd=repo, input=plan_prompt(prd, default_agent, minimum, maximum),
-        text=True, capture_output=True,
-    )
-    log = repo / ".factory/logs" / f"planner-{slug}-{plan_id}.log"
-    log.parent.mkdir(parents=True, exist_ok=True)
-    log.write_text(result.stdout + result.stderr)
-    if result.returncode:
-        raise RuntimeError(f"planning agent failed; see {log}")
-    try:
-        plan = json.loads(raw.read_text())
-    finally:
-        raw.unlink(missing_ok=True)
-    plan.update(
-        plan_version=1, plan_id=plan_id, source_prd=str(prd_path),
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        planning_agent="codex",
-    )
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    plan["_plan_path"] = str(destination)
-    validate_plan(plan)
-    if not minimum <= len(plan["tickets"]) <= maximum:
-        raise ValueError(
-            f"planning agent returned {len(plan['tickets'])} tickets; expected {minimum}-{maximum}"
-        )
-    review = destination.with_suffix(".md")
-    review.write_text(render_review(plan))
-    plan.pop("_plan_path")
-    destination.write_text(json.dumps(plan, indent=2) + "\n")
-    print(f"Plan:   {destination}")
-    print(f"Review: {review}")
-    print(f"Tickets: {len(plan['tickets'])}; open questions: {len(plan['open_questions'])}")
-    return destination
 
 
 def show_plan(plan: dict):
