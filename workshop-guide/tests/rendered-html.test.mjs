@@ -28,6 +28,12 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /Python 3\.11 or later/);
   assert.match(html, /No API key is required/);
   assert.match(html, /configure --preset claude-workshop/);
+  assert.match(html, /Use the agents your team already trusts/);
+  assert.match(html, /my-agent =/);
+  assert.match(html, /Any registered adapter/);
+  assert.match(html, /Configure project policy/);
+  assert.match(html, /test_roots/);
+  assert.match(html, /configure --project-number PROJECT_NUMBER/);
   assert.match(html, /Tickets come from the PRD/);
   assert.match(html, /factory seed recipe-rebrand/);
   assert.match(html, /Choose your workshop path/);

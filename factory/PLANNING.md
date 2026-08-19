@@ -43,6 +43,11 @@ rendered prompt and CLI log under `.factory/prompts/` and `.factory/logs/`.
 
 ## Human workflow
 
+Claude is the worked example below. Use `codex-workshop` for an all-Codex run,
+or configure any registered implementation and QA adapters before planning.
+Planning itself currently uses Claude or Codex because it requires structured
+output against the stage schemas. See `CONFIGURATION.md`.
+
 ```sh
 ./factory/factory configure --preset claude-workshop
 ./factory/factory plan PRD.md

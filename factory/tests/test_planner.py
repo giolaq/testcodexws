@@ -33,6 +33,11 @@ class PlannerTests(unittest.TestCase):
     def test_valid_plan_returns_dependency_order(self):
         self.assertEqual(validate_plan(sample_plan()), ["T1", "T2"])
 
+    def test_valid_plan_accepts_a_custom_adapter_name(self):
+        plan = sample_plan()
+        plan["tickets"][0]["agent"] = "my-agent"
+        self.assertEqual(validate_plan(plan), ["T1", "T2"])
+
     def test_cycle_is_rejected(self):
         plan = sample_plan()
         plan["tickets"][0]["dependencies"] = ["T2"]

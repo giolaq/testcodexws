@@ -75,8 +75,8 @@ factory checkout and continue the guided workshop in parallel. At the end,
 score both results against the same PRD journeys, tests, terminology scan, and
 review-effort measures.
 
-See `LIGHTS_OFF_EXPERIMENT.md` for the complete protocol and the Claude Code and
-Cursor commands. Credential-free sessions can use
+See `LIGHTS_OFF_EXPERIMENT.md` for the complete protocol, built-in CLI commands,
+and the custom-adapter control procedure. Credential-free sessions can use
 `scenarios/recipe-rebrand/lights-off-sample-report.md`, which is explicitly a
 discussion fixture rather than a model benchmark.
 
@@ -99,13 +99,15 @@ The orchestration flow is intentionally direct:
 8. Mirror every transition and artifact path to `.factory/state.json` for the dashboard.
 
 The ticket backend is isolated in `github_backend.py`; adapter commands and gates
-are all in `factory.toml`. That makes swapping a CLI, model wrapper, remote
-execution command, test suite, or lint policy a small workshop-2 exercise.
+are all in `factory.toml`. You can keep the workflow and swap the CLI, model
+wrapper, execution environment, test suite, or lint policy. See
+`CONFIGURATION.md` for the complete project configuration contract.
 
 ## Preflight every live session
 
-Choose the workshop agent once. The ignored `.factory/local.toml` file stores
-attendee-specific defaults; repository policy remains in `factory.toml`.
+Choose the workshop agents once. The ignored `.factory/local.toml` file stores
+attendee-specific defaults; repository policy remains in `factory.toml`. Claude
+is the worked example, not a factory requirement.
 
 ```sh
 curl -fsSL https://claude.ai/install.sh | bash  # omit when already installed
@@ -118,7 +120,22 @@ claude auth login
 The preset selects Claude for planning, independent QA, and implementation,
 requires human QA-test approval, and limits execution to two parallel jobs.
 Use `codex-workshop` to make the same choices with Codex. Explicit command-line
-flags still override saved defaults for one invocation.
+flags still override saved defaults for one invocation. You can also combine
+built-in adapters or register your own implementation and QA command:
+
+```sh
+./factory/factory configure \
+  --planning-agent claude \
+  --agent cursor \
+  --qa-agent codex \
+  --review-qa-tests \
+  --max-parallel 2
+```
+
+Planning currently uses Claude or Codex because those integrations enforce the
+four structured planning schemas. Implementation and QA can use any lowercase
+adapter registered in `factory.toml`. Follow `CONFIGURATION.md` to connect a
+different CLI, model wrapper, container, or remote runner.
 
 If the GitHub Project already exists, save its number at the same time:
 
@@ -206,7 +223,8 @@ Inspect the GitHub board, then deliberately start implementation:
 
 Real factory runs use a dedicated QA agent before the implementation agent for
 every ticket. The committed repository default is Codex; an attendee preset
-overrides it locally. Repository maintainers can change it in `factory.toml`:
+overrides it locally. The QA adapter can be different from the implementation
+adapter, including a project-specific adapter registered in `factory.toml`:
 
 ```toml
 [qa]
@@ -272,7 +290,8 @@ gh repo create software-refactory-workshop --private --source=. --remote=origin 
 ```
 
 Authenticate the GitHub CLI with Projects permission, configure the selected
-agent, and start with a PRD:
+agents, and start with a PRD. This example uses Claude; select a built-in or
+custom setup from `CONFIGURATION.md` if your team uses another CLI or model:
 
 ```sh
 gh auth login
@@ -320,9 +339,10 @@ When a ticket is Blocked, edit its issue spec or acceptance criteria and then:
 ./factory/factory retry 8
 ```
 
-Per-ticket `agent: claude`, `agent: codex`, or `agent: cursor` overrides the
-default. Before a live session, smoke-test each installed CLI because flags can
-change; update only its template in `factory.toml` if needed.
+Per-ticket `agent: adapter-name` overrides the default when that lowercase name
+is registered under `[agents]` in `factory.toml`. Before a live session,
+smoke-test each installed CLI or wrapper because provider flags can change;
+update only its adapter template when needed.
 
 Claude planning uses Claude Code structured output with the stage JSON schema.
 It runs in plan mode with read-only repository tools. Authenticate it with:
@@ -375,7 +395,11 @@ demo works offline.
 ## Operator reference
 
 ```text
-factory configure --preset claude-workshop|codex-workshop [--project-number N]
+factory configure [--preset claude-workshop|codex-workshop]
+                  [--agent NAME] [--qa-agent NAME]
+                  [--planning-agent claude|codex]
+                  [--review-qa-tests|--no-review-qa-tests]
+                  [--max-parallel N] [--project-number N]
 factory seed [recipe-rebrand|tv] [--github-repo OWNER/REPOSITORY] [--agent NAME]
 factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
             [--review-qa-tests|--no-review-qa-tests] [--scenario tv|recipe-rebrand]
@@ -406,4 +430,5 @@ The dashboard shows the four planning contracts and human gates above the ticket
 board. Click any planning stage or ticket to inspect its artifacts and evidence.
 
 See `WORKSHOP_OUTLINE.md` for the colleague-facing teaching structure and
-`FACILITATOR.md` for the live-demo sequence and recovery notes.
+`FACILITATOR.md` for the live-demo sequence and recovery notes. See
+`CONFIGURATION.md` before adapting the workshop to another repository or agent.

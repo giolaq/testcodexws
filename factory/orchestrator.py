@@ -101,7 +101,7 @@ def load_config(repo: Path) -> dict:
 def validate_qa_config(qa: dict, agents: dict):
     agent = qa.get("agent")
     if agent not in agents or agent == "mock":
-        raise ValueError("qa.agent must name a configured claude, codex, or cursor adapter")
+        raise ValueError("qa.agent must name a configured non-mock adapter")
     retries = qa.get("max_retries")
     if not isinstance(retries, int) or retries < 0:
         raise ValueError("qa.max_retries must be a non-negative integer")
@@ -145,7 +145,7 @@ def parse_dependencies(body: str) -> list[int]:
 
 
 def parse_agent(body: str, default: str) -> str:
-    match = re.search(r"(?im)^\s*agent:\s*(claude|codex|cursor|mock)\s*$", body or "")
+    match = re.search(r"(?im)^\s*agent:\s*([a-z][a-z0-9_-]{0,31})\s*$", body or "")
     return match.group(1).lower() if match else default
 
 
@@ -302,6 +302,10 @@ class Factory:
         self.repo = Path(args.repo).resolve()
         self.cfg = load_config(self.repo)
         validate_qa_config(self.cfg["qa"], self.cfg["agents"])
+        if args.agent not in self.cfg["agents"]:
+            raise ValueError(
+                f"--agent {args.agent!r} is not registered in factory/factory.toml [agents]"
+            )
         requested_qa = args.qa_agent or self.cfg["qa"]["agent"]
         if args.no_qa:
             self.qa_agent = None
@@ -314,7 +318,7 @@ class Factory:
             or self.qa_agent == "mock"
             or (self.qa_agent == "mock-qa" and not args.mock)
         ):
-            raise ValueError("--qa-agent must name a configured claude, codex, or cursor adapter")
+            raise ValueError("--qa-agent must name a configured non-mock adapter")
         self.review_qa_tests = bool(args.review_qa_tests or self.cfg["qa"].get("require_human_approval", False))
         self.python = sys.executable
         self.store = StateStore(self.repo)
@@ -360,6 +364,11 @@ class Factory:
                 "history": old.get("history", []), "mock_action": raw.get("mock_action", ""),
                 "simulate_merge_conflict": raw.get("simulate_merge_conflict", False),
             }
+            if ticket["agent"] not in self.cfg["agents"]:
+                raise ValueError(
+                    f"Ticket #{number} requests unregistered agent {ticket['agent']!r}; "
+                    "add it to factory/factory.toml [agents] or edit the ticket"
+                )
             recovered = ticket["status"] in ACTIVE
             if recovered:
                 ticket["status"] = "Backlog"  # safely replay interrupted work
@@ -546,6 +555,7 @@ class Factory:
             prompt=shlex.quote(str(prompt)), ticket=ticket["number"],
             python=shlex.quote(self.python), codex=shlex.quote(self.codex_bin or "codex"),
             scenario=shlex.quote(self.args.scenario),
+            repo=shlex.quote(str(self.repo)), worktree=shlex.quote(str(worktree)),
         )
         log = self.repo / ".factory/logs" / log_name
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -971,21 +981,29 @@ def parser():
     p = argparse.ArgumentParser(prog="factory", description="Software (re)-Factory orchestrator")
     sub = p.add_subparsers(dest="command", required=True)
     configure = sub.add_parser("configure", help="save attendee defaults for shorter commands")
-    configure.add_argument("--preset", choices=sorted(PRESETS), required=True)
+    configure.add_argument("--preset", choices=sorted(PRESETS))
+    configure.add_argument("--agent", help="registered implementation adapter name")
+    configure.add_argument("--qa-agent", help="registered independent QA adapter name")
+    configure.add_argument("--planning-agent", choices=["claude", "codex"])
+    configure.add_argument(
+        "--review-qa-tests", action=argparse.BooleanOptionalAction, default=None,
+        help="pause for human review after QA writes acceptance tests",
+    )
+    configure.add_argument("--max-parallel", type=positive_int)
     configure.add_argument("--project-number", type=positive_int)
     seed = sub.add_parser("seed", help="create deterministic fallback tickets without PRD planning")
     seed.add_argument("scenario", choices=["tv", "recipe-rebrand"], nargs="?", default="recipe-rebrand")
     seed.add_argument("--repo", default=".")
     seed.add_argument("--github-repo", metavar="OWNER/REPOSITORY")
-    seed.add_argument("--agent", choices=["claude", "codex", "cursor"])
+    seed.add_argument("--agent", help="registered implementation adapter name")
     seed.add_argument("--dry-run", action="store_true")
     run_p = sub.add_parser("run", help="schedule and execute tickets")
     run_p.add_argument("--repo", default="."); run_p.add_argument(
-        "--agent", choices=["claude", "codex", "cursor", "mock"],
+        "--agent", help="registered implementation adapter name",
     )
     run_p.add_argument("--max-parallel", type=positive_int); run_p.add_argument("--project-number", type=positive_int)
     run_p.add_argument(
-        "--qa-agent", choices=["claude", "codex", "cursor"],
+        "--qa-agent",
         help="independent agent that writes protected acceptance tests before implementation",
     )
     run_p.add_argument("--no-qa", action="store_true", help="skip the independent QA phase")
@@ -1004,7 +1022,7 @@ def parser():
     retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=positive_int)
     plan = sub.add_parser("plan", help="run the Product Review expert on a PRD")
     plan.add_argument("prd"); plan.add_argument("--repo", default="."); plan.add_argument("--output")
-    plan.add_argument("--default-agent", choices=["claude", "codex", "cursor"])
+    plan.add_argument("--default-agent", help="registered adapter written into generated tickets")
     plan.add_argument("--planning-agent", choices=["claude", "codex"])
     plan.add_argument("--min-tickets", type=int, default=3); plan.add_argument("--max-tickets", type=int, default=12)
     plan.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
@@ -1026,8 +1044,8 @@ def parser():
     approve_tests.add_argument("--yes", action="store_true")
     doctor = sub.add_parser("doctor", help="check workshop prerequisites and safety")
     doctor.add_argument("--repo", default="."); doctor.add_argument("--full", action="store_true")
-    doctor.add_argument("--agent", choices=["claude", "codex", "cursor"])
-    doctor.add_argument("--qa-agent", choices=["claude", "codex", "cursor"])
+    doctor.add_argument("--agent", help="registered implementation adapter name")
+    doctor.add_argument("--qa-agent", help="registered independent QA adapter name")
     doctor.add_argument("--planning-agent", choices=["claude", "codex"])
     return p
 
@@ -1038,7 +1056,13 @@ def main():
     try:
         session = apply_session_defaults(args, repo)
         if args.command == "configure":
-            path, configured = configure_session(repo, args.preset, args.project_number)
+            path, configured = configure_session(
+                repo, args.preset, args.project_number,
+                agent=args.agent, qa_agent=args.qa_agent,
+                planning_agent=args.planning_agent,
+                review_qa_tests=args.review_qa_tests,
+                max_parallel=args.max_parallel,
+            )
             print(render_session_config(configured))
             print(f"\nSaved attendee defaults: {path}")
             print("Next: ./factory/factory doctor")

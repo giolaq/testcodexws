@@ -29,7 +29,10 @@ Live mode also requires:
 - [ ] `gh auth status` succeeds.
 - [ ] GitHub authentication includes the `project` scope.
 - [ ] The repository owner can create issues, Projects, branches, and pull requests.
-- [ ] A current Claude Code CLI is authenticated. No API key is required.
+- [ ] A current Claude or Codex planning CLI is authenticated.
+- [ ] The selected implementation and QA adapters are registered and their
+      noninteractive commands have been smoke-tested. Claude is only the worked
+      example; attendees may use their own agent.
 - [ ] Network access to GitHub and the selected agent provider is stable.
 
 ## Prepare the dry run
@@ -63,6 +66,11 @@ git push origin main
 
 Continue only when the doctor reports zero failures. A warning is acceptable
 only for an optional adapter that won't be used.
+
+If the group uses another implementation or QA agent, register it under
+`[agents]` in `factory/factory.toml`, then save the attendee defaults with
+`factory configure`. Keep Claude or Codex as the structured planning adapter.
+The exact contract and wrapper requirements are in `factory/CONFIGURATION.md`.
 
 Prepare a separate control checkout:
 
@@ -148,6 +156,10 @@ Finish the scenario:
 ```
 
 ## Live command path
+
+The commands below use Claude as a coherent worked example. If an attendee uses
+a different registered implementation or QA adapter, the remaining planning,
+GitHub Project, worktree, QA-review, and verification steps stay the same.
 
 Start the control in Terminal C and don't intervene:
 

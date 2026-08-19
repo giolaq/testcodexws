@@ -8,13 +8,14 @@ operator choices that would otherwise be repeated on every command.
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from pathlib import Path
 
 
 CONFIG_PATH = Path(".factory/local.toml")
-AGENTS = {"claude", "codex", "cursor"}
 PLANNING_AGENTS = {"claude", "codex"}
+AGENT_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 PRESETS = {
     "claude-workshop": {
         "agent": "claude",
@@ -44,8 +45,10 @@ def validate_session_config(value: dict) -> dict:
     if preset is not None and preset not in PRESETS:
         raise ValueError(f"unknown factory preset: {preset}")
     for key in ("agent", "qa_agent"):
-        if key in value and value[key] not in AGENTS:
-            raise ValueError(f"{key} must be claude, codex, or cursor")
+        if key in value and (
+            not isinstance(value[key], str) or not AGENT_NAME.fullmatch(value[key])
+        ):
+            raise ValueError(f"{key} must be a lowercase registered adapter name")
     if "planning_agent" in value and value["planning_agent"] not in PLANNING_AGENTS:
         raise ValueError("planning_agent must be claude or codex")
     if "review_qa_tests" in value and not isinstance(value["review_qa_tests"], bool):
@@ -98,11 +101,26 @@ def write_session_config(repo: Path, value: dict) -> Path:
     return path
 
 
-def configure_session(repo: Path, preset: str, project_number: int | None = None) -> tuple[Path, dict]:
-    if preset not in PRESETS:
+def configure_session(
+    repo: Path, preset: str | None = None, project_number: int | None = None,
+    *, agent: str | None = None, qa_agent: str | None = None,
+    planning_agent: str | None = None, review_qa_tests: bool | None = None,
+    max_parallel: int | None = None,
+) -> tuple[Path, dict]:
+    if preset is not None and preset not in PRESETS:
         raise ValueError(f"unknown factory preset: {preset}")
     existing = load_session_config(repo)
-    value = {"preset": preset, **PRESETS[preset]}
+    value = dict(existing)
+    if preset is not None:
+        value = {"preset": preset, **PRESETS[preset]}
+    overrides = {
+        "agent": agent,
+        "qa_agent": qa_agent,
+        "planning_agent": planning_agent,
+        "review_qa_tests": review_qa_tests,
+        "max_parallel": max_parallel,
+    }
+    value.update({key: item for key, item in overrides.items() if item is not None})
     if project_number is not None:
         value["project_number"] = project_number
     elif existing.get("project_number"):

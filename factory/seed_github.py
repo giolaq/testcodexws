@@ -37,7 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description="Seed a deterministic Software (re)-Factory scenario")
     parser.add_argument("--repo", default=".")
     parser.add_argument("--github-repo", metavar="OWNER/REPOSITORY")
-    parser.add_argument("--agent", choices=["claude", "codex", "cursor"], default="codex")
+    parser.add_argument("--agent", default="codex", help="registered implementation adapter name")
     parser.add_argument("--scenario", choices=["tv", "recipe-rebrand"], default="tv")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

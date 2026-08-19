@@ -188,6 +188,14 @@ def run_doctor(
         required_agent = name in required_agents
         checks.append(Check("PASS" if available else ("FAIL" if required_agent else "WARN"), f"{name} adapter", detail))
 
+    for name in sorted(required_agents - {"codex", "claude", "cursor", None}):
+        registered = name in cfg.get("agents", {})
+        detail = (
+            "registered in factory/factory.toml; run the adapter command once to verify its own authentication"
+            if registered else "not registered in factory/factory.toml [agents]"
+        )
+        checks.append(Check("PASS" if registered else "FAIL", f"{name} adapter", detail))
+
     checks.extend(port_check(port) for port in (5000, 5050, 8000))
 
     qa = cfg.get("qa", {})

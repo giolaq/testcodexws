@@ -1,9 +1,10 @@
 # Software (re)-Factory workshop outline
 
-Build An AI factory and compare with the simple "one coding agent" way.
+Build an AI factory and compare it with the simple "one coding agent" way.
 
-Participants use Git, their agent CLIs, GitHub Projects, automated tests, and a local dashboard. 
-The example starts with Pocket Cinema, a multi media demo app and converts it into TableStory, a responsive food recipes application.
+Participants use Git, their preferred agent CLIs, GitHub Projects, automated
+tests, and a local dashboard. The example converts Pocket Cinema, a multimedia
+demo app, into TableStory, a responsive recipe application.
 
 ## Learning objectives
 
@@ -75,9 +76,11 @@ same worktree, dependency, protected-test, and verification flow.
   disposable repository.
 - GitHub token scope `project`, plus permission to create issues, Projects, and
   pull requests for that repository.
-- A current, authenticated [Claude Code CLI](https://code.claude.com/docs/en/cli-usage).
-  The live path uses fresh Claude agents for all four planning stages, QA, and
-  implementation. No API key is required.
+- A current, authenticated Claude or Codex CLI for the four structured planning
+  stages. The worked example uses Claude and requires no API key.
+- A current, authenticated agent CLI or wrapper for implementation and QA.
+  Built-in adapters support Claude, Codex, and Cursor; teams can register their
+  own noninteractive adapter in `factory/factory.toml`.
 - Network access to GitHub and the selected agent provider.
 - A clean default branch synchronized with the GitHub repository.
 
@@ -89,6 +92,9 @@ gh auth refresh -s project
 claude auth login
 claude auth status --text
 ```
+
+If you choose Codex or a custom adapter, use that CLI's normal login flow and
+follow `factory/CONFIGURATION.md`. Keep credentials outside the repository.
 
 ## Step 1: Set up and run preflight
 
@@ -120,6 +126,9 @@ git push origin main
 ```
 
 Choose another repository name if `software-refactory-dry-run` already exists.
+The Claude preset is the worked example. Before setup, attendees may instead
+choose the Codex preset, mix built-in adapters by role, or register their own
+implementation and QA adapter as described in `factory/CONFIGURATION.md`.
 Continue only when the doctor reports zero failures. Warnings about an optional
 agent are acceptable when that agent won't be used.
 
@@ -329,7 +338,7 @@ In live mode, review and merge a green pull request. Wait for the dashboard
 event **PR merged and synchronized**. A dependent ticket must not start until
 the merged commit is reachable from the local default branch.
 
-**Checkpoint:** Ticket transition are visibile.
+**Checkpoint:** Ticket transitions are visible.
 
 ## Step 9: Compare and verify both results
 
@@ -364,3 +373,8 @@ End with five developer rules:
 3. Split work by end-to-end value and explicit file ownership.
 4. Keep QA independent and protect its acceptance tests.
 5. Preserve prompts, logs, diffs, and verification output for review.
+
+The same controls apply when attendees replace the example agents. Ask them to
+identify the implementation command, QA command, model choice, execution
+boundary, test roots, and gates they would configure for one of their own
+repositories.

@@ -246,7 +246,9 @@ main {
 .check-list li { position: relative; margin: 8px 0; padding-left: 28px; }
 .check-list li::before { position: absolute; top: 3px; left: 0; display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: var(--green-pale); color: var(--green); content: "✓"; font-size: 11px; font-weight: 800; }
 
-.concept-section, .why-section, .story-section, .prerequisites-section, .path-section, .apply-section, .support-section, .reference-section { padding: 64px 0; border-bottom: 1px solid var(--line); }
+.concept-section, .why-section, .story-section, .prerequisites-section, .configuration-section, .path-section, .apply-section, .support-section, .reference-section { padding: 64px 0; border-bottom: 1px solid var(--line); }
+.configuration-section { background: linear-gradient(90deg, transparent, #fbfcff 12%, #fbfcff 88%, transparent); }
+.configuration-section .prerequisites-grid p { margin: 0; color: var(--muted); font-size: 14px; }
 .section-heading { max-width: 720px; margin-bottom: 28px; }
 .section-heading h2 { margin: 7px 0 8px; font-size: 32px; font-weight: 600; letter-spacing: -.025em; }
 .section-heading p { margin: 0; color: var(--muted); }

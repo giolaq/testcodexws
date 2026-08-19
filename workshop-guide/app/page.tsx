@@ -218,6 +218,7 @@ export default function Home() {
           <a href="#story" onClick={() => setMenuOpen(false)}>The workshop story</a>
           <p className="nav-label">Get started</p>
           <a href="#prerequisites" onClick={() => setMenuOpen(false)}>Prerequisites</a>
+          <a href="#configure" onClick={() => setMenuOpen(false)}>Configure your factory</a>
           <a href="#choose-track" onClick={() => setMenuOpen(false)}>Choose a path</a>
           <p className="nav-label">Guided lab</p>
           {steps.map((step, index) => (
@@ -422,8 +423,8 @@ export default function Home() {
                 <li>GitHub CLI authenticated with the <code>project</code> scope</li>
                 <li>A disposable repository you can push to</li>
                 <li>Permission to create issues, Projects, and pull requests</li>
-                <li>A current, authenticated <a href="https://code.claude.com/docs/en/cli-usage" target="_blank" rel="noreferrer">Claude Code CLI <span aria-hidden="true">↗</span></a></li>
-                <li>A Claude plan that permits Claude Code use</li>
+                <li>A current, authenticated Claude or Codex CLI for structured planning</li>
+                <li>An authenticated implementation and QA agent CLI or wrapper</li>
                 <li>Network access to GitHub and the agent provider</li>
               </ul>
             </article>
@@ -439,13 +440,13 @@ git --version`}</CodeBlock>
             <span aria-hidden="true"> · </span><a href="https://cli.github.com/" target="_blank" rel="noreferrer">GitHub CLI</a>
             <span aria-hidden="true"> · </span><a href="https://code.claude.com/docs/en/cli-usage" target="_blank" rel="noreferrer">Claude Code</a>
           </p>
-          <h3>Install Claude Code for live mode</h3>
-          <p>On macOS, Linux, or WSL, install the current CLI and sign in with your Claude account:</p>
+          <h3>Set up the live worked example</h3>
+          <p>The guided commands use Claude. On macOS, Linux, or WSL, install the current CLI and sign in with your Claude account:</p>
           <CodeBlock>{`curl -fsSL https://claude.ai/install.sh | bash
 claude auth login
 claude auth status --text`}</CodeBlock>
           <Callout type="note" title="No API key is required">
-            Rehearsal mode uses deterministic local agents. Live mode uses your authenticated Claude Code session; it does not require <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>.
+            Rehearsal mode uses deterministic local agents. The Claude worked example uses your authenticated Claude Code session; it does not require <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>. You can choose another supported setup below.
           </Callout>
           <h3>Use separate terminals</h3>
           <div className="terminal-grid">
@@ -454,6 +455,118 @@ claude auth status --text`}</CodeBlock>
             <div><b>Terminal C</b><span>Lights-off control</span></div>
             <div><b>Terminal D</b><span>Demo app, if needed</span></div>
           </div>
+        </section>
+
+        <section className="configuration-section" id="configure">
+          <div className="section-heading">
+            <span className="section-kicker">Project configuration</span>
+            <h2>Use the agents your team already trusts</h2>
+            <p>
+              The factory controls the workflow; it does not require one coding model.
+              Choose built-in adapters by role or register a noninteractive command for
+              your own agent, model wrapper, container, or remote runner.
+            </p>
+          </div>
+          <div className="prerequisites-grid">
+            <article>
+              <span className="requirement-label">Structured planning</span>
+              <h3>Claude or Codex</h3>
+              <p>One of these adapters runs the four planning experts and validates their JSON contracts.</p>
+            </article>
+            <article>
+              <span className="requirement-label">Implementation and QA</span>
+              <h3>Any registered adapter</h3>
+              <p>Use Claude, Codex, Cursor, or a lowercase adapter name registered in <code>factory/factory.toml</code>.</p>
+            </article>
+          </div>
+
+          <h3>Start with a preset</h3>
+          <p>Use one command to save attendee-specific defaults in the ignored <code>.factory/local.toml</code> file:</p>
+          <CodeBlock>{`# Claude for planning, QA, and implementation
+./factory/factory configure --preset claude-workshop
+
+# Codex for planning, QA, and implementation
+./factory/factory configure --preset codex-workshop`}</CodeBlock>
+
+          <h3>Mix adapters by role</h3>
+          <p>Planning, independent QA, and implementation do not need to use the same CLI:</p>
+          <CodeBlock>{`./factory/factory configure \\
+  --planning-agent claude \\
+  --agent cursor \\
+  --qa-agent codex \\
+  --review-qa-tests \\
+  --max-parallel 2`}</CodeBlock>
+
+          <h3>Register your own implementation or QA agent</h3>
+          <p>Add its command to the committed project policy in <code>factory/factory.toml</code>:</p>
+          <CodeBlock label="factory/factory.toml">{`[agents]
+my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
+          <p>
+            The command runs from an isolated ticket worktree. It must read the prompt,
+            run without interactive input, keep changes in that worktree, stream useful
+            output, and return a nonzero exit status on failure. Put model flags,
+            authentication-aware launch logic, and container or remote-runner setup in
+            the wrapper.
+          </p>
+          <CodeBlock>{`./factory/factory configure \\
+  --planning-agent claude \\
+  --agent my-agent \\
+  --qa-agent my-agent \\
+  --review-qa-tests \\
+  --max-parallel 2
+
+./factory/factory doctor --full`}</CodeBlock>
+
+          <h3>Configure project policy</h3>
+          <p>
+            Edit the committed <code>factory/factory.toml</code> file so the factory
+            uses your repository&apos;s time limits, acceptance-test directories, and
+            verification commands:
+          </p>
+          <CodeBlock label="factory/factory.toml">{`[factory]
+max_retries = 2
+agent_timeout = 900
+gate_timeout = 300
+
+[qa]
+agent = "my-agent"
+max_retries = 1
+require_human_approval = true
+test_roots = ["tests/acceptance", "web/tests"]
+
+[[gate]]
+name = "unit-tests"
+cmd = '{python} -m pytest -q'
+required = true
+
+[[gate]]
+name = "lint"
+cmd = 'npm run lint'
+required = true`}</CodeBlock>
+          <p>
+            QA may add tests only below <code>test_roots</code>. Gates run in order
+            from each ticket worktree. A required gate blocks the ticket after its
+            retries; an optional gate records a warning.
+          </p>
+
+          <h3>Connect a GitHub Project</h3>
+          <p>Save an existing Project number locally, or let plan approval create and remember a new Project:</p>
+          <CodeBlock>{`# Use an existing GitHub Project
+./factory/factory configure --project-number PROJECT_NUMBER
+
+# Or create one after reviewing the PRD-derived plan
+./factory/factory approve PLAN_ID \\
+  --new-project-title "My workshop"`}</CodeBlock>
+          <Callout type="tip" title="Project policy stays with the repository">
+            Commit agent command templates, QA test roots, retry and timeout values, and
+            verification gates in <code>factory/factory.toml</code>. Keep credentials and
+            each attendee&apos;s selected agents and GitHub Project number outside Git in
+            <code>.factory/local.toml</code>.
+          </Callout>
+          <p>
+            See the <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/CONFIGURATION.md" target="_blank" rel="noreferrer">complete configuration guide <span aria-hidden="true">↗</span></a> for
+            placeholders, QA policy, gates, custom execution environments, and preflight.
+          </p>
         </section>
 
         <section className="path-section" id="choose-track">
@@ -486,7 +599,7 @@ claude auth status --text`}</CodeBlock>
               <span className="path-icon live-icon" aria-hidden="true">⌘</span>
               <strong>Live GitHub mode</strong>
               <span>Use real agent CLIs, GitHub Issues, Projects, worktrees, and pull requests.</span>
-              <small>Requires a disposable repository and Claude login</small>
+              <small>Requires a disposable repository and authenticated agents</small>
             </button>
           </div>
           <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub mode" : "Rehearsal mode"}`}>
@@ -509,7 +622,7 @@ cd software-refactory-workshop
             </>
           ) : (
             <>
-              <p>First, confirm GitHub and Claude access. Sign in before creating the disposable repository.</p>
+              <p>These guided commands use the Claude preset. Confirm GitHub and Claude access before creating the disposable repository. If you selected another setup above, run its login checks and substitute its <code>factory configure</code> command.</p>
               <CodeBlock>{`gh auth status
 gh auth refresh -s project
 claude auth login
@@ -524,7 +637,7 @@ gh repo create software-refactory-dry-run \
 git push origin main
 ./factory/factory configure --preset claude-workshop
 ./factory/factory doctor --full`}</CodeBlock>
-              <p>If that repository name already exists, choose another name. The doctor checks the clean branch, remote synchronization, GitHub Projects access, authenticated agent CLIs, ports, QA policy, and all configured gates.</p>
+              <p>If that repository name already exists, choose another name. The doctor checks the clean branch, remote synchronization, GitHub Projects access, selected agent adapters, ports, QA policy, and all configured gates.</p>
               <Callout type="warning" title="Use a disposable repository">
                 A live run creates branches, worktrees, issues, Projects items, and pull requests. Don’t use a repository that contains unrelated work.
               </Callout>
@@ -953,7 +1066,7 @@ git --version`}</CodeBlock>
             </details>
             <details>
               <summary>The live-mode doctor reports a failure</summary>
-              <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. The saved workshop preset tells the doctor that Claude is required.</p>
+              <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. Your saved configuration tells the doctor which adapters are required.</p>
               <CodeBlock>{`./factory/factory doctor --full`}</CodeBlock>
             </details>
             <details>
@@ -968,6 +1081,12 @@ git push -u origin main`}</CodeBlock>
               <CodeBlock>{`claude auth login
 claude auth status --text
 ./factory/factory doctor`}</CodeBlock>
+            </details>
+            <details>
+              <summary>My custom agent is not registered</summary>
+              <p>Add the lowercase adapter name and noninteractive command under <code>[agents]</code> in <code>factory/factory.toml</code>. Use the same name in <code>factory configure</code>, then run preflight again.</p>
+              <CodeBlock label="factory/factory.toml">{`[agents]
+my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             </details>
             <details>
               <summary>Live planning is too slow for the workshop</summary>
@@ -1011,6 +1130,7 @@ claude auth status --text
           </div>
           <div className="reference-table" role="table" aria-label="Factory command reference">
             <div role="row"><code>factory configure --preset claude-workshop</code><span>Save local Claude defaults for short commands.</span></div>
+            <div role="row"><code>factory configure --agent NAME --qa-agent NAME</code><span>Save registered implementation and QA adapters.</span></div>
             <div role="row"><code>run_lights_off.py --agent claude</code><span>Start the one-agent control in its checkout.</span></div>
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
             <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
@@ -1032,8 +1152,8 @@ claude auth status --text
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/ARCHITECTURE.md" target="_blank" rel="noreferrer">
               <span>UNDERSTAND</span><b>Read the architecture map</b><i aria-hidden="true">→</i>
             </a>
-            <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/README.md" target="_blank" rel="noreferrer">
-              <span>EXTEND</span><b>Configure agents and gates</b><i aria-hidden="true">→</i>
+            <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/CONFIGURATION.md" target="_blank" rel="noreferrer">
+              <span>EXTEND</span><b>Configure your agents and project</b><i aria-hidden="true">→</i>
             </a>
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/PLANNING.md" target="_blank" rel="noreferrer">
               <span>ALIGN</span><b>Study the four expert contracts</b><i aria-hidden="true">→</i>

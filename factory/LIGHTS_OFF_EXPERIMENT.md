@@ -50,12 +50,19 @@ workshop path uses:
 python3 factory/run_lights_off.py --agent claude
 ```
 
-The launcher also supports the other implementation adapters:
+The launcher supports the other built-in implementation adapters:
 
 ```sh
 python3 factory/run_lights_off.py --agent codex
 python3 factory/run_lights_off.py --agent cursor
 ```
+
+For a custom factory adapter, run its underlying CLI or wrapper directly in the
+control checkout with the full prompt in
+`factory/scenarios/recipe-rebrand/lights-off-prompt.md`. Keep the same model and
+execution environment used by the factory. The convenience launcher is limited
+to the three built-in CLIs; custom factory setup is documented in
+`CONFIGURATION.md`.
 
 Leave this second terminal running while the workshop returns to the factory
 checkout. Do not treat speed alone as success: record elapsed time, but score

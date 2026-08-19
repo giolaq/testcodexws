@@ -32,14 +32,15 @@ flowchart LR
 
 1. `factory/factory.toml` — committed adapters, QA policy, retry/time limits,
    and gates; `.factory/local.toml` — ignored attendee defaults and Project selection.
-2. `factory/planning_pipeline.py` — four expert contracts, hashes, approvals,
+2. `factory/CONFIGURATION.md` — built-in, mixed-role, and custom adapter setup.
+3. `factory/planning_pipeline.py` — four expert contracts, hashes, approvals,
    traceability, validation, and planning dashboard state.
-3. `factory/planner.py` — ticket-plan validation and GitHub publication.
-4. `factory/orchestrator.py` — CLI, dependency scheduler, and ticket lifecycle.
-5. `factory/github_backend.py` — Issues, Projects, PRs, and merge observation.
-6. `factory/doctor.py` — workshop safety and environment diagnostics.
-7. `factory/dashboard.html` — read-only visualization of planning and execution.
-8. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
+4. `factory/planner.py` — ticket-plan validation and GitHub publication.
+5. `factory/orchestrator.py` — CLI, dependency scheduler, and ticket lifecycle.
+6. `factory/github_backend.py` — Issues, Projects, PRs, and merge observation.
+7. `factory/doctor.py` — workshop safety and environment diagnostics.
+8. `factory/dashboard.html` — read-only visualization of planning and execution.
+9. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
 
 ## Control boundaries
 
@@ -57,3 +58,9 @@ flowchart LR
 - Worktrees provide Git isolation, not a security boundary. Replace adapter
   commands with container or remote-runner wrappers when stronger isolation is
   required.
+
+The four planning stages currently use Claude or Codex because their adapters
+enforce the planning JSON schemas. Implementation and QA accept any lowercase
+adapter name registered under `[agents]` in `factory/factory.toml`. This keeps
+the control flow stable while teams swap models, CLIs, wrappers, or execution
+environments.

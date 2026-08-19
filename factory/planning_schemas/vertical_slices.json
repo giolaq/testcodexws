@@ -24,7 +24,7 @@
           "spec": { "type": "string" },
           "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
           "dependencies": { "type": "array", "items": { "type": "string" } },
-          "agent": { "type": "string", "enum": ["claude", "codex", "cursor"] },
+          "agent": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
           "requirement_ids": { "type": "array", "items": { "type": "string" } },
           "contract_ids": { "type": "array", "items": { "type": "string" } },
           "program_element_ids": { "type": "array", "items": { "type": "string" } },

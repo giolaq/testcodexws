@@ -6,7 +6,10 @@ it matters now, follows one PRD through two delivery systems, and helps
 attendees design the right level of control for their own work. It also
 includes complete mode-specific prerequisites, two workshop paths, nine guided
 steps, progress tracking, copyable commands, checkpoints, troubleshooting, and
-the complete factory command reference.
+the complete factory command reference. Claude is the live worked example, but
+the guide also explains how to use built-in adapters by role or register a
+team's own implementation and QA agent, model wrapper, and execution
+environment in `factory/factory.toml`.
 
 ## Local development
 

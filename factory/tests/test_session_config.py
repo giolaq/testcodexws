@@ -56,6 +56,32 @@ class SessionConfigTests(unittest.TestCase):
             self.assertEqual(args.planning_agent, "claude")
             self.assertEqual(args.default_agent, "claude")
 
+    def test_custom_registered_agent_can_be_saved_and_used_by_commands(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            _, value = configure_session(
+                repo, agent="my-agent", qa_agent="my-agent",
+                planning_agent="claude", review_qa_tests=True, max_parallel=3,
+            )
+            self.assertEqual(value["agent"], "my-agent")
+            self.assertEqual(value["qa_agent"], "my-agent")
+
+            args = parser().parse_args(["run"])
+            args.repo = str(repo)
+            apply_session_defaults(args, repo)
+            self.assertEqual(args.agent, "my-agent")
+            self.assertEqual(args.qa_agent, "my-agent")
+            self.assertEqual(args.max_parallel, 3)
+
+    def test_configure_parser_accepts_custom_adapter_overrides(self):
+        args = parser().parse_args([
+            "configure", "--agent", "my-agent", "--qa-agent", "qa-wrapper",
+            "--planning-agent", "codex", "--review-qa-tests", "--max-parallel", "2",
+        ])
+        self.assertEqual(args.agent, "my-agent")
+        self.assertEqual(args.qa_agent, "qa-wrapper")
+        self.assertEqual(args.planning_agent, "codex")
+
     def test_new_project_number_is_remembered_without_losing_preset(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)

@@ -46,6 +46,8 @@ class QaPolicyTests(unittest.TestCase):
     def test_validates_qa_configuration(self):
         qa = {"agent": "codex", "max_retries": 1, "test_roots": TEST_ROOTS}
         self.assertIsNone(validate_qa_config(qa, DEFAULT_AGENTS))
+        custom_agents = {**DEFAULT_AGENTS, "my-agent": "./tools/run-my-agent.sh {prompt}"}
+        self.assertIsNone(validate_qa_config({**qa, "agent": "my-agent"}, custom_agents))
         with self.assertRaisesRegex(ValueError, "stay inside"):
             validate_qa_config({**qa, "test_roots": ["../outside"]}, DEFAULT_AGENTS)
         with self.assertRaisesRegex(ValueError, "configured"):
@@ -67,7 +69,7 @@ class QaPolicyTests(unittest.TestCase):
 
             args = SimpleNamespace(
                 repo=str(repo), qa_agent="codex", no_qa=False, mock=True, project_number=None,
-                review_qa_tests=False, scenario="tv",
+                review_qa_tests=False, scenario="tv", agent="codex",
             )
             factory = Factory(args)
             ticket = {

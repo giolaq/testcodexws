@@ -9,7 +9,7 @@ from pathlib import Path
 
 from github_backend import GitHubBackend
 
-AGENTS = {"claude", "codex", "cursor"}
+AGENT_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
 def validate_plan(plan: dict) -> list[str]:
@@ -38,8 +38,8 @@ def validate_plan(plan: dict) -> list[str]:
             raise ValueError(f"{key} requires at least one acceptance criterion")
         if not isinstance(ticket.get("dependencies"), list):
             raise ValueError(f"{key} dependencies must be a list")
-        if ticket.get("agent") not in AGENTS:
-            raise ValueError(f"{key} agent must be one of: {', '.join(sorted(AGENTS))}")
+        if not isinstance(ticket.get("agent"), str) or not AGENT_NAME.fullmatch(ticket["agent"]):
+            raise ValueError(f"{key} agent must be a lowercase registered adapter name")
         by_key[key] = ticket
     for key, ticket in by_key.items():
         unknown = set(ticket["dependencies"]) - set(by_key)
@@ -217,5 +217,5 @@ def approve_plan(
     }
     plan_path.write_text(json.dumps(plan, indent=2) + "\n")
     print(f"Published {len(numbers)} tickets: {project['url']}")
-    print("Review the GitHub board, then start with `./factory/factory run --agent codex`.")
+    print("Review the GitHub board, then start with `./factory/factory run`.")
     return project["url"]
