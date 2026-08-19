@@ -27,6 +27,9 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /Prepare your development environment/);
   assert.match(html, /Python 3\.11 or later/);
   assert.match(html, /No API key is required/);
+  assert.match(html, /configure --preset claude-workshop/);
+  assert.match(html, /Tickets come from the PRD/);
+  assert.match(html, /factory seed recipe-rebrand/);
   assert.match(html, /Choose your workshop path/);
   assert.match(html, /Prepare a safe workspace/);
   assert.match(html, /Establish the lights-off control/);

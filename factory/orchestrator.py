@@ -33,10 +33,19 @@ from planner import approve_plan
 from planning_pipeline import (
     approve_product,
     continue_plan,
+    load_manifest,
     mark_published,
     plan_prd,
     prepare_publication,
+    resolve_run,
     review as review_plan,
+)
+from session_config import (
+    PRESETS,
+    configure_session,
+    load_session_config,
+    remember_project,
+    render_session_config,
 )
 
 STATES = ["Backlog", "Ready", "In Progress", "QA Review", "Verifying", "In Review", "Done", "Blocked"]
@@ -183,6 +192,90 @@ def resolve_codex_cli() -> str:
     )
 
 
+def resolve_planning_cli(agent: str) -> str:
+    if agent == "codex":
+        return resolve_codex_cli()
+    if agent != "claude":
+        raise ValueError(f"unsupported planning agent: {agent}")
+    binary = shutil.which("claude")
+    if not binary:
+        raise RuntimeError("Claude Code CLI not found. Install Claude Code, then run `claude auth login`.")
+    help_result = subprocess.run([binary, "--help"], text=True, capture_output=True, timeout=10)
+    if help_result.returncode or "--json-schema" not in help_result.stdout + help_result.stderr:
+        raise RuntimeError("Claude Code is too old for structured planning output. Update it, then retry.")
+    auth = subprocess.run(
+        [binary, "auth", "status", "--text"], text=True, capture_output=True, timeout=10,
+    )
+    if auth.returncode:
+        raise RuntimeError("Claude Code is not signed in. Run `claude auth login`, then retry.")
+    return binary
+
+
+def apply_session_defaults(args, repo: Path) -> dict:
+    """Apply ignored local defaults after argparse, preserving explicit flags."""
+    session = load_session_config(repo)
+    if args.command == "run":
+        if args.mock:
+            args.agent = args.agent or "codex"
+            args.review_qa_tests = bool(args.review_qa_tests)
+            args.max_parallel = args.max_parallel or 4
+        else:
+            args.agent = args.agent or session.get("agent", "codex")
+            args.qa_agent = args.qa_agent or session.get("qa_agent")
+            if args.review_qa_tests is None:
+                args.review_qa_tests = session.get("review_qa_tests", False)
+            args.max_parallel = args.max_parallel or session.get("max_parallel", 4)
+            args.project_number = args.project_number or session.get("project_number")
+    elif args.command == "plan":
+        args.default_agent = args.default_agent or session.get("agent", "codex")
+        args.planning_agent = args.planning_agent or session.get("planning_agent", "codex")
+    elif args.command == "approve":
+        if args.project_number is None and not args.new_project_title:
+            args.project_number = session.get("project_number")
+    elif args.command == "retry":
+        args.project_number = args.project_number or session.get("project_number")
+    elif args.command == "seed":
+        args.agent = args.agent or session.get("agent", "codex")
+    elif args.command == "doctor":
+        args.agent = args.agent or session.get("agent", "codex")
+        args.qa_agent = args.qa_agent or session.get("qa_agent")
+        args.planning_agent = args.planning_agent or session.get("planning_agent", "codex")
+    return session
+
+
+def resolved_run_config(args, session: dict) -> dict:
+    qa_agent = "disabled" if args.no_qa else (
+        args.qa_agent or load_config(Path(args.repo).resolve())["qa"]["agent"]
+    )
+    return {
+        **session,
+        "agent": args.agent,
+        "qa_agent": qa_agent,
+        "review_qa_tests": args.review_qa_tests,
+        "max_parallel": args.max_parallel,
+        **({"project_number": args.project_number} if args.project_number else {}),
+    }
+
+
+def seed_backlog(repo: Path, args):
+    print(
+        "Using deterministic fallback tickets. This bypasses PRD planning and "
+        "the product/alignment review gates.",
+        flush=True,
+    )
+    command = [
+        sys.executable, str(repo / "factory/seed_github.py"),
+        "--repo", str(repo), "--agent", args.agent, "--scenario", args.scenario,
+    ]
+    if args.github_repo:
+        command.extend(["--github-repo", args.github_repo])
+    if args.dry_run:
+        command.append("--dry-run")
+    result = subprocess.run(command, cwd=repo)
+    if result.returncode:
+        raise RuntimeError("deterministic ticket seeding failed")
+
+
 class StateStore:
     def __init__(self, repo: Path):
         self.path = repo / ".factory" / "state.json"
@@ -240,6 +333,8 @@ class Factory:
             source = json.loads(source_path.read_text())
         else:
             source = self.backend.load(read_only=self.args.dry_run)
+            if not self.args.dry_run and self.backend.project_number:
+                remember_project(self.repo, self.backend.project_number)
         previous = {t["number"]: t for t in self.store.data.get("tickets", [])}
         for raw in source:
             number = int(raw["number"])
@@ -865,21 +960,37 @@ def approve_qa_tests(repo: Path, number: int, assume_yes=False):
     print(f"Approved QA tests for #{number}. The running factory will resume it automatically.")
 
 
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
 def parser():
     p = argparse.ArgumentParser(prog="factory", description="Software (re)-Factory orchestrator")
     sub = p.add_subparsers(dest="command", required=True)
+    configure = sub.add_parser("configure", help="save attendee defaults for shorter commands")
+    configure.add_argument("--preset", choices=sorted(PRESETS), required=True)
+    configure.add_argument("--project-number", type=positive_int)
+    seed = sub.add_parser("seed", help="create deterministic fallback tickets without PRD planning")
+    seed.add_argument("scenario", choices=["tv", "recipe-rebrand"], nargs="?", default="recipe-rebrand")
+    seed.add_argument("--repo", default=".")
+    seed.add_argument("--github-repo", metavar="OWNER/REPOSITORY")
+    seed.add_argument("--agent", choices=["claude", "codex", "cursor"])
+    seed.add_argument("--dry-run", action="store_true")
     run_p = sub.add_parser("run", help="schedule and execute tickets")
     run_p.add_argument("--repo", default="."); run_p.add_argument(
-        "--agent", choices=["claude", "codex", "cursor", "mock"], default="codex",
+        "--agent", choices=["claude", "codex", "cursor", "mock"],
     )
-    run_p.add_argument("--max-parallel", type=int, default=4); run_p.add_argument("--project-number", type=int)
+    run_p.add_argument("--max-parallel", type=positive_int); run_p.add_argument("--project-number", type=positive_int)
     run_p.add_argument(
         "--qa-agent", choices=["claude", "codex", "cursor"],
         help="independent agent that writes protected acceptance tests before implementation",
     )
     run_p.add_argument("--no-qa", action="store_true", help="skip the independent QA phase")
     run_p.add_argument(
-        "--review-qa-tests", action="store_true",
+        "--review-qa-tests", action=argparse.BooleanOptionalAction, default=None,
         help="pause each ticket for human approval after QA commits its tests",
     )
     run_p.add_argument(
@@ -890,10 +1001,11 @@ def parser():
     run_p.add_argument("--mock", action="store_true", help="use seed tickets, mock agent, and local merges")
     status = sub.add_parser("status"); status.add_argument("--repo", default=".")
     retry = sub.add_parser("retry"); retry.add_argument("issue", type=int); retry.add_argument("--repo", default=".")
-    retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=int)
+    retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=positive_int)
     plan = sub.add_parser("plan", help="run the Product Review expert on a PRD")
     plan.add_argument("prd"); plan.add_argument("--repo", default="."); plan.add_argument("--output")
-    plan.add_argument("--default-agent", choices=["claude", "codex", "cursor"], default="codex")
+    plan.add_argument("--default-agent", choices=["claude", "codex", "cursor"])
+    plan.add_argument("--planning-agent", choices=["claude", "codex"])
     plan.add_argument("--min-tickets", type=int, default=3); plan.add_argument("--max-tickets", type=int, default=12)
     plan.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
     review = sub.add_parser("review", help="open a human review gate for a planning run")
@@ -907,47 +1019,69 @@ def parser():
     continue_p.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
     approve = sub.add_parser("approve", help="approve alignment and publish tickets to GitHub")
     approve.add_argument("plan"); approve.add_argument("--repo", default=".")
-    approve.add_argument("--project-number", type=int); approve.add_argument("--yes", action="store_true")
+    approve.add_argument("--project-number", type=positive_int); approve.add_argument("--yes", action="store_true")
     approve.add_argument("--new-project-title", help="create and use a fresh GitHub Project")
     approve_tests = sub.add_parser("approve-tests", help="approve protected QA tests for one ticket")
     approve_tests.add_argument("issue", type=int); approve_tests.add_argument("--repo", default=".")
     approve_tests.add_argument("--yes", action="store_true")
     doctor = sub.add_parser("doctor", help="check workshop prerequisites and safety")
     doctor.add_argument("--repo", default="."); doctor.add_argument("--full", action="store_true")
-    doctor.add_argument("--agent", choices=["claude", "codex", "cursor"], default="codex")
+    doctor.add_argument("--agent", choices=["claude", "codex", "cursor"])
     doctor.add_argument("--qa-agent", choices=["claude", "codex", "cursor"])
+    doctor.add_argument("--planning-agent", choices=["claude", "codex"])
     return p
 
 
 def main():
     args = parser().parse_args()
-    repo = Path(args.repo).resolve()
+    repo = Path(getattr(args, "repo", ".")).resolve()
     try:
-        if args.command == "status":
+        session = apply_session_defaults(args, repo)
+        if args.command == "configure":
+            path, configured = configure_session(repo, args.preset, args.project_number)
+            print(render_session_config(configured))
+            print(f"\nSaved attendee defaults: {path}")
+            print("Next: ./factory/factory doctor")
+        elif args.command == "seed":
+            seed_backlog(repo, args)
+        elif args.command == "status":
             show_status(repo)
         elif args.command == "retry":
             retry_ticket(repo, args.issue, args.mock, args.project_number)
         elif args.command == "plan":
+            planner_label = "deterministic fixtures" if args.mock else args.planning_agent.title()
+            print(f"Planning with {planner_label}; generated tickets will use {args.default_agent.title()}.")
             plan_prd(
                 repo, Path(args.prd), args.output, args.default_agent,
                 args.min_tickets, args.max_tickets,
-                "mock" if args.mock else resolve_codex_cli(), args.mock,
+                "mock" if args.mock else args.planning_agent,
+                "mock" if args.mock else resolve_planning_cli(args.planning_agent),
+                args.mock,
             )
         elif args.command == "review":
             review_plan(repo, args.kind, args.plan)
         elif args.command == "approve-product":
             approve_product(repo, args.plan, args.yes)
         elif args.command == "continue-plan":
-            continue_plan(repo, args.plan, "mock" if args.mock else resolve_codex_cli(), args.mock)
+            run_dir = resolve_run(repo, args.plan)
+            planning_agent = load_manifest(run_dir).get("planning_agent", "codex")
+            agent_bin = "mock" if args.mock or planning_agent == "mock" else resolve_planning_cli(planning_agent)
+            continue_plan(repo, args.plan, agent_bin, args.mock)
         elif args.command == "approve":
             supplied = Path(args.plan)
             legacy = supplied.is_file() and supplied.name != "manifest.json" and not (supplied.parent / "manifest.json").is_file()
             if legacy:
                 approve_plan(repo, supplied, args.project_number, args.yes, args.new_project_title)
+                published = json.loads(supplied.read_text())
             else:
                 publishable, run_dir = prepare_publication(repo, args.plan, args.yes)
                 url = approve_plan(repo, publishable, args.project_number, True, args.new_project_title)
                 mark_published(repo, run_dir, url)
+                published = json.loads(publishable.read_text())
+            project_number = published.get("publication", {}).get("project_number")
+            if project_number:
+                path = remember_project(repo, int(project_number))
+                print(f"Saved Project #{project_number} for future commands in {path}.")
         elif args.command == "approve-tests":
             approve_qa_tests(repo, args.issue, args.yes)
         elif args.command == "doctor":
@@ -955,9 +1089,13 @@ def main():
                 run_doctor(
                     repo, load_config(repo), full=args.full,
                     implementation_agent=args.agent, qa_agent=args.qa_agent,
+                    planning_agent=args.planning_agent,
                 )
             )
         else:
+            if not args.mock:
+                print(render_session_config(resolved_run_config(args, session)))
+                print()
             Factory(args).run_loop()
     except (RuntimeError, GitHubError, FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(f"factory: {exc}") from exc

@@ -444,7 +444,10 @@ def _fixture_path(repo: Path, stage: str) -> Path:
     return repo / "factory/scenarios/recipe-rebrand/planning" / f"{filename}.json"
 
 
-def _run_stage_agent(repo: Path, run_dir: Path, stage: str, manifest: dict, codex_bin: str, mock: bool) -> dict:
+def _run_stage_agent(
+    repo: Path, run_dir: Path, stage: str, manifest: dict,
+    planning_agent: str, agent_bin: str, mock: bool,
+) -> dict:
     json_path, _ = _stage_paths(run_dir, stage)
     raw = run_dir / f".{stage}-raw.json"
     inputs = _stage_inputs(run_dir, stage)
@@ -465,12 +468,32 @@ def _run_stage_agent(repo: Path, run_dir: Path, stage: str, manifest: dict, code
         log.write_text(f"Mock {stage} expert copied {fixture}\n")
     else:
         schema = repo / "factory/planning_schemas" / f"{stage}.json"
-        command = [
-            codex_bin, "exec", "--sandbox", "read-only", "--ephemeral",
-            "--ignore-user-config", "--ignore-rules", "--output-schema", str(schema),
-            "-o", str(raw), "-",
-        ]
-        result = subprocess.run(command, cwd=repo, input=prompt, text=True, capture_output=True)
+        if planning_agent == "codex":
+            command = [
+                agent_bin, "exec", "--sandbox", "read-only", "--ephemeral",
+                "--ignore-user-config", "--ignore-rules", "--output-schema", str(schema),
+                "-o", str(raw), "-",
+            ]
+            result = subprocess.run(command, cwd=repo, input=prompt, text=True, capture_output=True)
+        elif planning_agent == "claude":
+            command = [
+                agent_bin, "-p", "--permission-mode", "plan",
+                "--tools", "Read,Glob,Grep", "--no-session-persistence",
+                "--output-format", "json", "--json-schema", schema.read_text(),
+            ]
+            result = subprocess.run(command, cwd=repo, input=prompt, text=True, capture_output=True)
+            if result.returncode == 0:
+                try:
+                    envelope = json.loads(result.stdout)
+                    structured = envelope["structured_output"]
+                    write_json(raw, structured)
+                except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                    result = subprocess.CompletedProcess(
+                        result.args, 1, result.stdout,
+                        result.stderr + f"\nClaude returned no valid structured_output: {exc}\n",
+                    )
+        else:
+            raise ValueError(f"unsupported planning agent: {planning_agent}")
         log.write_text(result.stdout + result.stderr)
         if result.returncode:
             raise RuntimeError(f"{stage.replace('_', ' ')} expert failed; see {log}")
@@ -484,7 +507,7 @@ def _run_stage_agent(repo: Path, run_dir: Path, stage: str, manifest: dict, code
             "plan_id": manifest["plan_id"],
             "source_prd": str(run_dir / "source-prd.md"),
             "created_at": now(),
-            "planning_agent": "codex" if not mock else "mock",
+            "planning_agent": planning_agent if not mock else "mock",
         })
     _validate_stage(stage, value, inputs)
     if stage == "vertical_slices":
@@ -500,7 +523,7 @@ def _run_stage_agent(repo: Path, run_dir: Path, stage: str, manifest: dict, code
         "status": "blocked" if value.get("blocking_questions", value.get("open_questions", [])) else "complete",
         "sha256": sha_file(json_path),
         "source_hashes": _input_hashes(run_dir, stage, manifest),
-        "agent": "mock" if mock else "codex",
+        "agent": "mock" if mock else planning_agent,
         "prompt_version": PROMPT_VERSION,
         "created_at": now(),
         "log": relative_path(log, repo),
@@ -515,7 +538,8 @@ def _blank_stage_state() -> dict:
 
 def plan_prd(
     repo: Path, prd_path: Path, output: str | None, default_agent: str,
-    minimum: int, maximum: int, codex_bin: str, mock: bool = False,
+    minimum: int, maximum: int, planning_agent: str, agent_bin: str,
+    mock: bool = False,
 ) -> Path:
     prd_path = prd_path.resolve()
     if not prd_path.is_file():
@@ -543,6 +567,7 @@ def plan_prd(
         "prd_sha256": sha_text(prd),
         "project": prd_path.stem,
         "default_ticket_agent": default_agent,
+        "planning_agent": "mock" if mock else planning_agent,
         "ticket_limits": {"minimum": minimum, "maximum": maximum},
         "status": "planning_product_review",
         "created_at": now(),
@@ -551,7 +576,10 @@ def plan_prd(
         "stages": _blank_stage_state(),
     }
     save_manifest(repo, run_dir, manifest)
-    product = _run_stage_agent(repo, run_dir, "product_review", manifest, codex_bin, mock)
+    product = _run_stage_agent(
+        repo, run_dir, "product_review", manifest,
+        planning_agent, agent_bin, mock,
+    )
     manifest["project"] = product["project"]["name"]
     manifest["status"] = "blocked" if product["blocking_questions"] else "awaiting_product_approval"
     save_manifest(repo, run_dir, manifest)
@@ -656,9 +684,14 @@ def _assert_product_approval_current(repo: Path, run_dir: Path, manifest: dict):
         raise ValueError("product review changed; review and approve it again")
 
 
-def continue_plan(repo: Path, identifier: str | Path, codex_bin: str, mock: bool = False) -> Path:
+def continue_plan(repo: Path, identifier: str | Path, agent_bin: str, mock: bool = False) -> Path:
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
+    planning_agent = manifest.get("planning_agent", "codex")
+    if mock and planning_agent != "mock":
+        planning_agent = "mock"
+    elif planning_agent == "mock" and not mock:
+        raise ValueError("this planning run uses deterministic fixtures; rerun with --mock")
     _assert_product_approval_current(repo, run_dir, manifest)
     for stage, _, title in STAGES[1:]:
         edited = _refresh_edited_stage(repo, run_dir, manifest, stage)
@@ -668,7 +701,10 @@ def continue_plan(repo: Path, identifier: str | Path, codex_bin: str, mock: bool
         if not reusable or record.get("status") == "stale":
             manifest["status"] = f"planning_{stage}"
             save_manifest(repo, run_dir, manifest)
-            value = _run_stage_agent(repo, run_dir, stage, manifest, codex_bin, mock)
+            value = _run_stage_agent(
+                repo, run_dir, stage, manifest,
+                planning_agent, agent_bin, mock,
+            )
         else:
             value = read_json(_stage_paths(run_dir, stage)[0])
         questions = value.get("blocking_questions", value.get("open_questions", []))

@@ -67,7 +67,7 @@ criteria fixed; change only the delivery workflow.
 ./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
 cd ../software-refactory-control
 git switch -c experiment/lights-off
-python3 factory/run_lights_off.py --agent codex
+python3 factory/run_lights_off.py --agent claude
 ```
 
 Do not clarify or redirect the control agent while it runs. Return to the
@@ -104,11 +104,28 @@ execution command, test suite, or lint policy a small workshop-2 exercise.
 
 ## Preflight every live session
 
-Run the doctor before attendees create or execute tickets:
+Choose the workshop agent once. The ignored `.factory/local.toml` file stores
+attendee-specific defaults; repository policy remains in `factory.toml`.
 
 ```sh
-./factory/factory doctor --agent codex --qa-agent codex
-./factory/factory doctor --full --agent codex --qa-agent codex
+curl -fsSL https://claude.ai/install.sh | bash  # omit when already installed
+claude auth login
+./factory/factory configure --preset claude-workshop
+./factory/factory doctor
+./factory/factory doctor --full
+```
+
+The preset selects Claude for planning, independent QA, and implementation,
+requires human QA-test approval, and limits execution to two parallel jobs.
+Use `codex-workshop` to make the same choices with Codex. Explicit command-line
+flags still override saved defaults for one invocation.
+
+If the GitHub Project already exists, save its number at the same time:
+
+```sh
+./factory/factory configure \
+  --preset claude-workshop \
+  --project-number "$PROJECT_NUMBER"
 ```
 
 It checks repository safety and synchronization, GitHub authentication and
@@ -118,8 +135,9 @@ baseline data, configuration, and optionally the complete test suite.
 ## Start from an attendee PRD
 
 Copy `factory/PRD_TEMPLATE.md`, fill it in, then start the four-expert alignment
-pipeline. Each expert is a fresh, read-only Codex CLI invocation with a distinct
-role, prompt, strict JSON schema, Markdown review artifact, prompt, and log.
+pipeline. Each expert is a fresh, read-only invocation of the planning CLI
+selected by the workshop preset. Each stage has a distinct role, prompt, strict
+JSON schema, Markdown review artifact, prompt, and log.
 
 ```sh
 cp factory/PRD_TEMPLATE.md workshop-prd.md
@@ -177,16 +195,18 @@ For a clean workshop board, create one during approval:
 ./factory/factory approve PLAN_ID --new-project-title "TableStory Workshop"
 ```
 
+The approval command stores the selected Project number in `.factory/local.toml`.
 Inspect the GitHub board, then deliberately start implementation:
 
 ```sh
-./factory/factory run --agent codex --max-parallel 4
+./factory/factory run
 ```
 
 ## Independent QA acceptance-test phase
 
 Real factory runs use a dedicated QA agent before the implementation agent for
-every ticket. The default is Codex and can be changed in `factory/factory.toml`:
+every ticket. The committed repository default is Codex; an attendee preset
+overrides it locally. Repository maintainers can change it in `factory.toml`:
 
 ```toml
 [qa]
@@ -251,40 +271,47 @@ create and attach a private repository first (choose your own repository name):
 gh repo create software-refactory-workshop --private --source=. --remote=origin --push
 ```
 
-Then authenticate the GitHub CLI with Projects permission and seed the backlog:
+Authenticate the GitHub CLI with Projects permission, configure the selected
+agent, and start with a PRD:
 
 ```sh
 gh auth login
 gh auth refresh -s project
-python3 factory/seed_github.py --agent codex --scenario recipe-rebrand
-./factory/factory run --agent codex --max-parallel 4
+./factory/factory configure --preset claude-workshop
+./factory/factory plan recipe-app-prd.md
 ```
 
-You can seed an existing repository before attaching a remote by identifying it
-explicitly:
+Follow the two human planning gates described above. `factory approve` converts
+the approved Vertical Slices artifact into GitHub Issues and adds them to the
+selected Project. The tickets therefore come from the PRD; they are not a
+separate prepared backlog.
+
+Use deterministic tickets only when model access, latency, or workshop timing
+prevents the planning exercise from completing:
 
 ```sh
-python3 factory/seed_github.py --agent codex --github-repo OWNER/REPOSITORY
+./factory/factory seed recipe-rebrand
 ```
 
-The factory itself pushes ticket branches, so attach that repository as `origin`
-before `factory run`:
+The seed command explicitly reports that it bypasses PRD planning and both human
+alignment gates. It is a recovery fixture, not the normal product workflow. An
+advanced operator can still target another repository explicitly:
 
 ```sh
-git remote add origin https://github.com/OWNER/REPOSITORY.git
-./factory/factory run --agent codex
+./factory/factory seed recipe-rebrand --github-repo OWNER/REPOSITORY
 ```
 
 The first run creates or reuses a **Software (re)-Factory** Projects v2 project,
 normalizes its Status options, adds the issues, mirrors state labels, and opens
-PRs after required gates pass. Supply `--project-number N` to use an existing
-project. Use `--once` for one scheduler sweep; without it, the factory polls for
-newly merged PRs every 20 seconds.
+PRs after required gates pass. Configure `--project-number N` once to use an
+existing project; approval also remembers a newly created Project automatically.
+Use `--once` for one scheduler sweep; without it, the factory polls for QA
+approvals and newly merged PRs every 20 seconds.
 
 Run a no-write dependency preview before dispatch:
 
 ```sh
-./factory/factory run --dry-run --agent codex
+./factory/factory run --dry-run
 ```
 
 When a ticket is Blocked, edit its issue spec or acceptance criteria and then:
@@ -296,6 +323,14 @@ When a ticket is Blocked, edit its issue spec or acceptance criteria and then:
 Per-ticket `agent: claude`, `agent: codex`, or `agent: cursor` overrides the
 default. Before a live session, smoke-test each installed CLI because flags can
 change; update only its template in `factory.toml` if needed.
+
+Claude planning uses Claude Code structured output with the stage JSON schema.
+It runs in plan mode with read-only repository tools. Authenticate it with:
+
+```sh
+claude auth login
+claude auth status --text
+```
 
 For Codex, the factory selects a current CLI with a valid saved ChatGPT login
 and skips legacy `codex` executables that only support `OPENAI_API_KEY`. On
@@ -340,11 +375,14 @@ demo works offline.
 ## Operator reference
 
 ```text
+factory configure --preset claude-workshop|codex-workshop [--project-number N]
+factory seed [recipe-rebrand|tv] [--github-repo OWNER/REPOSITORY] [--agent NAME]
 factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
-            [--review-qa-tests] [--scenario tv|recipe-rebrand]
+            [--review-qa-tests|--no-review-qa-tests] [--scenario tv|recipe-rebrand]
             [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
 factory plan PRD.md [--output RUN_DIRECTORY] [--default-agent NAME]
+                    [--planning-agent claude|codex]
                     [--min-tickets N] [--max-tickets N] [--mock]
 factory review product|alignment PLAN_ID
 factory approve-product PLAN_ID [--yes]
@@ -354,6 +392,7 @@ factory approve-tests ISSUE [--yes]
 factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
 factory doctor [--repo PATH] [--full] [--agent NAME] [--qa-agent NAME]
+               [--planning-agent claude|codex]
 ```
 
 Runtime artifacts are under `.factory/`: `planning-state.json`, planning runs,

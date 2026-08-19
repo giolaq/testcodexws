@@ -29,8 +29,7 @@ Live mode also requires:
 - [ ] `gh auth status` succeeds.
 - [ ] GitHub authentication includes the `project` scope.
 - [ ] The repository owner can create issues, Projects, branches, and pull requests.
-- [ ] A current Codex CLI is authenticated. No `OPENAI_API_KEY` is required.
-- [ ] Any Claude Code or Cursor adapter used for tickets is also authenticated.
+- [ ] A current Claude Code CLI is authenticated. No API key is required.
 - [ ] Network access to GitHub and the selected agent provider is stable.
 
 ## Prepare the dry run
@@ -58,7 +57,8 @@ Prepare the live checkout only if you plan to demonstrate real agents:
 cd ../software-refactory-live
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main
-./factory/factory doctor --full --agent codex --qa-agent codex
+./factory/factory configure --preset claude-workshop
+./factory/factory doctor --full
 ```
 
 Continue only when the doctor reports zero failures. A warning is acceptable
@@ -152,7 +152,7 @@ Finish the scenario:
 Start the control in Terminal C and don't intervene:
 
 ```sh
-python3 factory/run_lights_off.py --agent codex
+python3 factory/run_lights_off.py --agent claude
 ```
 
 Return to Terminal A:
@@ -165,13 +165,12 @@ Return to Terminal A:
 ./factory/factory review alignment PLAN_ID
 ./factory/factory approve PLAN_ID \
   --new-project-title "TableStory Workshop"
-./factory/factory run \
-  --agent codex \
-  --qa-agent codex \
-  --review-qa-tests \
-  --max-parallel 4 \
-  --project-number PROJECT_NUMBER
+./factory/factory run
 ```
+
+The approved Vertical Slices artifact is the ticket source. The approval command
+creates the issues, adds them to the new Project, and saves its number locally.
+Do not seed tickets during the normal path.
 
 Approve a reviewed test set from another terminal:
 
@@ -205,6 +204,10 @@ Don't click through every field. Use one ticket to show this sequence:
 | A port is occupied | Stop the old process or use a fresh checkout. |
 | The state is stale | Reset only after confirming demo changes can be discarded. |
 | The agenda is late | Show one QA approval and one dependency unlock, then move to comparison. |
+
+If GitHub works but live planning cannot finish, use
+`./factory/factory seed recipe-rebrand` as a last-resort fixture. Tell attendees
+that it bypasses PRD planning and both human alignment gates.
 
 Reset a disposable rehearsal only when its demo changes can be discarded:
 

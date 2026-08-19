@@ -422,8 +422,8 @@ export default function Home() {
                 <li>GitHub CLI authenticated with the <code>project</code> scope</li>
                 <li>A disposable repository you can push to</li>
                 <li>Permission to create issues, Projects, and pull requests</li>
-                <li>A current, authenticated <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI <span aria-hidden="true">↗</span></a> for planning</li>
-                <li>Optional Claude Code or Cursor login for ticket agents</li>
+                <li>A current, authenticated <a href="https://code.claude.com/docs/en/cli-usage" target="_blank" rel="noreferrer">Claude Code CLI <span aria-hidden="true">↗</span></a></li>
+                <li>A Claude plan that permits Claude Code use</li>
                 <li>Network access to GitHub and the agent provider</li>
               </ul>
             </article>
@@ -437,10 +437,15 @@ git --version`}</CodeBlock>
             <span aria-hidden="true"> · </span><a href="https://nodejs.org/en/download" target="_blank" rel="noreferrer">Node.js</a>
             <span aria-hidden="true"> · </span><a href="https://git-scm.com/downloads" target="_blank" rel="noreferrer">Git</a>
             <span aria-hidden="true"> · </span><a href="https://cli.github.com/" target="_blank" rel="noreferrer">GitHub CLI</a>
-            <span aria-hidden="true"> · </span><a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI</a>
+            <span aria-hidden="true"> · </span><a href="https://code.claude.com/docs/en/cli-usage" target="_blank" rel="noreferrer">Claude Code</a>
           </p>
+          <h3>Install Claude Code for live mode</h3>
+          <p>On macOS, Linux, or WSL, install the current CLI and sign in with your Claude account:</p>
+          <CodeBlock>{`curl -fsSL https://claude.ai/install.sh | bash
+claude auth login
+claude auth status --text`}</CodeBlock>
           <Callout type="note" title="No API key is required">
-            Rehearsal mode uses deterministic local agents. Live mode uses your authenticated Codex CLI session; it does not read <code>OPENAI_API_KEY</code>.
+            Rehearsal mode uses deterministic local agents. Live mode uses your authenticated Claude Code session; it does not require <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>.
           </Callout>
           <h3>Use separate terminals</h3>
           <div className="terminal-grid">
@@ -481,7 +486,7 @@ git --version`}</CodeBlock>
               <span className="path-icon live-icon" aria-hidden="true">⌘</span>
               <strong>Live GitHub mode</strong>
               <span>Use real agent CLIs, GitHub Issues, Projects, worktrees, and pull requests.</span>
-              <small>Requires a disposable repository and Codex login</small>
+              <small>Requires a disposable repository and Claude login</small>
             </button>
           </div>
           <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub mode" : "Rehearsal mode"}`}>
@@ -504,9 +509,11 @@ cd software-refactory-workshop
             </>
           ) : (
             <>
-              <p>First, confirm GitHub access. If <code>gh auth status</code> fails, run <code>gh auth login</code> and repeat the check.</p>
+              <p>First, confirm GitHub and Claude access. Sign in before creating the disposable repository.</p>
               <CodeBlock>{`gh auth status
-gh auth refresh -s project`}</CodeBlock>
+gh auth refresh -s project
+claude auth login
+claude auth status --text`}</CodeBlock>
               <p>Clone the workshop, replace its read-only upstream remote with a private disposable repository, and run the full preflight:</p>
               <CodeBlock>{`git clone https://github.com/giolaq/software-refactory-workshop.git
 cd software-refactory-workshop
@@ -515,7 +522,8 @@ gh repo create software-refactory-dry-run \
   --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main
-./factory/factory doctor --full --agent codex --qa-agent codex`}</CodeBlock>
+./factory/factory configure --preset claude-workshop
+./factory/factory doctor --full`}</CodeBlock>
               <p>If that repository name already exists, choose another name. The doctor checks the clean branch, remote synchronization, GitHub Projects access, authenticated agent CLIs, ports, QA policy, and all configured gates.</p>
               <Callout type="warning" title="Use a disposable repository">
                 A live run creates branches, worktrees, issues, Projects items, and pull requests. Don’t use a repository that contains unrelated work.
@@ -583,8 +591,8 @@ git push origin main
               <CodeBlock>{`./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
 cd ../software-refactory-control
 git switch -c experiment/lights-off`}</CodeBlock>
-              <p>Start one autonomous Codex agent with the complete PRD:</p>
-              <CodeBlock>{`python3 factory/run_lights_off.py --agent codex`}</CodeBlock>
+              <p>Start one autonomous Claude agent with the complete PRD:</p>
+              <CodeBlock>{`python3 factory/run_lights_off.py --agent claude`}</CodeBlock>
               <p>Leave it running in that terminal and return to the original checkout. Do not clarify requirements, split work, review tests, or redirect it. Record assumptions later as observations.</p>
               <Checkpoint>
                 The control agent is running—or has finished—in its own checkout, using the same PRD and model but none of the factory controls.
@@ -610,7 +618,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
 
         <StepSection id="plan" number={5} title="Align product intent before code" time="12 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
           <p className="goal">Agree on the problem, behavior, scope, and evidence before any agent makes a technical decision.</p>
-          <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Codex CLI agent.</p>
+          <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Claude Code planning agent.</p>
           <CodeBlock>{track === "live"
             ? `./factory/factory plan recipe-app-prd.md`
             : `./factory/factory plan recipe-app-prd.md --mock`}</CodeBlock>
@@ -653,6 +661,9 @@ git switch -c experiment/lights-off`}</CodeBlock>
             <div><span>03</span><b>Program Design</b><p>Modules, types, signatures, calls, errors, and test seams.</p></div>
             <div><span>04</span><b>Vertical Slices</b><p>End-to-end outcomes, dependencies, file ownership, and QA evidence.</p></div>
           </div>
+          <Callout type="note" title="Tickets come from the PRD">
+            The Vertical Slices expert creates the backlog from the approved PRD, architecture, and program design. Seeding is not part of the normal path; <code>factory seed recipe-rebrand</code> is a deterministic recovery option when live planning cannot finish.
+          </Callout>
           <h3>Read the traceability matrix</h3>
           <p>For each <code>R*</code> row, follow the requirement through architecture contracts, program elements, ticket slices, and QA evidence. A blank final column is a reason to stop.</p>
           <h3>Expected execution waves</h3>
@@ -673,7 +684,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
               <p>Approve the whole aligned package and publish its slices:</p>
               <CodeBlock>{`./factory/factory approve PLAN_ID \
   --new-project-title "TableStory Workshop"`}</CodeBlock>
-              <p>Type <code>APPROVE ALIGNMENT</code> only after reviewing all four contracts. Save the Project number printed by the command.</p>
+              <p>Type <code>APPROVE ALIGNMENT</code> only after reviewing all four contracts. The factory creates the GitHub tickets, adds them to the new Project, and remembers that Project for later commands.</p>
               <Checkpoint>
                 GitHub shows five issues in a new Project. Dependency-free issues are Ready; the others remain Backlog.
               </Checkpoint>
@@ -697,12 +708,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           <p>Open <a href="http://localhost:8000/factory/dashboard.html" target="_blank" rel="noreferrer">localhost:8000/factory/dashboard.html <span aria-hidden="true">↗</span></a>. Return to Terminal A before starting the factory.</p>
           <p>The alignment pipeline appears above the ticket board. Click a planning stage to inspect its readable artifact, hash, status, and blocking questions.</p>
           {track === "live" ? (
-            <CodeBlock>{`./factory/factory run \
-  --agent codex \
-  --qa-agent codex \
-  --review-qa-tests \
-  --max-parallel 4 \
-  --project-number PROJECT_NUMBER`}</CodeBlock>
+            <CodeBlock>{`./factory/factory run`}</CodeBlock>
           ) : (
             <CodeBlock>{`./factory/factory run --mock \
   --scenario recipe-rebrand \
@@ -715,7 +721,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
             <h3>Would these tests prove the requirement?</h3>
             <p>Look for assertions that test behavior rather than implementation details. If a test is weak, stop and improve the ticket instead of approving it.</p>
           </div>
-          <p>Approve a reviewed test set. In rehearsal mode, the first wave uses issues 1 and 2:</p>
+          <p>Approve a reviewed test set from another terminal. In rehearsal mode, the first wave uses issues 1 and 2:</p>
           <CodeBlock>{track === "live"
             ? `./factory/factory approve-tests ISSUE_NUMBER`
             : `./factory/factory approve-tests 1 --yes
@@ -947,9 +953,8 @@ git --version`}</CodeBlock>
             </details>
             <details>
               <summary>The live-mode doctor reports a failure</summary>
-              <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. Optional Claude or Cursor warnings are safe only when neither adapter will be used.</p>
-              <CodeBlock>{`./factory/factory doctor --full \
-  --agent codex --qa-agent codex`}</CodeBlock>
+              <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. The saved workshop preset tells the doctor that Claude is required.</p>
+              <CodeBlock>{`./factory/factory doctor --full`}</CodeBlock>
             </details>
             <details>
               <summary>The factory reports “no git remotes found”</summary>
@@ -958,11 +963,16 @@ git --version`}</CodeBlock>
 git push -u origin main`}</CodeBlock>
             </details>
             <details>
-              <summary>A ticket says the OpenAI API key is missing</summary>
-              <p>The workshop uses an authenticated Codex CLI session, not an API key. Run the doctor first; it ignores legacy Codex executables and reports the compatible authenticated CLI it selected.</p>
-              <CodeBlock>{`./factory/factory doctor \
-  --agent codex --qa-agent codex`}</CodeBlock>
-              <p>If no compatible CLI is found, install or update Codex, run <code>codex</code>, and choose <strong>Sign in with ChatGPT</strong>. If several versions are installed, set <code>FACTORY_CODEX_BIN</code> to the authenticated executable.</p>
+              <summary>Claude is missing or not signed in</summary>
+              <p>The Claude workshop preset uses the Claude Code CLI for all four planning experts, independent QA, and implementation. Check the saved login and rerun the doctor; no API key is required.</p>
+              <CodeBlock>{`claude auth login
+claude auth status --text
+./factory/factory doctor`}</CodeBlock>
+            </details>
+            <details>
+              <summary>Live planning is too slow for the workshop</summary>
+              <p>Use the deterministic TableStory backlog only as a recovery path. This command creates reviewed fixture tickets and clearly reports that it bypasses PRD planning and the two alignment gates:</p>
+              <CodeBlock>{`./factory/factory seed recipe-rebrand`}</CodeBlock>
             </details>
             <details>
               <summary>The scheduler reports a deadlock</summary>
@@ -1000,7 +1010,8 @@ git push -u origin main`}</CodeBlock>
             <h2>Factory commands</h2>
           </div>
           <div className="reference-table" role="table" aria-label="Factory command reference">
-            <div role="row"><code>run_lights_off.py --agent codex</code><span>Start the one-agent control in its checkout.</span></div>
+            <div role="row"><code>factory configure --preset claude-workshop</code><span>Save local Claude defaults for short commands.</span></div>
+            <div role="row"><code>run_lights_off.py --agent claude</code><span>Start the one-agent control in its checkout.</span></div>
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
             <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
             <div role="row"><code>factory review product PLAN_ID</code><span>Inspect behavior, scope, evidence, and blockers.</span></div>
@@ -1012,6 +1023,7 @@ git push -u origin main`}</CodeBlock>
             <div role="row"><code>factory approve-tests ISSUE</code><span>Authorize implementation after QA review.</span></div>
             <div role="row"><code>factory status</code><span>Print the current ticket state.</span></div>
             <div role="row"><code>factory retry ISSUE</code><span>Reset a blocked ticket for another attempt.</span></div>
+            <div role="row"><code>factory seed recipe-rebrand</code><span>Create deterministic fallback tickets without running planning.</span></div>
           </div>
           <div className="next-links">
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/LIGHTS_OFF_EXPERIMENT.md" target="_blank" rel="noreferrer">

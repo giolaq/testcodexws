@@ -75,11 +75,9 @@ same worktree, dependency, protected-test, and verification flow.
   disposable repository.
 - GitHub token scope `project`, plus permission to create issues, Projects, and
   pull requests for that repository.
-- A current, authenticated [Codex CLI](https://learn.chatgpt.com/docs/codex/cli).
-  Product Review and the three technical planning stages use Codex. No
-  `OPENAI_API_KEY` is required.
-- Optional Claude Code or Cursor CLI authentication if either will run QA or
-  implementation tickets.
+- A current, authenticated [Claude Code CLI](https://code.claude.com/docs/en/cli-usage).
+  The live path uses fresh Claude agents for all four planning stages, QA, and
+  implementation. No API key is required.
 - Network access to GitHub and the selected agent provider.
 - A clean default branch synchronized with the GitHub repository.
 
@@ -88,11 +86,9 @@ Check live-mode authentication:
 ```sh
 gh auth status
 gh auth refresh -s project
+claude auth login
+claude auth status --text
 ```
-
-If more than one Codex executable is installed, the factory selects a current,
-authenticated CLI during `factory doctor`. Set `FACTORY_CODEX_BIN` only when
-you need to choose one explicitly.
 
 ## Step 1: Set up and run preflight
 
@@ -119,7 +115,8 @@ git remote rename origin upstream
 gh repo create software-refactory-dry-run --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main
-./factory/factory doctor --full --agent codex --qa-agent codex
+./factory/factory configure --preset claude-workshop
+./factory/factory doctor --full
 ```
 
 Choose another repository name if `software-refactory-dry-run` already exists.
@@ -134,7 +131,7 @@ Use separate terminals so long-running processes remain visible:
 | --- | --- | --- |
 | A | Factory commands | `./factory/factory …` |
 | B | Dashboard server | `python3 -m http.server 8000` |
-| C | Lights-off control | `python3 factory/run_lights_off.py --agent codex` |
+| C | Lights-off control | `python3 factory/run_lights_off.py --agent claude` |
 | D, optional | Demo application | `.factory/venv/bin/python demo-app/app.py` |
 
 Open the dashboard at `http://localhost:8000/factory/dashboard.html` and the
@@ -192,7 +189,7 @@ For live mode, create a second checkout and start one autonomous agent:
 ./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
 cd ../software-refactory-control
 git switch -c experiment/lights-off
-python3 factory/run_lights_off.py --agent codex
+python3 factory/run_lights_off.py --agent claude
 ```
 
 Use the same PRD, baseline, model, and final verification criteria as the
@@ -267,8 +264,9 @@ In live mode, publish the approved plans to a new GitHub Project:
   --new-project-title "TableStory Workshop"
 ```
 
-Save the printed Project number. Dependency-free issues should be Ready; the
-remaining issues should be Backlog.
+The approval creates tickets from the PRD-derived Vertical Slices, adds them to
+the Project, and remembers the Project number. Dependency-free issues should be
+Ready; the remaining issues should be Backlog. Seeding is not part of this path.
 
 **Checkpoint:** The plan has no orphan requirement, dependency cycle, or
 overlapping parallel file ownership.
@@ -285,12 +283,7 @@ Start the factory in Terminal A:
 
 ```sh
 # Live mode
-./factory/factory run \
-  --agent codex \
-  --qa-agent codex \
-  --review-qa-tests \
-  --max-parallel 4 \
-  --project-number PROJECT_NUMBER
+./factory/factory run
 
 # Rehearsal mode
 ./factory/factory run --mock \

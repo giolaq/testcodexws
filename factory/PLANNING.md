@@ -44,6 +44,7 @@ rendered prompt and CLI log under `.factory/prompts/` and `.factory/logs/`.
 ## Human workflow
 
 ```sh
+./factory/factory configure --preset claude-workshop
 ./factory/factory plan PRD.md
 ./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
@@ -60,6 +61,19 @@ before a human accepts the whole package.
 For a credential-free rehearsal, add `--mock` to `plan` and `continue-plan`.
 The bundled TableStory artifacts follow the same schemas, validators, manifest,
 approval gates, traceability generation, and dashboard path as live agents.
+
+## Ticket provenance
+
+The normal backlog is the output of planning. Product Review derives stable
+requirements from the PRD. Architecture and Program Design make the contracts
+and code boundaries explicit. Vertical Slices then turns that approved package
+into dependency-mapped tickets. Only `factory approve` publishes those slices
+as GitHub Issues.
+
+`factory seed recipe-rebrand` is different. It copies a bundled, deterministic
+ticket fixture directly to GitHub and skips all four experts and both human
+planning gates. Use it for recovery, offline rehearsal, or a time-boxed demo;
+do not present it as the production workflow.
 
 ## Validation and invalidation
 

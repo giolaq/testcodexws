@@ -43,18 +43,17 @@ cd ../software-refactory-control
 git switch -c experiment/lights-off
 ```
 
-Run the same CLI/model that you will use for factory implementation. The
-launcher selects the current authenticated Codex CLI in the same way as the
-factory and can also start Claude Code or Cursor:
-
-```sh
-python3 factory/run_lights_off.py --agent codex
-```
-
-Or choose another supported adapter:
+Run the same CLI/model that you will use for factory implementation. The Claude
+workshop path uses:
 
 ```sh
 python3 factory/run_lights_off.py --agent claude
+```
+
+The launcher also supports the other implementation adapters:
+
+```sh
+python3 factory/run_lights_off.py --agent codex
 python3 factory/run_lights_off.py --agent cursor
 ```
 

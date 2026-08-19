@@ -30,7 +30,8 @@ flowchart LR
 
 ## Reading path
 
-1. `factory/factory.toml` — adapters, QA policy, retry/time limits, and gates.
+1. `factory/factory.toml` — committed adapters, QA policy, retry/time limits,
+   and gates; `.factory/local.toml` — ignored attendee defaults and Project selection.
 2. `factory/planning_pipeline.py` — four expert contracts, hashes, approvals,
    traceability, validation, and planning dashboard state.
 3. `factory/planner.py` — ticket-plan validation and GitHub publication.

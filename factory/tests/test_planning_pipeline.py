@@ -1,9 +1,11 @@
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -19,6 +21,7 @@ from planning_pipeline import (
 
 
 FIXTURES = Path(__file__).parents[1] / "scenarios" / "recipe-rebrand" / "planning"
+SCHEMAS = Path(__file__).parents[1] / "planning_schemas"
 
 
 class PlanningPipelineTests(unittest.TestCase):
@@ -28,6 +31,7 @@ class PlanningPipelineTests(unittest.TestCase):
         destination = self.repo / "factory/scenarios/recipe-rebrand/planning"
         destination.parent.mkdir(parents=True)
         shutil.copytree(FIXTURES, destination)
+        shutil.copytree(SCHEMAS, self.repo / "factory/planning_schemas")
         self.prd = self.repo / "PRD.md"
         self.prd.write_text("# TableStory\n\nConvert the demo into the approved recipe product.\n")
 
@@ -35,7 +39,10 @@ class PlanningPipelineTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def start(self) -> Path:
-        return plan_prd(self.repo, self.prd, None, "codex", 3, 12, "codex", mock=True)
+        return plan_prd(
+            self.repo, self.prd, None, "codex", 3, 12,
+            "mock", "mock", mock=True,
+        )
 
     def finish(self) -> Path:
         run = self.start()
@@ -50,6 +57,26 @@ class PlanningPipelineTests(unittest.TestCase):
         self.assertEqual(manifest["stages"]["product_review"]["status"], "complete")
         self.assertEqual(manifest["stages"]["system_architecture"]["status"], "pending")
         self.assertIsNone(manifest["approvals"]["product"])
+
+    def test_claude_planner_uses_structured_output_and_records_agent(self):
+        product = json.loads((FIXTURES / "01-product-review.json").read_text())
+        response = subprocess.CompletedProcess(
+            ["claude"], 0,
+            json.dumps({"structured_output": product, "result": ""}), "",
+        )
+        with patch("planning_pipeline.subprocess.run", return_value=response) as invoked:
+            run = plan_prd(
+                self.repo, self.prd, None, "claude", 3, 12,
+                "claude", "claude", mock=False,
+            )
+        command = invoked.call_args.args[0]
+        self.assertIn("--json-schema", command)
+        self.assertTrue(
+            invoked.call_args.kwargs["input"].startswith("You are the Product Review expert."),
+        )
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["planning_agent"], "claude")
+        self.assertEqual(manifest["stages"]["product_review"]["agent"], "claude")
 
     def test_continue_requires_product_approval(self):
         run = self.start()

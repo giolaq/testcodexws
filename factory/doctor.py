@@ -93,7 +93,10 @@ def baseline_check(repo: Path) -> Check:
     return Check("FAIL", "factory baseline", f"{revision[:7]} still carries {', '.join(stale)}; {remedy}")
 
 
-def run_doctor(repo: Path, cfg: dict, *, full=False, implementation_agent="codex", qa_agent=None) -> int:
+def run_doctor(
+    repo: Path, cfg: dict, *, full=False, implementation_agent="codex",
+    qa_agent=None, planning_agent="codex",
+) -> int:
     checks: list[Check] = []
 
     required = ["factory/orchestrator.py", "factory/factory.toml", "demo-app/app.py"]
@@ -149,7 +152,11 @@ def run_doctor(repo: Path, cfg: dict, *, full=False, implementation_agent="codex
         else:
             checks.append(Check("FAIL", "GitHub repository", view.stderr.strip() or "no connected repository"))
 
-    required_agents = {implementation_agent, qa_agent or cfg.get("qa", {}).get("agent")}
+    required_agents = {
+        implementation_agent,
+        qa_agent or cfg.get("qa", {}).get("agent"),
+        planning_agent,
+    }
     for name in ("codex", "claude", "cursor"):
         if name == "codex":
             available = False
@@ -160,9 +167,23 @@ def run_doctor(repo: Path, cfg: dict, *, full=False, implementation_agent="codex
                 if status.returncode == 0 and help_result.returncode == 0:
                     available, detail = True, candidate
                     break
+        elif name == "claude":
+            found = shutil.which("claude")
+            if found:
+                status = command([found, "auth", "status", "--text"], repo)
+                help_result = command([found, "--help"], repo)
+                structured = "--json-schema" in help_result.stdout + help_result.stderr
+                available = status.returncode == 0 and (planning_agent != "claude" or structured)
+                if status.returncode:
+                    detail = "not signed in; run claude auth login"
+                elif planning_agent == "claude" and not structured:
+                    detail = "update Claude Code; --json-schema is required for planning"
+                else:
+                    detail = found
+            else:
+                available, detail = False, "not installed"
         else:
-            binary = "claude" if name == "claude" else "cursor-agent"
-            found = shutil.which(binary)
+            found = shutil.which("cursor-agent")
             available, detail = bool(found), found or "not installed"
         required_agent = name in required_agents
         checks.append(Check("PASS" if available else ("FAIL" if required_agent else "WARN"), f"{name} adapter", detail))
