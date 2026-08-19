@@ -1,12 +1,9 @@
 # Software (re)-Factory workshop outline
 
-Build the same feature in two ways: first with one autonomous coding agent, then
-with a planned software factory. Compare the working result and the evidence a
-developer must review before merging it.
+Build An AI factory and compare with the simple "one coding agent" way.
 
-This is a developer workshop. Participants use Git, agent CLIs, GitHub Projects,
-automated tests, and a local dashboard. The example starts with Pocket Cinema
-and converts it into TableStory, a responsive recipe application.
+Participants use Git, their agent CLIs, GitHub Projects, automated tests, and a local dashboard. 
+The example starts with Pocket Cinema, a multi media demo app and converts it into TableStory, a responsive food recipes application.
 
 ## Learning objectives
 
@@ -28,8 +25,7 @@ developer-experience teams. Participants should understand branches, pull
 requests, test commands, and basic command-line use. They don't need experience
 building agent orchestrators.
 
-Allow 100 minutes for the lab and 10 to 20 minutes for questions. Use rehearsal
-mode for a reliable first dry run. Use live mode when you want attendees to
+Use rehearsal mode for a simulated dry run. Use live mode when you want attendees to
 create real GitHub issues, Project items, worktrees, and pull requests.
 
 ## Workflow at a glance
@@ -167,7 +163,7 @@ Start the application:
 ```
 
 Open `http://localhost:5000`. Search for a film and open its details. Ask the
-group which parts of the application must change besides the logo. Expected
+group which parts of the application must change. Expected
 answers include the data model, URLs, APIs, copy, accessibility labels, saved
 items, navigation, tests, and documentation.
 
@@ -206,8 +202,8 @@ runs. Record questions and stops as observations.
 For rehearsal mode, inspect the stable discussion fixture:
 
 ```sh
-sed -n '1,200p' factory/scenarios/recipe-rebrand/lights-off-prompt.md
-sed -n '1,260p' factory/scenarios/recipe-rebrand/lights-off-sample-report.md
+open factory/scenarios/recipe-rebrand/lights-off-prompt.md
+open factory/scenarios/recipe-rebrand/lights-off-sample-report.md
 ```
 
 The fixture is not a model benchmark. It exists so the comparison exercise can
@@ -235,17 +231,13 @@ Save the printed `PLAN_ID`, then review the product contract:
 ```
 
 Check users, journeys, scope, evidence, assumptions, mockup needs, and blocking
-questions. If two developers could reasonably build different behavior, revise
-the contract before approval.
+questions. 
 
 ```sh
 ./factory/factory approve-product PLAN_ID
 ```
 
-Product approval authorizes technical planning. It doesn't create issues or
-start an implementation agent.
-
-**Checkpoint:** Product Review is approved and contains no blocking question.
+**Checkpoint:** Product Review is approved.
 
 ## Step 6: Align architecture, program design, and slices
 
@@ -265,12 +257,10 @@ Review four things:
 1. Architecture assigns component ownership and defines data and API contracts.
 2. Program design names modules, types, signatures, call flows, errors, and test
    seams.
-3. Vertical slices deliver end-to-end behavior and declare file ownership and
-   dependencies.
-4. Every requirement has architecture, program, slice, and QA evidence in the
+3. Every requirement has architecture, program, slice, and QA evidence in the
    traceability matrix.
 
-In live mode, publish the approved slices to a new GitHub Project:
+In live mode, publish the approved plans to a new GitHub Project:
 
 ```sh
 ./factory/factory approve PLAN_ID \
@@ -283,7 +273,7 @@ remaining issues should be Backlog.
 **Checkpoint:** The plan has no orphan requirement, dependency cycle, or
 overlapping parallel file ownership.
 
-## Step 7: Let QA define acceptance evidence
+## Step 7: Let QA define acceptance criteria
 
 Start the dashboard in Terminal B:
 
@@ -346,8 +336,7 @@ In live mode, review and merge a green pull request. Wait for the dashboard
 event **PR merged and synchronized**. A dependent ticket must not start until
 the merged commit is reachable from the local default branch.
 
-**Checkpoint:** Participants can explain one ticket transition with visible
-evidence instead of trust in the agent.
+**Checkpoint:** Ticket transition are visibile.
 
 ## Step 9: Compare and verify both results
 
@@ -356,25 +345,9 @@ Run the application and verify the same journeys in both results:
 - search by recipe title and ingredient;
 - open a recipe and inspect its metadata, ingredients, and steps;
 - add and remove a recipe from My Cookbook;
-- navigate TV browse and detail views using only keys; and
+- navigate the TV app using only keys;
 - find obsolete cinema terminology in UI, APIs, metadata, tests, and docs.
 
-Run the available gates in the control checkout:
-
-```sh
-.factory/venv/bin/python -m pytest -q demo-app/tests
-node --test demo-app/static/tests/*.test.js
-python3 -m compileall -q demo-app
-git diff --stat
-```
-
-Compare requirements evidenced, unresolved assumptions, largest review unit,
-independent QA evidence, safe parallelism, and human review or rework time. A
-successful control is still useful. The question is how much evidence each
-workflow produces for the cost it adds.
-
-**Checkpoint:** The group can name a situation suited to a direct agent and a
-situation that needs factory controls.
 
 ## Recovery plan
 
@@ -398,7 +371,3 @@ End with five developer rules:
 3. Split work by end-to-end value and explicit file ownership.
 4. Keep QA independent and protect its acceptance tests.
 5. Preserve prompts, logs, diffs, and verification output for review.
-
-Ask each participant to choose one team repository and write down the agent
-adapter, execution boundary, verification gates, and human approvals they would
-use for a first factory experiment.
