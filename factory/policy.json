@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "version": "workshop-policy-v1",
+  "engineering": [
+    "Verify behavior through public seams and keep tests deterministic and offline.",
+    "Prefer the smallest change that satisfies the approved Ticket and preserves existing contracts.",
+    "Do not hide failures by weakening assertions, swallowing errors, or skipping required gates."
+  ],
+  "workflow": [
+    "Work only in the assigned isolated worktree and within the approved Ticket scope.",
+    "Treat the orchestrator as the only lifecycle authority; roles do not assign work to one another.",
+    "Report unresolved risk explicitly in the Handoff Receipt."
+  ],
+  "repository": [
+    "Do not rewrite shared history, force-push, delete branches, or change repository visibility.",
+    "Do not commit .factory runtime state, prompts, logs, credentials, or Evidence Packets automatically.",
+    "Preserve QA-owned protected Acceptance Tests and repository-defined verification commands."
+  ],
+  "role_applicability": {
+    "*": ["engineering", "workflow", "repository"]
+  }
+}

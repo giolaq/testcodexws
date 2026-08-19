@@ -186,6 +186,7 @@ export default function Home() {
         <span className="header-section">Workshop</span>
         <div className="topbar-actions">
           <span className="duration-pill">100 min</span>
+          <span className="duration-pill">workshop-v1.0.0</span>
           <a
             className="github-link"
             href="https://github.com/giolaq/software-refactory-workshop"
@@ -252,7 +253,7 @@ export default function Home() {
             <div className="hero-meta">
               <span><b>Level</b> Intermediate</span>
               <span><b>Time</b> 100 minutes</span>
-              <span><b>Modes</b> Rehearsal or live GitHub</span>
+              <span><b>Modes</b> Instructor-led Live Run or Self-paced Rehearsal Run</span>
             </div>
             <a className="primary-button" href="#concept">Start with the concept <span aria-hidden="true">→</span></a>
           </div>
@@ -291,6 +292,10 @@ export default function Home() {
               production—and what evidence is required before it can move again.
             </p>
           </div>
+          <h3 className="subsection-title">The delivery loop</h3>
+          <div className="state-line" aria-label="Factory macro phases">
+            <span>Plan</span><i>→</i><span>Build</span><i>→</i><span>Verify</span><i>→</i><span>Review</span>
+          </div>
           <div className="concept-grid">
             <article>
               <span>01</span>
@@ -317,6 +322,11 @@ export default function Home() {
             It is the workflow around the agents. You can replace the model, agent CLI,
             execution environment, or repository host while keeping the same contracts
             and control points.
+          </Callout>
+          <Callout type="warning" title="The controls have a cost">
+            Planning, isolated worktrees, independent tests, receipts, and approval gates
+            add setup and review time. Use the Lean, Standard, or Assured Factory Profile
+            that matches the cost of failure; don&apos;t add roles that cannot change a decision.
           </Callout>
         </section>
 
@@ -373,6 +383,20 @@ export default function Home() {
             <article><span>Act 3 · Step 7</span><h3>Operate</h3><p>Watch bounded agents work through dependencies, retries, gates, and review.</p></article>
             <article><span>Act 4 · Step 8</span><h3>Adapt</h3><p>Inspect the evidence and design the smallest useful factory for your team.</p></article>
           </div>
+          <h3 className="subsection-title">100-minute run of show</h3>
+          <div className="reference-table" role="table" aria-label="Workshop schedule">
+            <div role="row"><code>0–5</code><span>Pass readiness checks and pair attendees who need setup help.</span></div>
+            <div role="row"><code>5–13</code><span>Define an AI software factory and inspect Pocket Cinema.</span></div>
+            <div role="row"><code>13–20</code><span>Read the TableStory PRD and identify the highest-risk requirement.</span></div>
+            <div role="row"><code>20–35</code><span>Reject and revise weak Product Review evidence.</span></div>
+            <div role="row"><code>35–50</code><span>Trace R3 through Product Review, System Architecture, Program Design, and Vertical Slices.</span></div>
+            <div role="row"><code>50–58</code><span>Approve alignment and inspect the PRD-derived ticket graph.</span></div>
+            <div role="row"><code>58–68</code><span>Review QA-owned Acceptance Tests before implementation.</span></div>
+            <div role="row"><code>68–85</code><span>Follow one ticket through Plan, Build, Verify, and Review.</span></div>
+            <div role="row"><code>85–91</code><span>Verify the app and preview its Evidence Packet.</span></div>
+            <div role="row"><code>91–98</code><span>Complete the Factory Canvas and peer review a colleague&apos;s design.</span></div>
+            <div role="row"><code>98–100</code><span>Export evidence and choose one bounded next experiment.</span></div>
+          </div>
           <div className="outcome-grid">
             <div>
               <h3>What you will build</h3>
@@ -389,13 +413,19 @@ export default function Home() {
               </ul>
             </div>
           </div>
+          <Callout type="note" title="Facilitator live-run policy">
+            Demonstrate from the facilitator&apos;s repository first. Live agents have no
+            presentation timeout: narrate the current state while they work. If time
+            allows, continue in a consenting attendee’s repository. If no attendee is
+            ready, teach from the visible state and complete that run after the session.
+          </Callout>
         </section>
 
         <section className="prerequisites-section" id="prerequisites">
           <div className="section-heading">
             <span className="section-kicker">Prerequisites</span>
             <h2>Prepare your development environment</h2>
-            <p>Complete these checks before the workshop. A Rehearsal Run has no account or model requirement.</p>
+            <p>Complete these checks before the workshop. A Self-paced Rehearsal Run has no account or model requirement.</p>
           </div>
           <div className="prerequisites-grid">
             <article>
@@ -415,7 +445,7 @@ export default function Home() {
               <h3>Accounts and access</h3>
               <ul>
                 <li>GitHub CLI authenticated with the <code>project</code> scope</li>
-                <li>A disposable repository you can push to</li>
+                <li>A separate disposable repository that you create, own, and can push to</li>
                 <li>Permission to create issues, Projects, and pull requests</li>
                 <li>A current, authenticated Claude or Codex CLI for structured planning</li>
                 <li>An authenticated implementation and QA agent CLI or wrapper</li>
@@ -423,6 +453,17 @@ export default function Home() {
               </ul>
             </article>
           </div>
+          <Callout type="note" title="Repository ownership is part of the exercise">
+            Every attendee creates and owns a separate repository for the workshop.
+            The facilitator uses a different repository on screen. During peer review,
+            review a peer’s repository, Factory Canvas, and evidence; don&apos;t share
+            one implementation repository.
+          </Callout>
+          <p>
+            The facilitator publishes the versioned workshop template the day before the
+            session. Confirm that your checkout reports <code>workshop-v1.0.0</code> so the
+            instructions, fixtures, and factory contracts match.
+          </p>
           <h3>Check the required versions</h3>
           <CodeBlock>{`python3 --version   # 3.11 or later
 node --version      # 20 or later
@@ -473,6 +514,46 @@ claude auth status --text`}</CodeBlock>
             </article>
           </div>
 
+          <h3>Choose a Factory Profile</h3>
+          <p>
+            A Factory Profile selects an executable set of planning and execution roles.
+            Start with Standard for the workshop, then remove or add controls only when
+            your delivery risk justifies the change.
+          </p>
+          <div className="control-spectrum">
+            <article>
+              <span>LOWER RISK</span>
+              <h3>Lean Factory Profile</h3>
+              <p>Product Review and Vertical Slices, followed by implementation, verification, and human review.</p>
+            </article>
+            <article className="spectrum-featured">
+              <span>WORKSHOP DEFAULT</span>
+              <h3>Standard Factory Profile</h3>
+              <p>Four planning experts, independent QA, protected Acceptance Tests, implementation, verification, and human review.</p>
+            </article>
+            <article>
+              <span>HIGHER CONSEQUENCE</span>
+              <h3>Assured Factory Profile</h3>
+              <p>Adds cleanup, architecture conformance, hardening, and a read-only final verifier before human review.</p>
+            </article>
+          </div>
+          <CodeBlock>{`./factory/factory profiles
+./factory/factory configure --profile standard`}</CodeBlock>
+
+          <h3>Keep role and policy contracts separate from adapters</h3>
+          <p>
+            An Agent Role contract defines four things: <strong>Ownership</strong>,
+            <strong> Exclusions</strong>, <strong>Verification responsibility</strong>, and the required
+            <strong> Handoff Receipt</strong>. The adapter—Claude, Codex, Cursor, a local
+            model, a container, or a remote runner—fills that role but does not redefine
+            its responsibility.
+          </p>
+          <p>
+            Role contracts live in <code>factory/roles.json</code>. Repository rules live
+            in <code>factory/policy.json</code>; the workshop records policy version
+            <code>workshop-policy-v1</code> and section hashes in every plan and receipt.
+          </p>
+
           <h3>Start with a preset</h3>
           <p>Use one command to save attendee-specific defaults in the ignored <code>.factory/local.toml</code> file:</p>
           <CodeBlock>{`# Claude for planning, QA, and implementation
@@ -488,7 +569,7 @@ claude auth status --text`}</CodeBlock>
   --agent cursor \\
   --qa-agent codex \\
   --review-qa-tests \\
-  --max-parallel 2`}</CodeBlock>
+  --max-parallel 1`}</CodeBlock>
 
           <h3>Register your own implementation or QA agent</h3>
           <p>Add its command to the committed project policy in <code>factory/factory.toml</code>:</p>
@@ -506,7 +587,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
   --agent my-agent \\
   --qa-agent my-agent \\
   --review-qa-tests \\
-  --max-parallel 2
+  --max-parallel 1
 
 ./factory/factory doctor --full`}</CodeBlock>
 
@@ -518,7 +599,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
           </p>
           <CodeBlock label="factory/factory.toml">{`[factory]
 max_retries = 2
-agent_timeout = 900
+agent_timeout = 900 # Rehearsal Run only; live agents have no presentation timeout
 gate_timeout = 300
 
 [qa]
@@ -578,7 +659,7 @@ required = true`}</CodeBlock>
             >
               <span className="recommended">RECOMMENDED</span>
               <span className="path-icon rehearsal-icon" aria-hidden="true">▶</span>
-              <strong>Rehearsal Run</strong>
+              <strong>Self-paced Rehearsal Run</strong>
               <span>Run deterministic planning, QA, implementation, and local merges. No GitHub writes or model credentials.</span>
               <small>Use this path for the dry run</small>
             </button>
@@ -590,12 +671,12 @@ required = true`}</CodeBlock>
               onClick={() => chooseTrack("live")}
             >
               <span className="path-icon live-icon" aria-hidden="true">⌘</span>
-              <strong>Live GitHub mode</strong>
+              <strong>Instructor-led Live Run</strong>
               <span>Use real agent CLIs, GitHub Issues, Projects, worktrees, and pull requests.</span>
               <small>Requires a disposable repository and authenticated agents</small>
             </button>
           </div>
-          <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub Run" : "Rehearsal Run"}`}>
+          <Callout type="note" title={`You selected ${track === "live" ? "Instructor-led Live Run" : "Self-paced Rehearsal Run"}`}>
             The commands below now follow this path. Complete each checkpoint before moving on.
           </Callout>
         </section>
@@ -620,17 +701,17 @@ cd software-refactory-workshop
 gh auth refresh -s project
 claude auth login
 claude auth status --text`}</CodeBlock>
-              <p>Clone the workshop, replace its read-only upstream remote with a private disposable repository, and run the full preflight:</p>
-              <CodeBlock>{`git clone https://github.com/giolaq/software-refactory-workshop.git
-cd software-refactory-workshop
-git remote rename origin upstream
-gh repo create software-refactory-dry-run \
-  --private --source=. --remote=origin --push
+              <p>Create and clone your own private repository from the public workshop template, then run the full preflight:</p>
+              <CodeBlock>{`gh repo create software-refactory-dry-run \
+  --private \
+  --template giolaq/software-refactory-workshop \
+  --clone
+cd software-refactory-dry-run
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main
 ./factory/factory configure --preset claude-workshop
 ./factory/factory doctor --full`}</CodeBlock>
-              <p>If that repository name already exists, choose another name. The doctor checks the clean branch, remote synchronization, GitHub Projects access, selected agent adapters, ports, QA policy, and all configured gates.</p>
+              <p>If that repository name already exists, choose another name. Confirm the source repository shows <strong>Use this template</strong> before the session. The doctor checks the clean branch, remote synchronization, GitHub Projects access, selected agent adapters, ports, QA policy, and all configured gates.</p>
               <Callout type="warning" title="Use a disposable repository">
                 A live run creates branches, worktrees, issues, Projects items, and pull requests. Don’t use a repository that contains unrelated work.
               </Callout>
@@ -704,9 +785,26 @@ git push origin main
           </ol>
           <div className="activity-card">
             <span className="activity-label">Product decision</span>
-            <h3>Would two teams build the same product?</h3>
-            <p>Pick one requirement and explain its successful user-visible outcome. If two reasonable interpretations remain, edit <code>.factory/plans/PLAN_ID/01-product-review.json</code>, review it again, and approve only when the ambiguity is resolved.</p>
+            <h3>Reject weak evidence, then revise it</h3>
+            <p>
+              In the deterministic artifact, R4 says a TV walkthrough proves that remote
+              navigation and Back work. That is subjective: it does not name the inputs,
+              route state, or focus result an automated check must observe.
+            </p>
           </div>
+          <p>Ask the Product Review agent to revise only that contract:</p>
+          <CodeBlock>{track === "live"
+            ? `./factory/factory revise PLAN_ID product \\
+  --feedback "Require automated Escape and Backspace checks that preserve mode=tv and restore focus."`
+            : `./factory/factory revise PLAN_ID product \\
+  --feedback "Require automated Escape and Backspace checks that preserve mode=tv and restore focus." \\
+  --mock`}</CodeBlock>
+          <p>
+            Run <code>factory review product PLAN_ID</code> again. Confirm that the new R4
+            evidence names Escape, Backspace, <code>mode=tv</code>, and focus restoration.
+            The manifest keeps both revision hashes and marks downstream work stale rather
+            than silently reusing it.
+          </p>
           <p>When the behavior and scope are correct, approve only the product contract:</p>
           <CodeBlock>{`./factory/factory approve-product PLAN_ID`}</CodeBlock>
           <p>Type <code>APPROVE PRODUCT</code>. This authorizes technical planning—it does not create tickets or start implementation.</p>
@@ -735,7 +833,17 @@ git push origin main
             The Vertical Slices expert creates the backlog from the approved PRD, architecture, and program design. Seeding is not part of the normal path; <code>factory seed recipe-rebrand</code> is a deterministic recovery option when live planning cannot finish.
           </Callout>
           <h3>Read the traceability matrix</h3>
-          <p>For each <code>R*</code> row, follow the requirement through architecture contracts, program elements, ticket slices, and QA evidence. A blank final column is a reason to stop.</p>
+          <p>
+            Start with R3. Trace R3 through four planning artifacts: Product Review →
+            System Architecture → Program Design → Vertical Slices. Then confirm the
+            final slice names objective QA evidence. Repeat for each <code>R*</code> row;
+            a blank applicable column is a reason to stop.
+          </p>
+          <Callout type="note" title="Each role signs its handoff">
+            A Handoff Receipt records the input and output revision hashes, claimed result,
+            verification performed, unresolved risks, artifacts, and policy hashes. Open a
+            planning stage in the dashboard to inspect the receipt behind the transition.
+          </Callout>
           <h3>Expected execution waves</h3>
           <div className="waves" aria-label="Ticket dependency waves">
             <div><span>Wave 1</span><b>Recipe API</b><b>Design system</b></div>
@@ -761,11 +869,14 @@ git push origin main
             </>
           ) : (
             <>
-              <p>A Rehearsal Run doesn’t write to GitHub. Preview the five deterministic tickets and their dependency order:</p>
-              <CodeBlock>{`./factory/factory run --mock \
+              <p>A Rehearsal Run doesn’t write to GitHub. Record the same alignment decision locally, materialize the approved Vertical Slices, and preview their dependency order:</p>
+              <CodeBlock>{`./factory/factory approve-rehearsal PLAN_ID
+
+./factory/factory run --mock \
   --scenario recipe-rebrand --dry-run`}</CodeBlock>
+              <p>Type <code>APPROVE ALIGNMENT</code>. The command records the approval and writes local tickets; it does not contact GitHub.</p>
               <Checkpoint>
-                The alignment review is complete, its traceability rows are populated, and the preview lists Recipe API and Design system as the first wave.
+                Alignment approval is recorded, traceability rows are populated, and the preview titles match the approved PRD-derived Vertical Slices.
               </Checkpoint>
             </>
           )}
@@ -806,17 +917,19 @@ git push origin main
 
         <StepSection id="factory" number={7} title="Operate and observe the factory" time="22 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
           <p className="goal">Follow parallel implementation, verification, review, and dependency synchronization.</p>
+          <div className="state-line" aria-label="Factory macro phase progress">
+            <span>Plan</span><i>→</i><span>Build</span><i>→</i><span>Verify</span><i>→</i><span>Review</span>
+          </div>
           {track === "live" ? (
             <>
-              <p>Leave the factory command running. It notices QA approvals, dispatches implementation agents, and opens pull requests after required gates pass.</p>
+              <p>Leave the factory command running. It notices Acceptance Test approvals, dispatches implementation agents, and opens pull requests after required gates pass.</p>
               <p>For each active ticket, use the dashboard to follow:</p>
             </>
           ) : (
             <>
-              <p>Resume the first wave after QA approval:</p>
+              <p>Resume the first wave after Acceptance Test approval:</p>
               <CodeBlock>{`./factory/factory run --mock \
   --scenario recipe-rebrand \
-  --review-qa-tests \
   --once`}</CodeBlock>
               <p>This command resumes the approved first wave and runs the remaining deterministic tickets without another manual QA pause. Independent QA still runs for every ticket.</p>
             </>
@@ -829,11 +942,25 @@ git push origin main
           </div>
           <h3>Understand the state transitions</h3>
           <div className="state-line" aria-label="Ticket lifecycle">
-            <span>Backlog</span><i>→</i><span>Ready</span><i>→</i><span>QA</span><i>→</i><span>In progress</span><i>→</i><span>Verifying</span><i>→</i><span>In review</span><i>→</i><span>Done</span>
+            <span>Backlog</span><i>→</i><span>Ready</span><i>→</i><span>In Progress</span><i>→</i><span>QA Review</span><i>→</i><span>Verifying</span><i>→</i><span>In Review</span><i>→</i><span>Done</span><i>·</i><span>Blocked</span>
           </div>
+          <p>
+            Use GitHub Projects to see shared backlog ownership and issue status. Use the
+            local dashboard to inspect factory-only evidence such as prompts, logs,
+            worktree changes, protected tests, gate results, and Handoff Receipts. The two
+            views complement one another; the dashboard is not a hosted Project board.
+          </p>
           <Callout type="warning" title="A failure is part of the lesson">
             Required gate output is sent back to the implementation agent for a bounded retry. Repeated failure moves the ticket to Blocked and preserves its worktree for inspection.
           </Callout>
+          {track === "rehearsal" && (
+            <Callout type="note" title="The retry is deterministic">
+              The first deterministic implementation is incomplete for the mobile recipe ticket.
+              Its protected Acceptance Test fails, the verification receipt records the
+              failure, and attempt 2 applies the complete change. This is an observable
+              recovery path, not a surprise failure staged with a live model.
+            </Callout>
+          )}
           {track === "live" ? (
             <>
               <h3>Merge one dependency pull request</h3>
@@ -879,14 +1006,34 @@ git push origin main
               <p>Use Arrow keys, Enter, and Escape or Backspace without a pointer.</p>
             </a>
           </div>
+          <h3>Complete and peer review the Factory Canvas</h3>
+          <p>
+            Generate a project-specific Canvas, complete its nine sections, then exchange
+            it with a colleague. Review the design and evidence boundary in the colleague&apos;s
+            repository; each attendee keeps ownership of their own repository.
+          </p>
+          <CodeBlock>{`./factory/factory canvas --output factory-canvas.md
+# Edit factory-canvas.md, then ask a peer to review it.`}</CodeBlock>
+          <h3>Export the Evidence Packet</h3>
+          <CodeBlock>{`./factory/factory evidence PLAN_ID --canvas factory-canvas.md`}</CodeBlock>
+          <p>
+            Open <code>.factory/evidence/PLAN_ID/evidence-packet.md</code>. The Evidence
+            Packet contains reviewed planning artifacts, approval history, ticket and pull
+            request links, protected Acceptance Test metadata, gate results, receipts, the
+            Canvas, and a manifest of artifact hashes.
+          </p>
+          <Callout type="warning" title="Evidence has a deliberate boundary">
+            Raw prompts, raw logs, environment values, tokens, and credentials are excluded
+            from the Evidence Packet. Missing evidence is reported instead of being invented.
+          </Callout>
           <h3>Completion checklist</h3>
           <ul className="check-list completion-list">
-            <li>TableStory is recognizable from the first viewport.</li>
-            <li>Recipe search matches titles and ingredients.</li>
-            <li>Details contain metadata, ingredients, and ordered steps.</li>
-            <li>My Cookbook exposes saved state.</li>
-            <li>TV navigation works entirely from the keyboard.</li>
-            <li>The dashboard shows Acceptance Tests and green gate evidence.</li>
+            <li>You rejected and revised weak Product Review evidence.</li>
+            <li>PRD-derived tickets appear in your GitHub Project or deterministic preview.</li>
+            <li>You reviewed a QA-owned Acceptance Test before implementation.</li>
+            <li>You can trace one ticket across Plan, Build, Verify, and Review.</li>
+            <li>You exported a sanitized Evidence Packet with missing evidence called out.</li>
+            <li>A peer reviewed your completed Factory Canvas.</li>
           </ul>
           <h3>Review the delivery evidence</h3>
           <ul className="check-list">
@@ -894,6 +1041,18 @@ git push origin main
             <li>Explain why one dependency waited and what caused it to unlock.</li>
             <li>Use prompt, test, gate, and merge evidence to explain why the narrative ticket is complete.</li>
           </ul>
+          <h3>Release-check the workshop source</h3>
+          <p>
+            Maintainers can execute the complete Standard journey from a clean clone.
+            The external smoke is separate, opt-in, and must run only in a disposable GitHub repository.
+            It uses Claude for planning, independent QA, and implementation; creates a fresh Project;
+            merges one Ticket; and verifies the resulting Evidence Packet links.
+          </p>
+          <CodeBlock>{`./factory/factory release-check --rehearsal
+
+# Maintainers only, from a disposable GitHub repository
+./factory/factory release-check --live-smoke \
+  --confirm-disposable-repo`}</CodeBlock>
           <div className="activity-card final-reflection">
             <span className="activity-label">Take it back to your team</span>
             <h3>Design your first factory experiment</h3>
@@ -934,22 +1093,22 @@ git push origin main
           </div>
           <div className="control-spectrum">
             <article>
-              <span>LOW COORDINATION</span>
-              <h3>Direct agent</h3>
-              <p>Use for a clear, reversible change with a small diff and strong existing tests.</p>
-              <ul><li>One task</li><li>One workspace</li><li>Human diff review</li></ul>
+              <span>LOWER CONSEQUENCE</span>
+              <h3>Lean</h3>
+              <p>Use for a clear, reversible vertical slice with strong existing tests.</p>
+              <ul><li>Two planning roles</li><li>Implementation and verification</li><li>Human review</li></ul>
             </article>
             <article className="spectrum-featured">
-              <span>SHARED CHANGE</span>
-              <h3>Guided workflow</h3>
-              <p>Use when a feature crosses files or layers but does not need several agents at once.</p>
-              <ul><li>Reviewed outcome</li><li>QA acceptance tests</li><li>Automated gates</li></ul>
+              <span>TYPICAL SHARED CHANGE</span>
+              <h3>Standard</h3>
+              <p>Use when a feature crosses product, architecture, and implementation boundaries.</p>
+              <ul><li>Four planning roles</li><li>Independent protected QA</li><li>Automated gates and review</li></ul>
             </article>
             <article>
-              <span>HIGH COORDINATION</span>
-              <h3>Software factory</h3>
-              <p>Use when work has shared contracts, dependent slices, parallel agents, or high failure cost.</p>
-              <ul><li>Specialist plans</li><li>Isolated execution</li><li>Approval gates and evidence</li></ul>
+              <span>HIGHER CONSEQUENCE</span>
+              <h3>Assured</h3>
+              <p>Use when architecture drift, security hardening, or a high failure cost needs additional separation of duties.</p>
+              <ul><li>Cleanup and conformance</li><li>Hardening</li><li>Read-only final verifier</li></ul>
             </article>
           </div>
 
@@ -964,17 +1123,29 @@ git push origin main
           <div className="canvas-panel">
             <div>
               <span className="section-kicker">Factory design canvas</span>
-              <h3>Answer five questions</h3>
+              <h3>Complete nine design fields</h3>
               <p>Your answers define the first version of your operating model.</p>
             </div>
             <ol>
-              <li><b>Input</b><span>What must be true before an agent starts?</span></li>
-              <li><b>Roles</b><span>Which decisions need a specialist perspective?</span></li>
-              <li><b>Boundaries</b><span>How will concurrent work stay isolated?</span></li>
-              <li><b>Evidence</b><span>What proves the user outcome and engineering constraints?</span></li>
-              <li><b>Authority</b><span>Which transitions require a human decision?</span></li>
+              <li><b>Use case</b><span>Which product change and risk are in scope?</span></li>
+              <li><b>Factory Profile</b><span>Why is Lean, Standard, or Assured proportionate?</span></li>
+              <li><b>Agent Roles</b><span>Which decisions need a specialist contract?</span></li>
+              <li><b>Human Gates</b><span>Which transitions require accountable approval?</span></li>
+              <li><b>Execution environment</b><span>How will concurrent and untrusted work stay isolated?</span></li>
+              <li><b>Required evidence</b><span>What proves user outcomes and engineering constraints?</span></li>
+              <li><b>Recovery policy</b><span>What retries, blocks, and requires intervention?</span></li>
+              <li><b>First Vertical Slice</b><span>What is the smallest end-to-end experiment?</span></li>
+              <li><b>Peer review</b><span>Who challenged this factory design?</span></li>
             </ol>
           </div>
+          <h3 className="subsection-title">Production boundaries outside this workshop</h3>
+          <p>
+            The workshop demonstrates coordination, not a production security model.
+            Before running on proprietary code, design Untrusted-code sandboxing,
+            credential isolation, spend and concurrency limits, audit retention,
+            idempotent recovery, branch protection, supply-chain controls,
+            observability, and organization policy enforcement.
+          </p>
           <Callout type="tip" title="Run one bounded experiment next week">
             Choose a feature that normally takes one or two days. Save the baseline,
             add one planning contract and one independent QA gate, then compare review
@@ -997,7 +1168,7 @@ node --version
 git --version`}</CodeBlock>
             </details>
             <details>
-              <summary>The live-mode doctor reports a failure</summary>
+              <summary>The Live Run doctor reports a failure</summary>
               <p>Don’t continue with a failed preflight. Read the named check, fix that condition, and rerun the same doctor command. Your saved configuration tells the doctor which adapters are required.</p>
               <CodeBlock>{`./factory/factory doctor --full`}</CodeBlock>
             </details>
@@ -1032,8 +1203,10 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             </details>
             <details>
               <summary>A planning artifact is blocked or stale</summary>
-              <p>Open its JSON artifact, resolve every blocking question, and rerun <code>continue-plan</code>. Editing Product Review clears product approval; review and approve it again first. The manifest never silently reuses downstream output with changed input hashes.</p>
-              <CodeBlock>{`./factory/factory review product PLAN_ID
+              <p>Send precise feedback through the revision command, review the new Product Review, and approve it again before continuing. The manifest never silently reuses downstream output with changed input hashes.</p>
+              <CodeBlock>{`./factory/factory revise PLAN_ID product \
+  --feedback "Describe the missing objective evidence"
+./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
 ./factory/factory continue-plan PLAN_ID`}</CodeBlock>
             </details>
@@ -1058,18 +1231,24 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
           </div>
           <div className="reference-table" role="table" aria-label="Factory command reference">
             <div role="row"><code>factory configure --preset claude-workshop</code><span>Save local Claude defaults for short commands.</span></div>
+            <div role="row"><code>factory profiles</code><span>Compare the executable Lean, Standard, and Assured role sets.</span></div>
             <div role="row"><code>factory configure --agent NAME --qa-agent NAME</code><span>Save registered implementation and QA adapters.</span></div>
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
             <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
             <div role="row"><code>factory review product PLAN_ID</code><span>Inspect behavior, scope, evidence, and blockers.</span></div>
+            <div role="row"><code>factory revise PLAN_ID product</code><span>Give product feedback, preserve revision history, and stale downstream work.</span></div>
             <div role="row"><code>factory approve-product PLAN_ID</code><span>Authorize technical planning without publishing tickets.</span></div>
             <div role="row"><code>factory continue-plan PLAN_ID</code><span>Run Architecture, Program Design, and Vertical Slices.</span></div>
             <div role="row"><code>factory review alignment PLAN_ID</code><span>Inspect traceability, ownership, evidence, and waves.</span></div>
             <div role="row"><code>factory approve PLAN_ID</code><span>Approve alignment and publish slices to GitHub.</span></div>
+            <div role="row"><code>factory approve-rehearsal PLAN_ID</code><span>Approve alignment and materialize local PRD-derived rehearsal tickets.</span></div>
             <div role="row"><code>factory run</code><span>Schedule QA, implementation, gates, and review.</span></div>
             <div role="row"><code>factory approve-tests ISSUE</code><span>Authorize implementation after QA review.</span></div>
             <div role="row"><code>factory status</code><span>Print the current ticket state.</span></div>
             <div role="row"><code>factory retry ISSUE</code><span>Reset a blocked ticket for another attempt.</span></div>
+            <div role="row"><code>factory canvas</code><span>Create the nine-section Factory Canvas template.</span></div>
+            <div role="row"><code>factory evidence PLAN_ID</code><span>Export the sanitized Evidence Packet and integrity manifest.</span></div>
+            <div role="row"><code>factory release-check --rehearsal</code><span>Run the complete Standard path from a clean committed checkout.</span></div>
             <div role="row"><code>factory seed recipe-rebrand</code><span>Create deterministic fallback tickets without running planning.</span></div>
           </div>
           <div className="next-links">
@@ -1098,7 +1277,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
       <aside className="right-rail" aria-label="Current workshop status">
         <div className="rail-card">
           <span className="rail-label">CURRENT PATH</span>
-          <strong>{track === "live" ? "Live GitHub" : "Rehearsal"}</strong>
+          <strong>{track === "live" ? "Instructor-led Live Run" : "Self-paced Rehearsal Run"}</strong>
           <button type="button" onClick={() => document.getElementById("choose-track")?.scrollIntoView({ behavior: "smooth" })}>Change path</button>
         </div>
         <div className="rail-card">

@@ -1,3 +1,5 @@
+import hashlib
+import json
 import sys
 import subprocess
 import tempfile
@@ -14,6 +16,66 @@ TEST_ROOTS = ["demo-app/tests", "demo-app/static/tests"]
 
 
 class QaPolicyTests(unittest.TestCase):
+    def test_standard_profile_cannot_disable_independent_qa(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = SimpleNamespace(
+                repo=directory, qa_agent=None, no_qa=True, mock=True,
+                project_number=None, review_qa_tests=False, scenario="tv",
+                agent="mock", profile="standard",
+            )
+            with self.assertRaisesRegex(ValueError, "requires independent QA"):
+                Factory(args)
+
+    def test_implementation_prompt_includes_role_contract_and_versioned_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            contract_dir = repo / "factory"
+            contract_dir.mkdir()
+            (contract_dir / "roles.json").write_text(json.dumps({
+                "schema_version": 1,
+                "roles": {
+                    "implementation": {
+                        "ownership": ["Production code in the Ticket scope."],
+                        "exclusions": ["Protected Acceptance Tests."],
+                        "verification": ["Run the required gates."],
+                        "handoff_receipt": ["Report changed files and unresolved risks."],
+                    },
+                },
+            }))
+            policy = {
+                "version": "policy-test-v1",
+                "engineering": ["Prefer public behavior seams."],
+                "workflow": ["Stay within the Ticket scope."],
+                "repository": ["Do not rewrite shared history."],
+                "role_applicability": {
+                    "implementation": ["engineering", "workflow", "repository"],
+                },
+            }
+            (contract_dir / "policy.json").write_text(json.dumps(policy))
+            args = SimpleNamespace(
+                repo=str(repo), qa_agent="codex", no_qa=False, mock=True,
+                project_number=None, review_qa_tests=False,
+                scenario="tv", agent="codex", profile="standard",
+            )
+            factory = Factory(args)
+            prompt = factory.make_prompt({
+                "number": 7,
+                "title": "Search recipes",
+                "body": "## Spec\nSearch by ingredient.",
+                "attempt": 1,
+                "qa_tests": {},
+            }, "").read_text()
+
+            self.assertIn("## Agent Role contract · Implementation", prompt)
+            self.assertIn("### Ownership", prompt)
+            self.assertIn("### Exclusions", prompt)
+            self.assertIn("### Verification responsibility", prompt)
+            self.assertIn("### Handoff Receipt", prompt)
+            self.assertIn("Policy version: `policy-test-v1`", prompt)
+            engineering_hash = hashlib.sha256("Prefer public behavior seams.\n".encode()).hexdigest()
+            self.assertIn(engineering_hash, prompt)
+            self.assertIn("Do not rewrite shared history.", prompt)
+
     def test_accepts_new_ticket_numbered_python_and_javascript_tests(self):
         changes = [
             ("A", "demo-app/tests/test_ticket_42_search.py"),
@@ -89,6 +151,14 @@ class QaPolicyTests(unittest.TestCase):
             self.assertEqual(factory.create_qa_tests(ticket, repo, base_sha), "")
             self.assertNotEqual(ticket["qa_commit"], base_sha)
             self.assertEqual(list(ticket["qa_tests"]), ["demo-app/tests/test_ticket_42_search.py"])
+            self.assertEqual(len(ticket["receipts"]), 1)
+            receipt = json.loads((repo / ticket["receipts"][0]).read_text())
+            self.assertEqual(receipt["role"], "qa")
+            self.assertEqual(receipt["phase"], "Build")
+            self.assertEqual(receipt["ticket"], 42)
+            self.assertEqual(receipt["output_revisions"]["qa_commit"], ticket["qa_commit"])
+            self.assertEqual(receipt["artifacts"], ["demo-app/tests/test_ticket_42_search.py"])
+            self.assertEqual(set(receipt["policy_hashes"]), {"engineering", "workflow", "repository"})
 
             prompt = factory.make_prompt(ticket, "").read_text()
             self.assertIn("Independent QA acceptance tests", prompt)
@@ -97,6 +167,85 @@ class QaPolicyTests(unittest.TestCase):
             protected = repo / "demo-app/tests/test_ticket_42_search.py"
             protected.write_text("def test_recipe_search_acceptance():\n    assert False\n")
             self.assertIn("was modified", factory.verify_qa_tests_unchanged(ticket, repo))
+
+    def test_assured_profile_executes_extended_roles_with_read_only_reviews(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+            subprocess.run(["git", "config", "user.name", "Factory Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
+            (repo / "README.md").write_text("baseline\n")
+            (repo / ".gitignore").write_text(".factory/\n")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            args = SimpleNamespace(
+                repo=str(repo), qa_agent=None, no_qa=False, mock=True,
+                project_number=None, review_qa_tests=False, scenario="tv",
+                agent="mock", profile="assured",
+            )
+            factory = Factory(args)
+            ticket = {
+                "number": 9, "title": "Harden search", "body": "## Spec\nHarden search.",
+                "agent": "mock", "attempt": 1, "qa_tests": {}, "history": [], "receipts": [],
+            }
+            factory.tickets[9] = ticket
+            phases = []
+
+            def successful_role(agent, active_ticket, worktree, prompt, log_name, phase):
+                phases.append(phase)
+                return 0, f"{phase} passed\nFACTORY_ROLE_VERDICT: PASS"
+
+            factory.run_adapter = successful_role
+            self.assertEqual(factory.run_assured_roles(ticket, repo, head), "")
+            self.assertEqual(factory.run_final_verifier(ticket, repo, head), "")
+            self.assertEqual(
+                phases,
+                ["cleanup", "architecture_conformance", "hardening", "final_verifier"],
+            )
+            receipts = [json.loads((repo / path).read_text()) for path in ticket["receipts"]]
+            self.assertEqual(
+                [item["role"] for item in receipts],
+                ["cleanup", "architecture_conformance", "hardening", "final_verifier"],
+            )
+            self.assertEqual(receipts[1]["phase"], "Verify")
+            self.assertEqual(receipts[-1]["phase"], "Verify")
+
+            correction_phases = []
+
+            def corrected_final_verdict(agent, active_ticket, worktree, prompt, log_name, phase):
+                correction_phases.append(phase)
+                if len(correction_phases) == 1:
+                    return 0, "Contract C4 is not enforced.\nFACTORY_ROLE_VERDICT: BLOCK: C4 is missing"
+                if phase == "hardening":
+                    self.assertIn("Final Verifier blocked: C4 is missing", prompt.read_text())
+                return 0, "Correction verified.\nFACTORY_ROLE_VERDICT: PASS"
+
+            factory.cfg["gate"] = [{"name": "tests", "cmd": "true", "required": True}]
+            factory.run_adapter = corrected_final_verdict
+            self.assertEqual(factory.run_final_verifier(ticket, repo, head), "")
+            self.assertEqual(
+                correction_phases,
+                ["final_verifier", "hardening", "final_verifier"],
+            )
+
+            blocked_phases = []
+
+            def blocked_conformance(agent, active_ticket, worktree, prompt, log_name, phase):
+                blocked_phases.append(phase)
+                if phase == "architecture_conformance":
+                    return 0, "Contract C2 drifted.\nFACTORY_ROLE_VERDICT: BLOCK: C2 drifted"
+                return 0, "Role passed.\nFACTORY_ROLE_VERDICT: PASS"
+
+            factory.run_adapter = blocked_conformance
+            failure = factory.run_assured_roles(ticket, repo, head)
+            self.assertIn("Architecture Conformance blocked: C2 drifted", failure)
+            self.assertEqual(blocked_phases, ["cleanup", "architecture_conformance"])
+            blocked_receipt = json.loads((repo / ticket["receipts"][-1]).read_text())
+            self.assertEqual(blocked_receipt["role"], "architecture_conformance")
+            self.assertEqual(blocked_receipt["claimed_result"], "Architecture Conformance blocked")
 
 
 if __name__ == "__main__":

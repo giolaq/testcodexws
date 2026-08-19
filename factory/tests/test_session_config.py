@@ -18,7 +18,7 @@ class SessionConfigTests(unittest.TestCase):
             self.assertEqual(value["planning_agent"], "claude")
             self.assertEqual(value["qa_agent"], "claude")
             self.assertTrue(value["review_qa_tests"])
-            self.assertEqual(value["max_parallel"], 2)
+            self.assertEqual(value["max_parallel"], 1)
             self.assertEqual(value["project_number"], 7)
             self.assertEqual(load_session_config(repo), value)
 
@@ -101,6 +101,34 @@ class SessionConfigTests(unittest.TestCase):
             args.repo = str(repo)
             apply_session_defaults(args, repo)
             self.assertIsNone(args.project_number)
+
+    def test_standard_profile_is_executable_configuration_with_safe_live_capacity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            _, configured = configure_session(repo, profile="standard")
+            self.assertEqual(configured["profile"], "standard")
+            self.assertEqual(configured["max_parallel"], 1)
+
+            args = parser().parse_args(["run"])
+            args.repo = str(repo)
+            apply_session_defaults(args, repo)
+            self.assertEqual(args.profile, "standard")
+            self.assertEqual(args.max_parallel, 1)
+
+            override = parser().parse_args(["run", "--max-parallel", "3"])
+            override.repo = str(repo)
+            apply_session_defaults(override, repo)
+            self.assertEqual(override.max_parallel, 3)
+
+    def test_unconfigured_live_run_defaults_to_one_ticket(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            args = parser().parse_args(["run"])
+            args.repo = str(repo)
+
+            apply_session_defaults(args, repo)
+
+            self.assertEqual(args.max_parallel, 1)
 
 
 if __name__ == "__main__":

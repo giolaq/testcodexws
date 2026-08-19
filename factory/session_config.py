@@ -12,24 +12,29 @@ import re
 import tomllib
 from pathlib import Path
 
+from factory_contracts import PROFILES
+
 
 CONFIG_PATH = Path(".factory/local.toml")
 PLANNING_AGENTS = {"claude", "codex"}
+FACTORY_PROFILES = set(PROFILES)
 AGENT_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 PRESETS = {
     "claude-workshop": {
+        "profile": "standard",
         "agent": "claude",
         "qa_agent": "claude",
         "planning_agent": "claude",
         "review_qa_tests": True,
-        "max_parallel": 2,
+        "max_parallel": 1,
     },
     "codex-workshop": {
+        "profile": "standard",
         "agent": "codex",
         "qa_agent": "codex",
         "planning_agent": "codex",
         "review_qa_tests": True,
-        "max_parallel": 2,
+        "max_parallel": 1,
     },
 }
 
@@ -44,6 +49,8 @@ def validate_session_config(value: dict) -> dict:
     preset = value.get("preset")
     if preset is not None and preset not in PRESETS:
         raise ValueError(f"unknown factory preset: {preset}")
+    if "profile" in value and value["profile"] not in FACTORY_PROFILES:
+        raise ValueError("profile must be lean, standard, or assured")
     for key in ("agent", "qa_agent"):
         if key in value and (
             not isinstance(value[key], str) or not AGENT_NAME.fullmatch(value[key])
@@ -82,7 +89,7 @@ def write_session_config(repo: Path, value: dict) -> Path:
     path = config_path(repo)
     path.parent.mkdir(parents=True, exist_ok=True)
     order = (
-        "preset", "agent", "qa_agent", "planning_agent",
+        "preset", "profile", "agent", "qa_agent", "planning_agent",
         "review_qa_tests", "max_parallel", "project_number",
     )
     lines = ["# Attendee-specific defaults. This file is ignored by Git."]
@@ -105,7 +112,7 @@ def configure_session(
     repo: Path, preset: str | None = None, project_number: int | None = None,
     *, agent: str | None = None, qa_agent: str | None = None,
     planning_agent: str | None = None, review_qa_tests: bool | None = None,
-    max_parallel: int | None = None,
+    max_parallel: int | None = None, profile: str | None = None,
 ) -> tuple[Path, dict]:
     if preset is not None and preset not in PRESETS:
         raise ValueError(f"unknown factory preset: {preset}")
@@ -113,6 +120,12 @@ def configure_session(
     value = dict(existing)
     if preset is not None:
         value = {"preset": preset, **PRESETS[preset]}
+    if profile is not None:
+        if profile not in FACTORY_PROFILES:
+            raise ValueError(f"unknown factory profile: {profile}")
+        value["profile"] = profile
+        if max_parallel is None:
+            value["max_parallel"] = 1
     overrides = {
         "agent": agent,
         "qa_agent": qa_agent,
@@ -136,11 +149,12 @@ def remember_project(repo: Path, project_number: int) -> Path:
 
 def render_session_config(value: dict) -> str:
     labels = (
+        ("Profile", value.get("profile", "standard").title()),
         ("Project", f"#{value['project_number']}" if value.get("project_number") else "automatic"),
         ("Planning", value.get("planning_agent", "codex").title()),
         ("Implementation", value.get("agent", "codex").title()),
         ("QA", value.get("qa_agent", "codex").title()),
         ("Test approval", "Required" if value.get("review_qa_tests") else "Not required"),
-        ("Parallel jobs", str(value.get("max_parallel", 4))),
+        ("Parallel jobs", str(value.get("max_parallel", 1))),
     )
     return "Factory configuration\n" + "\n".join(f"  {label + ':':<16}{item}" for label, item in labels)

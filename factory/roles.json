@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "roles": {
+    "product_review": {
+      "ownership": ["Product problem, users, journeys, scope, requirements, and objective success evidence."],
+      "exclusions": ["Architecture, program layout, implementation tickets, and source-code changes."],
+      "verification": ["Trace every requirement to the PRD and expose unresolved product decisions."],
+      "handoff_receipt": ["Hand off the Product Review artifact, its revision, verification summary, and unresolved risks."]
+    },
+    "system_architecture": {
+      "ownership": ["Component ownership, contracts, data models, architectural decisions, constraints, and risks."],
+      "exclusions": ["Product-scope changes, low-level implementation, and Ticket assignment."],
+      "verification": ["Give every approved requirement an owning component and explicit contract coverage."],
+      "handoff_receipt": ["Hand off the architecture artifact, input revisions, policy hashes, and open risks."]
+    },
+    "program_design": {
+      "ownership": ["Modules, paths, types, signatures, call flows, errors, and test seams."],
+      "exclusions": ["Product-scope changes, architecture replacement, Ticket assignment, and implementation."],
+      "verification": ["Map design elements to approved requirements and architecture contracts."],
+      "handoff_receipt": ["Hand off the program-design artifact, input revisions, policy hashes, and open risks."]
+    },
+    "vertical_slices": {
+      "ownership": ["Small end-to-end Tickets, dependencies, file ownership, and required evidence."],
+      "exclusions": ["Changing approved product intent or upstream technical contracts."],
+      "verification": ["Cover every applicable requirement and design element without cycles or unsafe parallel ownership."],
+      "handoff_receipt": ["Hand off the slice artifact, dependency map, input revisions, and unresolved risks."]
+    },
+    "qa": {
+      "ownership": ["Independent, deterministic Acceptance Tests derived from the Ticket criteria."],
+      "exclusions": ["Production implementation, existing-test modification, and scope changes."],
+      "verification": ["Cover automatable criteria, boundary behavior, and user-visible failure cases."],
+      "handoff_receipt": ["Hand off protected test paths and hashes, test intent, and unresolved evidence gaps."]
+    },
+    "implementation": {
+      "ownership": ["Production code and implementation-owned tests within the assigned Ticket scope."],
+      "exclusions": ["Protected Acceptance Tests, unrelated files, lifecycle state, and approved scope."],
+      "verification": ["Run required gates and preserve the hashes of QA-owned Acceptance Tests."],
+      "handoff_receipt": ["Hand off changed files, commits, gate evidence, claimed result, and unresolved risks."]
+    },
+    "cleanup": {
+      "ownership": ["Readability and maintainability improvements within the implemented Ticket diff."],
+      "exclusions": ["Behavior changes, protected Acceptance Tests, and unrelated cleanup."],
+      "verification": ["Preserve behavior and run the required gates after cleanup."],
+      "handoff_receipt": ["Hand off cleanup changes, verification, and any remaining maintainability risk."]
+    },
+    "architecture_conformance": {
+      "ownership": ["Read-only comparison of the implementation with approved architecture contracts."],
+      "exclusions": ["All file modifications, including protected Acceptance Tests."],
+      "verification": ["Report contract conformance or block with precise deviations."],
+      "handoff_receipt": ["Hand off a read-only conformance claim, evidence references, and unresolved deviations."]
+    },
+    "hardening": {
+      "ownership": ["Ticket-scoped reliability, error handling, and security improvements justified by identified risk."],
+      "exclusions": ["Protected Acceptance Tests, unrelated hardening, and product-scope expansion."],
+      "verification": ["Run required gates and document the risk addressed by each change."],
+      "handoff_receipt": ["Hand off hardening changes, verification, and residual risk."]
+    },
+    "verification": {
+      "ownership": ["Execution of configured required and advisory verification gates."],
+      "exclusions": ["Source changes, test weakening, and lifecycle decisions outside gate results."],
+      "verification": ["Record command, exit status, bounded output, duration, and required/advisory status."],
+      "handoff_receipt": ["Hand off gate results and any blocking or advisory failures."]
+    },
+    "final_verifier": {
+      "ownership": ["Read-only final assessment of requirements, policy, protected evidence, and gate results."],
+      "exclusions": ["All file modifications and acceptance of unresolved blocking risk."],
+      "verification": ["Block when the claimed result is not supported by objective evidence."],
+      "handoff_receipt": ["Hand off the final read-only verdict, evidence references, and unresolved risks."]
+    },
+    "human_review": {
+      "ownership": ["Human decision to merge, request changes, or stop based on the complete evidence."],
+      "exclusions": ["Automatic approval and silent waiver of blocking evidence."],
+      "verification": ["Inspect scope, protected evidence, gates, receipts, and unresolved risks."],
+      "handoff_receipt": ["Hand off the review state and stable GitHub or local merge reference."]
+    }
+  }
+}

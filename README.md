@@ -1,5 +1,7 @@
 # Software (re)-Factory Workshop
 
+Release: `workshop-v1.0.0`
+
 This repository contains the reference factory orchestrator and the Pocket
 Cinema refactoring workpiece. A four-expert planning pipeline turns each PRD
 into Product Review, System Architecture, Program Design, and Vertical Slices
@@ -11,4 +13,7 @@ contracts before a human can publish tickets.
   Codex, Cursor, or register your own implementation and QA agent, model
   wrapper, and execution environment.
 - Read the [planning pipeline guide](factory/PLANNING.md) for prompts, artifacts,
-  approvals, traceability, and stale-plan behavior.
+approvals, traceability, and stale-plan behavior.
+- Compare the executable [Factory Profiles and role topology](factory/README.md#choose-a-factory-profile).
+- Use the [facilitator runbook](factory/FACILITATOR.md) for the 100-minute
+  schedule, live fallback, and release checklist.

@@ -1,11 +1,13 @@
 # Facilitator runbook
 
+Release: `workshop-v1.0.0`
+
 Use this runbook to prepare and deliver the 100-minute Software (re)-Factory
 workshop. The attendee website contains the full instructions. Your job is to
 keep time, make the control points visible, and stop the group when evidence is
 weak.
 
-For the first dry run, use a Rehearsal Run. It exercises the complete workflow
+For the first dry run, use a Self-paced Rehearsal Run. It exercises the complete workflow
 without GitHub writes or model latency. Demonstrate a Live Run only after the
 rehearsal path works from a clean checkout.
 
@@ -22,6 +24,11 @@ Complete this checklist before attendees arrive:
 - [ ] A disposable checkout exists for a Rehearsal Run.
 - [ ] The deterministic recipe scenario completes successfully.
 - [ ] The attendee website is open at the prerequisites section.
+- [ ] The frozen source, CLI, website, and Git tag all identify
+      `workshop-v1.0.0`.
+- [ ] Every attendee will create and own a separate repository; the facilitator
+      uses a different repository on screen.
+- [ ] Peer-review pairs are assigned without sharing repository state.
 
 A Live Run also requires:
 
@@ -96,14 +103,21 @@ reported as a warning.
 
 | Time | Attendee action | What to say or show |
 | --- | --- | --- |
-| 0–8 min | Set up the selected mode | Point to the prerequisite list and required readiness result. |
-| 8–13 min | Inspect Pocket Cinema | Ask what must change besides the logo, then stop the server. |
+| 0–5 min | Pass readiness and pair | Confirm separate repositories and identify each peer reviewer. |
+| 5–13 min | Define the factory and inspect Pocket Cinema | Teach Plan, Build, Verify, Review; ask what must change besides the logo. |
 | 13–20 min | Read the PRD | Identify the user journey, system constraints, and shared-data risk. |
-| 20–37 min | Review Product Review | Reject ambiguous behavior before technical planning begins. |
-| 37–57 min | Review technical alignment | Trace one requirement through architecture, program design, slice, and QA evidence. |
-| 57–67 min | Review Acceptance Tests | Ask whether the assertions prove behavior before approving them. |
-| 67–89 min | Observe implementation | Follow one ticket through prompt, log, diff, gate, merge, and dependency unlock. |
-| 89–100 min | Verify and adapt | Verify TableStory, inspect the evidence, and identify useful controls for another use case. |
+| 20–35 min | Revise Product Review | Reject vague R4 evidence, record feedback, and approve the objective revision. |
+| 35–50 min | Trace R3 | Follow R3 across the four planning artifacts. |
+| 50–58 min | Align and publish | Show PRD-derived tickets and dependencies in GitHub Projects. |
+| 58–68 min | Review Acceptance Tests | Ask whether QA-owned assertions prove behavior before approving them. |
+| 68–85 min | Observe the Factory Run | Follow one ticket through Plan, Build, Verify, Review, and the deterministic retry. |
+| 85–91 min | Verify the app | Verify TableStory and preview delivery evidence. |
+| 91–98 min | Peer review the Canvas | Attendees review another repository's nine-section Factory Canvas. |
+| 98–100 min | Export and close | Export the Evidence Packet and name one bounded next experiment. |
+
+The schedule is a teaching target, not a guarantee that live model work will
+finish. Live agents have no presentation timeout. Narrate observable state
+instead of terminating slow work to manufacture a result.
 
 ## Rehearsal command path
 
@@ -111,6 +125,10 @@ Run Product Review:
 
 ```sh
 ./factory/factory plan recipe-app-prd.md --mock
+./factory/factory review product PLAN_ID
+./factory/factory revise PLAN_ID product \
+  --feedback "Require automated Escape and Backspace checks that preserve mode=tv and restore focus." \
+  --mock
 ./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
 ```
@@ -149,6 +167,9 @@ GitHub Project, worktree, QA-review, and verification steps stay the same.
 ```sh
 ./factory/factory plan recipe-app-prd.md
 ./factory/factory review product PLAN_ID
+./factory/factory revise PLAN_ID product \
+  --feedback "Require automated Escape and Backspace checks that preserve mode=tv and restore focus."
+./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
 ./factory/factory continue-plan PLAN_ID
 ./factory/factory review alignment PLAN_ID
@@ -170,6 +191,11 @@ Approve a reviewed test set from another terminal:
 After a green pull request is merged, wait for **PR merged and synchronized**
 before showing the next ticket move to Ready.
 
+Demonstrate from the facilitator repository first. If its live run has not
+reached the evidence you need, ask a consenting attendee whether you may show
+their repository. If neither is ready, teach from the visible current state;
+record missing evidence and complete it after the session.
+
 ## Evidence to show for one ticket
 
 Don't click through every field. Use one ticket to show this sequence:
@@ -180,7 +206,14 @@ Don't click through every field. Use one ticket to show this sequence:
 4. **Implementation prompt and log:** the current scope and activity.
 5. **Changed files:** the code-review surface.
 6. **Gate output:** the reason for pass, retry, or block.
-7. **History:** merge synchronization and dependency unlock.
+7. **Handoff Receipts:** the revisions, claim, verification, risks, and policy
+   hashes behind each role transition.
+8. **History:** merge synchronization and dependency unlock.
+
+Use GitHub Projects for shared backlog ownership and dependencies. Use the
+Factory Dashboard for local prompts, logs, worktree changes, protected tests,
+gate results, and receipts. Do not describe the dashboard as a hosted Project
+board.
 
 ## Recovery during the session
 
@@ -192,7 +225,7 @@ Don't click through every field. Use one ticket to show this sequence:
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |
 | The state is stale | Reset only after confirming demo changes can be discarded. |
-| The agenda is late | Show one QA approval and one dependency unlock, then verify the application. |
+| The agenda is late | Show one Acceptance Test approval and one dependency unlock, then verify the application. |
 
 If GitHub works but live planning cannot finish, use
 `./factory/factory seed recipe-rebrand` as a last-resort fixture. Tell attendees
@@ -212,9 +245,37 @@ rejected because “It feels right” isn't an objective acceptance criterion.
 The workshop is ready when a colleague can use the website without verbal help
 to:
 
-- select a mode and verify its prerequisites;
+- select a path and verify its prerequisites;
 - reach every checkpoint using the displayed commands;
 - find the dashboard, ticket evidence, and troubleshooting section;
-- explain the two human planning approvals and the QA approval;
-- explain one dependency unlock; and
-- choose which factory controls address a concrete delivery risk.
+- explain the two human planning approvals and the Acceptance Test approval;
+- explain one dependency unlock;
+- complete and peer review a Factory Canvas;
+- export a sanitized Evidence Packet; and
+- choose which Factory Profile addresses a concrete delivery risk.
+
+## Freeze and publish the workshop
+
+The repository remains private until the owner runs the complete rehearsal and
+release audit. The day before delivery:
+
+```sh
+./factory/factory --version
+./factory/factory release-check
+./factory/factory release-check --rehearsal
+```
+
+The rehearsal release check executes the complete Standard journey in a clean
+clone. Run the full Python and website suites, a participant-link check, and
+deployed website verification separately. In a dedicated disposable GitHub
+repository with Claude authenticated, also run the golden-path smoke below. It
+creates a fresh Project and merges one planned Ticket:
+
+```sh
+./factory/factory release-check --live-smoke \
+  --confirm-disposable-repo
+```
+
+After all checks pass, tag `workshop-v1.0.0`, make the repository public, and
+enable GitHub template mode. Those external owner actions are intentionally not
+automated by the factory.

@@ -1,5 +1,7 @@
 # Software (re)-Factory
 
+Release: `workshop-v1.0.0`
+
 Software (re)-Factory is a legible control layer for running several coding
 agents against a dependency-mapped backlog. GitHub Issues are tickets, Projects
 v2 is the audited board, Git worktrees isolate changes, and ordered gates decide
@@ -25,7 +27,7 @@ python3 -m http.server 8000
 ```
 
 Open <http://localhost:8000/factory/dashboard.html>. The Rehearsal Run exercises the
-same independent-QA commit and protected-test policy as real mode without using
+same independent-QA commit and protected-test policy as a Live Run without using
 credentials. The `recipe-rebrand` scenario runs five deterministic TableStory
 tickets; the original `tv` scenario merges seven tickets and deliberately blocks
 the vague eighth ticket.
@@ -75,6 +77,32 @@ The orchestration flow is intentionally direct:
    the default branch and verifies the merge commit before unlocking dependants.
 8. Mirror every transition and artifact path to `.factory/state.json` for the dashboard.
 
+The dashboard teaches four macro phases—**Plan, Build, Verify, Review**—before
+showing detailed ticket states. Every orchestrated role writes a Handoff Receipt
+with input and output revisions, its claim, verification, unresolved risks,
+artifacts, and policy hashes.
+
+## Choose a Factory Profile
+
+Profiles are executable role topologies, not presentation labels:
+
+```sh
+./factory/factory profiles
+./factory/factory configure --profile standard
+```
+
+- **Lean** runs Product Review and Vertical Slices, then implementation,
+  verification, and human review.
+- **Standard** runs all four planning roles, independent QA, protected
+  Acceptance Tests, implementation, verification, and human review.
+- **Assured** adds cleanup, architecture conformance, hardening, and a read-only
+  final verifier.
+
+Agent Role contracts are versioned in `roles.json`; ownership, exclusions,
+verification responsibility, and receipt requirements remain stable when an
+Agent Adapter changes. Project policy is versioned in `policy.json`, and its
+section hashes are recorded in plans and receipts.
+
 The ticket backend is isolated in `github_backend.py`; adapter commands and gates
 are all in `factory.toml`. You can keep the workflow and swap the CLI, model
 wrapper, execution environment, test suite, or lint policy. See
@@ -95,7 +123,8 @@ claude auth login
 ```
 
 The preset selects Claude for planning, independent QA, and implementation,
-requires human QA-test approval, and limits execution to two parallel jobs.
+requires human QA-test approval, selects the Standard profile, and limits
+execution to one ticket at a time for a legible workshop trace.
 Use `codex-workshop` to make the same choices with Codex. Explicit command-line
 flags still override saved defaults for one invocation. You can also combine
 built-in adapters or register your own implementation and QA command:
@@ -106,7 +135,7 @@ built-in adapters or register your own implementation and QA command:
   --agent cursor \
   --qa-agent codex \
   --review-qa-tests \
-  --max-parallel 2
+  --max-parallel 1
 ```
 
 Planning currently uses Claude or Codex because those integrations enforce the
@@ -145,6 +174,9 @@ questions. Nothing technical runs until a human approves this contract:
 
 ```sh
 ./factory/factory review product PLAN_ID
+./factory/factory revise PLAN_ID product \
+  --feedback "Describe the objective evidence this requirement must produce"
+./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
 ```
 
@@ -173,6 +205,10 @@ between parallel tickets. Editing an approved upstream artifact invalidates its
 approval and every downstream artifact; the factory never silently reuses stale
 planning output.
 
+Use `factory revise` rather than editing a generated artifact. It records human
+feedback and revision history, reruns only Product Review, clears affected
+approvals, and marks downstream stages stale.
+
 After the alignment review, approve and publish the final slices:
 
 ```sh
@@ -182,6 +218,20 @@ After the alignment review, approve and publish the final slices:
 The human types `APPROVE ALIGNMENT`; only then does the factory create or update
 GitHub Issues, translate dependencies into issue numbers, add them to Projects,
 and set dependency-free tickets Ready. Publication remains idempotent.
+
+For a credential-free Rehearsal Run, record the same alignment approval and
+materialize local tickets directly from the reviewed Vertical Slices:
+
+```sh
+./factory/factory approve-rehearsal PLAN_ID
+./factory/factory run --mock --scenario recipe-rebrand --dry-run
+```
+
+Type `APPROVE ALIGNMENT`. This path writes only local rehearsal state and does
+not contact GitHub.
+
+The deterministic scenario supplies execution actions, but ticket titles,
+specifications, criteria, dependencies, and plan provenance come from the PRD.
 
 For a clean workshop board, create one during approval:
 
@@ -211,11 +261,12 @@ require_human_approval = false
 test_roots = ["demo-app/tests", "demo-app/static/tests"]
 ```
 
-You can select a different QA CLI for one run or disable the phase explicitly:
+You can select a different QA CLI for one run. To omit independent QA, select
+the Lean profile; Standard and Assured reject `--no-qa`:
 
 ```sh
 ./factory/factory run --agent codex --qa-agent claude --max-parallel 4
-./factory/factory run --agent codex --no-qa --max-parallel 4
+./factory/factory run --profile lean --agent codex --max-parallel 1
 ./factory/factory run --agent codex --review-qa-tests
 ```
 
@@ -241,7 +292,7 @@ QA prompts and logs are separate from implementation artifacts:
 .factory/logs/ISSUE-qa-attemptN.log
 ```
 
-Mock rehearsal uses `mock_qa_agent.py`, so QA commits and protected-test checks
+The Rehearsal Run uses `mock_qa_agent.py`, so QA commits and protected-test checks
 remain credential-free and deterministic. Passing `--qa-agent` explicitly with
 `--mock` opts into a real QA CLI instead.
 
@@ -254,16 +305,20 @@ Avoid resetting an attendee's working repository by creating a disposable clone:
 ```
 
 The command refuses an existing destination and clones `origin`. Use `live` for
-a synchronized real-agent checkout, or `tv`/`recipe-rebrand` to prepare a local
-mock rehearsal from the tagged baseline.
+a synchronized Live Run checkout, or `tv`/`recipe-rebrand` to prepare a local
+Rehearsal Run from the tagged baseline.
 
-## Real GitHub and agent mode
+## Instructor-led Live Run
 
-Use a clean GitHub repository. If this checkout is not connected to GitHub yet,
-create and attach a private repository first (choose your own repository name):
+Create and clone a private repository from the public workshop template (choose
+your own repository name):
 
 ```sh
-gh repo create software-refactory-workshop --private --source=. --remote=origin --push
+gh repo create software-refactory-workshop \
+  --private \
+  --template giolaq/software-refactory-workshop \
+  --clone
+cd software-refactory-workshop
 ```
 
 Authenticate the GitHub CLI with Projects permission, configure the selected
@@ -364,34 +419,81 @@ Before that run, the mobile baseline starts with:
 .factory/venv/bin/python demo-app/app.py
 ```
 
-After the seven successful mock merges, open <http://localhost:5000/?mode=tv>.
+After the seven successful Rehearsal Run merges, open <http://localhost:5000/?mode=tv>.
 Use arrow keys and Enter on the home rails, then Escape or Backspace in film
 details. The data and gradient poster artwork are bundled and fictional, so the
 demo works offline.
+
+## Export review evidence
+
+Generate the nine-section Factory Canvas, complete it, and ask a peer to review
+it before export:
+
+```sh
+./factory/factory canvas --output factory-canvas.md
+./factory/factory evidence PLAN_ID --canvas factory-canvas.md
+```
+
+The packet includes reviewed planning, approvals, traceability, selected ticket
+and pull-request links, protected-test metadata, gate results, Handoff Receipts,
+the Canvas, missing-evidence warnings, and a hash manifest. Raw prompts, raw
+logs, command output, environment values, tokens, and credentials are excluded.
+
+Before a public/template release, freeze a clean tree and run:
+
+```sh
+./factory/factory --version
+./factory/factory release-check
+./factory/factory release-check --rehearsal
+```
+
+The local audit checks release identity, tracked generated state, possible
+credentials, obsolete participant-facing language, and a clean worktree. The
+`--rehearsal` check clones committed HEAD and executes the complete Standard
+planning, approval, execution-role, and retry path. Maintainers can additionally
+validate GitHub Issue, Project, PR, merge, and dashboard synchronization from a
+disposable repository. This opt-in check runs the Claude Standard path, creates
+a fresh Project, approves independent Acceptance Tests, merges one Ticket, and
+verifies its Evidence Packet links:
+
+```sh
+./factory/factory release-check --live-smoke \
+  --confirm-disposable-repo
+```
 
 ## Operator reference
 
 ```text
 factory configure [--preset claude-workshop|codex-workshop]
+                  [--profile lean|standard|assured]
                   [--agent NAME] [--qa-agent NAME]
                   [--planning-agent claude|codex]
                   [--review-qa-tests|--no-review-qa-tests]
                   [--max-parallel N] [--project-number N]
 factory seed [recipe-rebrand|tv] [--github-repo OWNER/REPOSITORY] [--agent NAME]
-factory run [--repo PATH] [--agent NAME] [--qa-agent NAME] [--no-qa]
+factory run [--repo PATH] [--profile lean|standard|assured]
+            [--agent NAME] [--qa-agent NAME]
             [--review-qa-tests|--no-review-qa-tests] [--scenario tv|recipe-rebrand]
             [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
 factory plan PRD.md [--output RUN_DIRECTORY] [--default-agent NAME]
+                    [--profile lean|standard|assured]
                     [--planning-agent claude|codex]
                     [--min-tickets N] [--max-tickets N] [--mock]
 factory review product|alignment PLAN_ID
 factory approve-product PLAN_ID [--yes]
 factory continue-plan PLAN_ID [--mock]
+factory revise PLAN_ID product (--feedback TEXT|--feedback-file PATH) [--mock]
 factory approve PLAN_ID [--project-number N] [--new-project-title TITLE] [--yes]
+factory approve-rehearsal PLAN_ID [--scenario recipe-rebrand|tv] [--yes]
 factory approve-tests ISSUE [--yes]
 factory status [--repo PATH]
 factory retry ISSUE [--repo PATH] [--project-number N] [--mock]
+factory profiles [--json]
+factory canvas [--output PATH] [--force]
+factory evidence PLAN_ID --canvas PATH [--ticket ISSUE] [--output DIRECTORY]
+factory release-check [--repo PATH] [--rehearsal]
+                      [--live-smoke --confirm-disposable-repo]
 factory doctor [--repo PATH] [--full] [--agent NAME] [--qa-agent NAME]
                [--planning-agent claude|codex]
 ```

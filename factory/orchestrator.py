@@ -28,19 +28,32 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from doctor import run_doctor
+from evidence_packet import create_canvas, export_evidence
+from factory_contracts import (
+    WORKSHOP_VERSION,
+    handoff_receipt,
+    profile as factory_profile,
+    render_profiles,
+    role_input,
+    write_handoff_receipt,
+)
+from release_check import render_release_check
 from github_backend import GitHubBackend, GitHubError
 from planner import approve_plan
 from planning_pipeline import (
+    approve_rehearsal,
     approve_product,
     continue_plan,
     load_manifest,
     mark_published,
     plan_prd,
     prepare_publication,
+    revise_plan,
     resolve_run,
     review as review_plan,
 )
 from session_config import (
+    FACTORY_PROFILES,
     PRESETS,
     configure_session,
     load_session_config,
@@ -55,7 +68,7 @@ DEFAULT_AGENTS = {
     "claude": 'claude -p "$(cat {prompt})" --permission-mode acceptEdits',
     "codex": '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"',
     "cursor": 'cursor-agent -p "$(cat {prompt})"',
-    "mock": "{python} factory/mock_agent.py {ticket} --scenario {scenario}",
+    "mock": "{python} factory/mock_agent.py {ticket} --scenario {scenario} --attempt {attempt}",
     "mock-qa": "{python} factory/mock_qa_agent.py {ticket} --scenario {scenario}",
 }
 DEFAULT_QA = {
@@ -149,8 +162,28 @@ def parse_agent(body: str, default: str) -> str:
     return match.group(1).lower() if match else default
 
 
+def parse_plan_id(body: str) -> str:
+    match = re.search(r"factory-plan:([a-zA-Z0-9_-]+):", body or "")
+    return match.group(1) if match else ""
+
+
 def slugify(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:42] or "ticket"
+
+
+def role_verdict(role: str, output: str) -> str:
+    matches = list(re.finditer(
+        r"(?im)^FACTORY_ROLE_VERDICT:\s*(PASS|BLOCK)(?::\s*(.+))?\s*$",
+        output,
+    ))
+    display = role.replace("_", " ").title()
+    if not matches:
+        return f"{display} did not return a structured FACTORY_ROLE_VERDICT"
+    result = matches[-1]
+    if result.group(1).upper() == "PASS":
+        return ""
+    reason = (result.group(2) or "no reason supplied").strip()
+    return f"{display} blocked: {reason}"
 
 
 def resolve_codex_cli() -> str:
@@ -215,6 +248,7 @@ def apply_session_defaults(args, repo: Path) -> dict:
     """Apply ignored local defaults after argparse, preserving explicit flags."""
     session = load_session_config(repo)
     if args.command == "run":
+        args.profile = args.profile or session.get("profile", "standard")
         if args.mock:
             args.agent = args.agent or "codex"
             args.review_qa_tests = bool(args.review_qa_tests)
@@ -224,9 +258,10 @@ def apply_session_defaults(args, repo: Path) -> dict:
             args.qa_agent = args.qa_agent or session.get("qa_agent")
             if args.review_qa_tests is None:
                 args.review_qa_tests = session.get("review_qa_tests", False)
-            args.max_parallel = args.max_parallel or session.get("max_parallel", 4)
+            args.max_parallel = args.max_parallel or session.get("max_parallel", 1)
             args.project_number = args.project_number or session.get("project_number")
     elif args.command == "plan":
+        args.profile = args.profile or session.get("profile", "standard")
         args.default_agent = args.default_agent or session.get("agent", "codex")
         args.planning_agent = args.planning_agent or session.get("planning_agent", "codex")
     elif args.command == "approve":
@@ -249,6 +284,7 @@ def resolved_run_config(args, session: dict) -> dict:
     )
     return {
         **session,
+        "profile": args.profile,
         "agent": args.agent,
         "qa_agent": qa_agent,
         "review_qa_tests": args.review_qa_tests,
@@ -301,6 +337,8 @@ class Factory:
         self.args = args
         self.repo = Path(args.repo).resolve()
         self.cfg = load_config(self.repo)
+        self.profile_name = getattr(args, "profile", None) or "standard"
+        self.profile = factory_profile(self.profile_name)
         validate_qa_config(self.cfg["qa"], self.cfg["agents"])
         if args.agent not in self.cfg["agents"]:
             raise ValueError(
@@ -313,6 +351,13 @@ class Factory:
             self.qa_agent = "mock-qa"
         else:
             self.qa_agent = requested_qa
+        if "qa" not in self.profile["execution_roles"]:
+            self.qa_agent = None
+        elif args.no_qa:
+            raise ValueError(
+                f"Factory Profile {self.profile['name']} requires independent QA; "
+                "select the Lean profile instead of --no-qa"
+            )
         if self.qa_agent and (
             self.qa_agent not in self.cfg["agents"]
             or self.qa_agent == "mock"
@@ -331,9 +376,22 @@ class Factory:
         self.backend = None if args.mock else GitHubBackend(self.repo, args.project_number)
 
     def load_tickets(self):
+        rehearsal_plan_id = ""
         if self.args.mock:
             scenario_path = self.repo / "factory/scenarios" / self.args.scenario / "tickets.json"
-            source_path = scenario_path if scenario_path.is_file() else self.repo / "factory/seed/tickets.json"
+            latest_plan = self.repo / ".factory/plans/latest.json"
+            if latest_plan.is_file():
+                try:
+                    rehearsal_plan_id = json.loads(latest_plan.read_text()).get("plan_id", "")
+                except json.JSONDecodeError:
+                    pass
+            approved_path = self.repo / ".factory/rehearsal" / rehearsal_plan_id / "tickets.json"
+            source_path = (
+                approved_path
+                if rehearsal_plan_id and approved_path.is_file()
+                else scenario_path if scenario_path.is_file()
+                else self.repo / "factory/seed/tickets.json"
+            )
             source = json.loads(source_path.read_text())
         else:
             source = self.backend.load(read_only=self.args.dry_run)
@@ -361,6 +419,12 @@ class Factory:
                 "current_prompt": old.get("current_prompt", ""),
                 "current_log": old.get("current_log", ""),
                 "phase": old.get("phase", ""),
+                "plan_id": (
+                    parse_plan_id(raw.get("body", ""))
+                    or rehearsal_plan_id
+                    or old.get("plan_id", "")
+                ),
+                "receipts": old.get("receipts", []),
                 "history": old.get("history", []), "mock_action": raw.get("mock_action", ""),
                 "simulate_merge_conflict": raw.get("simulate_merge_conflict", False),
             }
@@ -381,6 +445,13 @@ class Factory:
 
     def _sync_store(self, save=True):
         self.store.data["mode"] = "mock" if self.args.mock else "github"
+        self.store.data["profile"] = self.profile_name
+        self.store.data["execution_roles"] = self.profile["execution_roles"]
+        run_policy = role_input(self.repo, "implementation")
+        self.store.data["policy"] = {
+            "version": run_policy["policy_version"],
+            "hashes": run_policy["policy_hashes"],
+        }
         self.store.data["scenario"] = self.args.scenario
         self.store.data["qa_review_required"] = self.review_qa_tests
         self.store.data["states"] = STATES
@@ -388,13 +459,50 @@ class Factory:
         if save:
             self.store.save()
 
+    def record_receipt(
+        self,
+        ticket: dict,
+        role: str,
+        phase: str,
+        *,
+        attempt: int,
+        input_revisions: dict[str, str],
+        output_revisions: dict[str, str],
+        claimed_result: str,
+        verification: list[str],
+        unresolved_risks: list[str] | None = None,
+        artifacts: list[str] | None = None,
+    ) -> str:
+        contract = role_input(self.repo, role)
+        receipt = handoff_receipt(
+            run_id=ticket.get("plan_id") or f"{'rehearsal' if self.args.mock else 'live'}-{self.args.scenario}",
+            role=role,
+            phase=phase,
+            ticket=ticket["number"],
+            attempt=max(1, attempt),
+            input_revisions=input_revisions,
+            output_revisions=output_revisions,
+            claimed_result=claimed_result,
+            verification=verification,
+            unresolved_risks=unresolved_risks or [],
+            artifacts=artifacts or [],
+            policy_hashes=contract["policy_hashes"],
+        )
+        path = write_handoff_receipt(self.repo, receipt)
+        reference = os.path.relpath(path.resolve(), self.repo.resolve())
+        ticket.setdefault("receipts", []).append(reference)
+        self._sync_store()
+        return reference
+
     def transition(self, ticket: dict, status: str, note=""):
         if status not in STATES:
             raise ValueError(status)
         with self.transition_lock:
             ticket["status"] = status
-            if status != "In Progress":
+            if status not in {"In Progress", "Blocked"}:
                 ticket["phase"] = status.lower().replace(" ", "-")
+            elif status == "Blocked" and not ticket.get("phase"):
+                ticket["phase"] = "build"
             if status == "In Progress" and not ticket.get("started_at"):
                 ticket["started_at"] = now()
             if status in TERMINAL | {"In Review"}:
@@ -501,6 +609,7 @@ class Factory:
         gates = "\n".join(f"- {g['name']}: `{g['cmd']}`" for g in self.cfg["gate"])
         retry = f"\n## Previous failure\n```\n{failure[-3000:]}\n```\n" if failure else ""
         protected = ""
+        contract = role_input(self.repo, "implementation")["text"]
         if ticket.get("qa_tests"):
             paths = "\n".join(f"- `{path}`" for path in sorted(ticket["qa_tests"]))
             protected = (
@@ -512,7 +621,7 @@ class Factory:
         path.write_text(
             f"# Ticket #{ticket['number']}: {ticket['title']}\n\n{ticket['body']}\n\n"
             f"## Verification gates\n{gates}\n{protected}\nCommit as `factory(#{ticket['number']}): <summary>`.\n"
-            "Work only in the current worktree. Do not change ticket scope.\n" + retry
+            "Work only in the current worktree. Do not change ticket scope.\n\n" + contract + retry
         )
         return path
 
@@ -523,6 +632,7 @@ class Factory:
         roots = "\n".join(f"- `{root}/`" for root in self.cfg["qa"]["test_roots"])
         gates = "\n".join(f"- {g['name']}: `{g['cmd']}`" for g in self.cfg["gate"])
         retry = f"\n## Previous QA failure\n```\n{failure[-3000:]}\n```\n" if failure else ""
+        contract = role_input(self.repo, "qa")["text"]
         path.write_text(
             f"# QA assignment for ticket #{ticket['number']}: {ticket['title']}\n\n{ticket['body']}\n\n"
             "## Role\n"
@@ -540,9 +650,157 @@ class Factory:
             "may already satisfy regression-oriented criteria.\n"
             "- Do not skip tests, soften assertions, change production files, or commit; the factory commits "
             "the accepted QA files separately.\n\n"
-            f"## Later verification gates\n{gates}\n" + retry
+            f"## Later verification gates\n{gates}\n\n" + contract + retry
         )
         return path
+
+    def make_role_prompt(self, ticket: dict, role: str, failure: str = "") -> Path:
+        path = self.repo / ".factory/prompts" / f"{ticket['number']}-{role}-attempt{ticket['attempt']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        retry = f"\n## Previous role failure\n```\n{failure[-3000:]}\n```\n" if failure else ""
+        path.write_text(
+            f"# {role.replace('_', ' ').title()} for Ticket #{ticket['number']}: {ticket['title']}\n\n"
+            f"{ticket['body']}\n\n{role_input(self.repo, role)['text']}\n"
+            "Work only within this Ticket handoff. The orchestrator owns lifecycle state.\n\n"
+            "End the response with exactly one structured verdict line:\n"
+            "`FACTORY_ROLE_VERDICT: PASS` or `FACTORY_ROLE_VERDICT: BLOCK: <reason>`.\n"
+            + retry
+        )
+        return path
+
+    def run_profile_role(
+        self,
+        ticket: dict,
+        worktree: Path,
+        role: str,
+        input_commit: str,
+        *,
+        read_only: bool,
+        failure_context: str = "",
+    ) -> str:
+        before_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+        before_status = self.git("status", "--porcelain", cwd=worktree).stdout
+        prompt = self.make_role_prompt(ticket, role, failure_context)
+        code, output = self.run_adapter(
+            ticket["agent"],
+            ticket,
+            worktree,
+            prompt,
+            f"{ticket['number']}-{role}-attempt{ticket['attempt']}.log",
+            role,
+        )
+        failure = output[-3000:] if code else role_verdict(role, output)
+        if read_only:
+            after_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+            after_status = self.git("status", "--porcelain", cwd=worktree).stdout
+            if after_head != before_head or after_status != before_status:
+                failure = f"Read-only Agent Role {role} modified the worktree"
+        else:
+            try:
+                self.commit_leftovers(
+                    ticket,
+                    worktree,
+                    f"factory(#{ticket['number']}): {role.replace('_', ' ')}",
+                )
+            except Exception as exc:
+                failure = str(exc)[-3000:]
+            after_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+        protected_failure = self.verify_qa_tests_unchanged(ticket, worktree)
+        if protected_failure:
+            failure = protected_failure
+        phase = "Verify" if read_only else "Build"
+        verification_summary = [
+            f"Agent adapter exit code: {code}.",
+            "Protected Acceptance Test hashes checked.",
+        ]
+        if read_only:
+            verification_summary.append("Worktree commit and status were checked for read-only conformance.")
+        self.record_receipt(
+            ticket,
+            role,
+            phase,
+            attempt=ticket["attempt"],
+            input_revisions={"input_commit": input_commit},
+            output_revisions={"output_commit": after_head} if not failure else {},
+            claimed_result=f"{role.replace('_', ' ').title()} passed" if not failure else f"{role.replace('_', ' ').title()} blocked",
+            verification=verification_summary,
+            unresolved_risks=(
+                [f"{role.replace('_', ' ').title()} did not complete; inspect the referenced role log."]
+                if failure else []
+            ),
+            artifacts=[os.path.relpath(prompt, self.repo)],
+        )
+        return failure
+
+    def run_assured_roles(self, ticket: dict, worktree: Path, input_commit: str) -> str:
+        current = input_commit
+        for role, read_only in (
+            ("cleanup", False),
+            ("architecture_conformance", True),
+            ("hardening", False),
+        ):
+            failure = self.run_profile_role(
+                ticket,
+                worktree,
+                role,
+                current,
+                read_only=read_only,
+            )
+            if failure:
+                return failure
+            current = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+        return ""
+
+    def run_final_verifier(self, ticket: dict, worktree: Path, input_commit: str) -> str:
+        failure = self.run_profile_role(
+            ticket,
+            worktree,
+            "final_verifier",
+            input_commit,
+            read_only=True,
+        )
+        if not failure:
+            return ""
+        correction = self.run_profile_role(
+            ticket,
+            worktree,
+            "hardening",
+            input_commit,
+            read_only=False,
+            failure_context=failure,
+        )
+        if correction:
+            return correction
+        corrected_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+        gate_failure = self.verify_qa_tests_unchanged(ticket, worktree) or self.verify(ticket, worktree)
+        verification = [
+            f"{gate['name']}: exit {gate['exit_code']} ({'required' if gate['required'] else 'advisory'})"
+            for gate in ticket.get("gate_results", [])
+        ]
+        self.record_receipt(
+            ticket,
+            "verification",
+            "Verify",
+            attempt=ticket["attempt"],
+            input_revisions={"hardening_commit": corrected_head},
+            output_revisions={"verified_commit": corrected_head} if not gate_failure else {},
+            claimed_result="Post-hardening verification passed" if not gate_failure else "Post-hardening verification failed",
+            verification=verification or ["Protected Acceptance Test hashes checked."],
+            unresolved_risks=(
+                ["Required verification did not pass after hardening; inspect gate results in factory state."]
+                if gate_failure else []
+            ),
+            artifacts=sorted(ticket.get("qa_tests", {})),
+        )
+        if gate_failure:
+            return gate_failure
+        return self.run_profile_role(
+            ticket,
+            worktree,
+            "final_verifier",
+            corrected_head,
+            read_only=True,
+        )
 
     def run_adapter(
         self, agent: str, ticket: dict, worktree: Path, prompt: Path, log_name: str,
@@ -555,6 +813,7 @@ class Factory:
             prompt=shlex.quote(str(prompt)), ticket=ticket["number"],
             python=shlex.quote(self.python), codex=shlex.quote(self.codex_bin or "codex"),
             scenario=shlex.quote(self.args.scenario),
+            attempt=max(1, ticket.get("attempt", ticket.get("qa_attempt", 1))),
             repo=shlex.quote(str(self.repo)), worktree=shlex.quote(str(worktree)),
         )
         log = self.repo / ".factory/logs" / log_name
@@ -582,7 +841,7 @@ class Factory:
             reader = threading.Thread(target=copy_output, daemon=True)
             reader.start()
             try:
-                returncode = process.wait(timeout=self.cfg["factory"]["agent_timeout"])
+                returncode = process.wait(timeout=self.adapter_timeout())
             except subprocess.TimeoutExpired:
                 process.kill()
                 returncode = 124
@@ -593,6 +852,10 @@ class Factory:
         ticket.update(last_agent_exit=returncode, phase_finished_at=now())
         self._sync_store()
         return returncode, output
+
+    def adapter_timeout(self) -> int | None:
+        """Bound deterministic rehearsal hangs without killing a live coding agent."""
+        return self.cfg["factory"]["agent_timeout"] if self.args.mock else None
 
     def run_agent(self, ticket: dict, worktree: Path, prompt: Path):
         return self.run_adapter(
@@ -647,10 +910,33 @@ class Factory:
                         f"test(#{ticket['number']}): add independent acceptance tests",
                     )
                     self.snapshot_qa_tests(ticket, worktree, [path for _, path in changes])
+                    self.record_receipt(
+                        ticket,
+                        "qa",
+                        "Build",
+                        attempt=attempt,
+                        input_revisions={"base_commit": base_sha},
+                        output_revisions={"qa_commit": ticket["qa_commit"]},
+                        claimed_result="Protected Acceptance Tests created",
+                        verification=["QA file policy validated and protected hashes recorded."],
+                        artifacts=sorted(ticket["qa_tests"]),
+                    )
                     return ""
                 failure = "\n".join(policy_errors)
             ticket["qa_failure"] = failure[-3000:]
             ticket["failure"] = "QA acceptance-test phase failed:\n" + ticket["qa_failure"]
+            self.record_receipt(
+                ticket,
+                "qa",
+                "Build",
+                attempt=attempt,
+                input_revisions={"base_commit": base_sha},
+                output_revisions={},
+                claimed_result="Acceptance Test creation failed",
+                verification=["QA adapter and file policy did not produce an acceptable handoff."],
+                unresolved_risks=["QA handoff failed; inspect the referenced QA log."],
+                artifacts=[ticket.get("current_log", "")],
+            )
             self._sync_store()
             if attempt < max_attempts:
                 self.transition(ticket, "In Progress", f"Retrying QA ({attempt} of {max_attempts - 1})")
@@ -723,12 +1009,33 @@ class Factory:
                     self.transition(ticket, "Blocked", "Merge conflict; worktree preserved")
                     return
             self.transition(ticket, "Done", "Mock review merged locally")
+            self.record_receipt(
+                ticket,
+                "human_review",
+                "Review",
+                attempt=max(1, ticket.get("attempt", 1)),
+                input_revisions={"reviewed_commit": self.git("rev-parse", ticket["branch"]).stdout.strip()},
+                output_revisions={"merged_commit": self.git("rev-parse", "HEAD").stdout.strip()},
+                claimed_result="Rehearsal review merged locally",
+                verification=["Verified Ticket branch was merged through the orchestrator."],
+            )
             self.git("worktree", "remove", "--force", str(worktree), check=False)
             self.git("branch", "-d", ticket["branch"], check=False)
             return
         pr_url = self.backend.publish(ticket, worktree)
         ticket["pr_url"] = pr_url
         self.transition(ticket, "In Review", "PR opened after verification")
+        self.record_receipt(
+            ticket,
+            "human_review",
+            "Review",
+            attempt=max(1, ticket.get("attempt", 1)),
+            input_revisions={"reviewed_commit": self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()},
+            output_revisions={"pull_request": pr_url},
+            claimed_result="Pull request opened for human review",
+            verification=["Required verification gates passed before publication."],
+            artifacts=[pr_url],
+        )
 
     def process(self, ticket: dict):
         resume_qa = bool(ticket.get("qa_approved") and ticket.get("qa_commit") and ticket.get("branch"))
@@ -797,13 +1104,67 @@ class Factory:
                 commits, output, code = 0, f"{output}\n{exc}", 1
             if code or not commits:
                 failure = output[-3000:] if code else "Agent produced no changes or commits."
+                self.record_receipt(
+                    ticket,
+                    "implementation",
+                    "Build",
+                    attempt=attempt,
+                    input_revisions={"implementation_base": implementation_base_sha},
+                    output_revisions={},
+                    claimed_result="Implementation attempt failed",
+                    verification=[f"Agent adapter exit code: {code}"],
+                    unresolved_risks=[
+                        "Implementation did not produce acceptable committed output; inspect the referenced log."
+                    ],
+                    artifacts=[ticket.get("current_log", "")],
+                )
                 if self.block_or_retry(ticket, failure):
                     continue
                 return
+            implementation_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
+            self.record_receipt(
+                ticket,
+                "implementation",
+                "Build",
+                attempt=attempt,
+                input_revisions={"implementation_base": implementation_base_sha},
+                output_revisions={"implementation_commit": implementation_head},
+                claimed_result="Implementation committed",
+                verification=["Agent exited successfully and produced at least one commit."],
+                artifacts=[item["path"] for item in ticket["changed_files"]],
+            )
+            if "cleanup" in self.profile["execution_roles"]:
+                failure = self.run_assured_roles(ticket, worktree, implementation_head)
+                if failure:
+                    if self.block_or_retry(ticket, failure):
+                        continue
+                    return
+                implementation_head = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
             self.transition(ticket, "Verifying", f"Attempt {attempt}")
             failure = self.verify_qa_tests_unchanged(ticket, worktree)
             if not failure:
                 failure = self.verify(ticket, worktree)
+            verification = [
+                f"{gate['name']}: exit {gate['exit_code']} ({'required' if gate['required'] else 'advisory'})"
+                for gate in ticket.get("gate_results", [])
+            ]
+            self.record_receipt(
+                ticket,
+                "verification",
+                "Verify",
+                attempt=attempt,
+                input_revisions={"implementation_commit": implementation_head},
+                output_revisions={"verified_commit": implementation_head} if not failure else {},
+                claimed_result="Verification passed" if not failure else "Verification failed",
+                verification=verification or ["Protected Acceptance Test hashes checked."],
+                unresolved_risks=(
+                    ["Required verification did not pass; inspect gate results in factory state."]
+                    if failure else []
+                ),
+                artifacts=sorted(ticket.get("qa_tests", {})),
+            )
+            if not failure and "final_verifier" in self.profile["execution_roles"]:
+                failure = self.run_final_verifier(ticket, worktree, implementation_head)
             if failure:
                 if self.block_or_retry(ticket, failure):
                     continue
@@ -837,6 +1198,17 @@ class Factory:
                     self.transition(ticket, "Blocked", "Merged dependency is missing from the synchronized base")
                     continue
             self.transition(ticket, "Done", "PR merged and synchronized")
+            self.record_receipt(
+                ticket,
+                "human_review",
+                "Review",
+                attempt=max(1, ticket.get("attempt", 1)),
+                input_revisions={"pull_request": ticket.get("pr_url", "")},
+                output_revisions={"merged_commit": merge_sha or head},
+                claimed_result="Human-reviewed pull request merged and synchronized",
+                verification=[f"Merge commit is reachable from {self.backend.default_branch}."],
+                artifacts=[ticket.get("pr_url", "")],
+            )
             worktree = self.repo.parent / f"wt-{ticket['number']}"
             self.git("worktree", "remove", "--force", str(worktree), check=False)
 
@@ -979,9 +1351,11 @@ def positive_int(value: str) -> int:
 
 def parser():
     p = argparse.ArgumentParser(prog="factory", description="Software (re)-Factory orchestrator")
+    p.add_argument("--version", action="version", version=f"factory {WORKSHOP_VERSION}")
     sub = p.add_subparsers(dest="command", required=True)
     configure = sub.add_parser("configure", help="save attendee defaults for shorter commands")
     configure.add_argument("--preset", choices=sorted(PRESETS))
+    configure.add_argument("--profile", choices=sorted(FACTORY_PROFILES))
     configure.add_argument("--agent", help="registered implementation adapter name")
     configure.add_argument("--qa-agent", help="registered independent QA adapter name")
     configure.add_argument("--planning-agent", choices=["claude", "codex"])
@@ -991,6 +1365,26 @@ def parser():
     )
     configure.add_argument("--max-parallel", type=positive_int)
     configure.add_argument("--project-number", type=positive_int)
+    profiles = sub.add_parser("profiles", help="show executable Factory Profile role sequences")
+    profiles.add_argument("--json", action="store_true", dest="as_json")
+    canvas = sub.add_parser("canvas", help="create a Factory Canvas from the versioned template")
+    canvas.add_argument("--repo", default=".")
+    canvas.add_argument("--output", default="factory-canvas.md")
+    canvas.add_argument("--force", action="store_true")
+    evidence = sub.add_parser("evidence", help="export a sanitized Evidence Packet")
+    evidence.add_argument("plan"); evidence.add_argument("--repo", default=".")
+    evidence.add_argument("--canvas", required=True)
+    evidence.add_argument("--ticket", action="append", type=int, dest="tickets")
+    evidence.add_argument("--output")
+    release_check = sub.add_parser("release-check", help="audit a frozen tree before public/template release")
+    release_check.add_argument("--repo", default=".")
+    release_check.add_argument("--rehearsal", action="store_true", help="run the clean Standard Rehearsal journey")
+    release_check.add_argument(
+        "--live-smoke",
+        action="store_true",
+        help="run the Claude golden path and create a fresh Project in a disposable GitHub repo",
+    )
+    release_check.add_argument("--confirm-disposable-repo", action="store_true")
     seed = sub.add_parser("seed", help="create deterministic fallback tickets without PRD planning")
     seed.add_argument("scenario", choices=["tv", "recipe-rebrand"], nargs="?", default="recipe-rebrand")
     seed.add_argument("--repo", default=".")
@@ -1001,6 +1395,7 @@ def parser():
     run_p.add_argument("--repo", default="."); run_p.add_argument(
         "--agent", help="registered implementation adapter name",
     )
+    run_p.add_argument("--profile", choices=sorted(FACTORY_PROFILES))
     run_p.add_argument("--max-parallel", type=positive_int); run_p.add_argument("--project-number", type=positive_int)
     run_p.add_argument(
         "--qa-agent",
@@ -1022,6 +1417,7 @@ def parser():
     retry.add_argument("--mock", action="store_true"); retry.add_argument("--project-number", type=positive_int)
     plan = sub.add_parser("plan", help="run the Product Review expert on a PRD")
     plan.add_argument("prd"); plan.add_argument("--repo", default="."); plan.add_argument("--output")
+    plan.add_argument("--profile", choices=sorted(FACTORY_PROFILES))
     plan.add_argument("--default-agent", help="registered adapter written into generated tickets")
     plan.add_argument("--planning-agent", choices=["claude", "codex"])
     plan.add_argument("--min-tickets", type=int, default=3); plan.add_argument("--max-tickets", type=int, default=12)
@@ -1035,10 +1431,26 @@ def parser():
     continue_p = sub.add_parser("continue-plan", help="run architecture, program design, and vertical-slice experts")
     continue_p.add_argument("plan"); continue_p.add_argument("--repo", default=".")
     continue_p.add_argument("--mock", action="store_true", help="use bundled deterministic planning artifacts")
+    revise = sub.add_parser("revise", help="revise a planning stage from written human feedback")
+    revise.add_argument("plan"); revise.add_argument("stage", choices=["product"])
+    revise.add_argument("--repo", default=".")
+    feedback = revise.add_mutually_exclusive_group(required=True)
+    feedback.add_argument("--feedback")
+    feedback.add_argument("--feedback-file")
+    revise.add_argument("--mock", action="store_true", help="use the bundled deterministic revision")
     approve = sub.add_parser("approve", help="approve alignment and publish tickets to GitHub")
     approve.add_argument("plan"); approve.add_argument("--repo", default=".")
     approve.add_argument("--project-number", type=positive_int); approve.add_argument("--yes", action="store_true")
     approve.add_argument("--new-project-title", help="create and use a fresh GitHub Project")
+    approve_rehearsal_p = sub.add_parser(
+        "approve-rehearsal",
+        help="approve alignment and materialize local PRD-derived rehearsal tickets",
+    )
+    approve_rehearsal_p.add_argument("plan"); approve_rehearsal_p.add_argument("--repo", default=".")
+    approve_rehearsal_p.add_argument("--yes", action="store_true")
+    approve_rehearsal_p.add_argument(
+        "--scenario", choices=["tv", "recipe-rebrand"], default="recipe-rebrand",
+    )
     approve_tests = sub.add_parser("approve-tests", help="approve protected Acceptance Tests for one ticket")
     approve_tests.add_argument("issue", type=int); approve_tests.add_argument("--repo", default=".")
     approve_tests.add_argument("--yes", action="store_true")
@@ -1061,11 +1473,33 @@ def main():
                 agent=args.agent, qa_agent=args.qa_agent,
                 planning_agent=args.planning_agent,
                 review_qa_tests=args.review_qa_tests,
-                max_parallel=args.max_parallel,
+                max_parallel=args.max_parallel, profile=args.profile,
             )
             print(render_session_config(configured))
             print(f"\nSaved attendee defaults: {path}")
             print("Next: ./factory/factory doctor")
+        elif args.command == "profiles":
+            print(render_profiles(args.as_json))
+        elif args.command == "canvas":
+            path = create_canvas(repo, Path(args.output), args.force)
+            print(f"Factory Canvas created: {path}")
+        elif args.command == "evidence":
+            packet, evidence_manifest = export_evidence(
+                repo,
+                args.plan,
+                Path(args.canvas),
+                args.tickets,
+                Path(args.output) if args.output else None,
+            )
+            print(f"Evidence Packet: {packet}")
+            print(f"Evidence manifest: {evidence_manifest}")
+        elif args.command == "release-check":
+            raise SystemExit(render_release_check(
+                repo,
+                rehearsal=args.rehearsal,
+                live_smoke=args.live_smoke,
+                confirm_disposable_repo=args.confirm_disposable_repo,
+            ))
         elif args.command == "seed":
             seed_backlog(repo, args)
         elif args.command == "status":
@@ -1081,6 +1515,7 @@ def main():
                 "mock" if args.mock else args.planning_agent,
                 "mock" if args.mock else resolve_planning_cli(args.planning_agent),
                 args.mock,
+                args.profile,
             )
         elif args.command == "review":
             review_plan(repo, args.kind, args.plan)
@@ -1091,6 +1526,14 @@ def main():
             planning_agent = load_manifest(run_dir).get("planning_agent", "codex")
             agent_bin = "mock" if args.mock or planning_agent == "mock" else resolve_planning_cli(planning_agent)
             continue_plan(repo, args.plan, agent_bin, args.mock)
+        elif args.command == "revise":
+            run_dir = resolve_run(repo, args.plan)
+            planning_agent = load_manifest(run_dir).get("planning_agent", "codex")
+            agent_bin = "mock" if args.mock or planning_agent == "mock" else resolve_planning_cli(planning_agent)
+            feedback_text = args.feedback
+            if args.feedback_file:
+                feedback_text = Path(args.feedback_file).read_text()
+            revise_plan(repo, args.plan, args.stage, feedback_text, agent_bin, args.mock)
         elif args.command == "approve":
             supplied = Path(args.plan)
             legacy = supplied.is_file() and supplied.name != "manifest.json" and not (supplied.parent / "manifest.json").is_file()
@@ -1106,6 +1549,12 @@ def main():
             if project_number:
                 path = remember_project(repo, int(project_number))
                 print(f"Saved Project #{project_number} for future commands in {path}.")
+        elif args.command == "approve-rehearsal":
+            tickets_path = approve_rehearsal(
+                repo, args.plan, args.yes, args.scenario,
+            )
+            print(f"Approved rehearsal tickets: {tickets_path}")
+            print(f"Next: ./factory/factory run --mock --scenario {args.scenario} --dry-run")
         elif args.command == "approve-tests":
             approve_qa_tests(repo, args.issue, args.yes)
         elif args.command == "doctor":

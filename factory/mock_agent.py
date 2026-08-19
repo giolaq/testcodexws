@@ -257,7 +257,13 @@ def test_watchlist_rail_reflects_session_state(client):
 TICKETS = {1: ticket_1, 2: ticket_2, 3: ticket_3, 4: ticket_4, 5: ticket_5, 6: ticket_6, 7: ticket_7}
 
 
-def recipe_rebrand_ticket(number: int):
+def recipe_rebrand_ticket(number: int, attempt: int):
+    if number == 3 and attempt == 1:
+        write(
+            "demo-app/rehearsal-attempt.txt",
+            "The first mobile implementation omitted the user-visible TableStory journey.\n",
+        )
+        return
     step = Path(__file__).parent / "scenarios/recipe-rebrand/steps" / str(number)
     if not step.is_dir():
         raise RuntimeError(f"No recipe-rebrand snapshot for ticket #{number}")
@@ -278,10 +284,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("ticket", type=int)
     parser.add_argument("--scenario", choices=["tv", "recipe-rebrand"], default="tv")
+    parser.add_argument("--attempt", type=int, default=1)
     args = parser.parse_args()
     number = args.ticket
     if args.scenario == "recipe-rebrand":
-        recipe_rebrand_ticket(number)
+        recipe_rebrand_ticket(number, args.attempt)
     else:
         if number == 8:
             print("Ticket #8 is not actionable: no measurable acceptance criteria, target screens, or expected behavior.")
@@ -296,6 +303,7 @@ def main():
         subprocess.run(["git", "add", "-A"], check=True)
         subprocess.run(["git", "commit", "-m", f"factory(#{number}): implement mock ticket"], check=True)
     print(f"Mock agent completed ticket #{number}")
+    print("FACTORY_ROLE_VERDICT: PASS")
     return 0
 
 

@@ -12,3 +12,4 @@ demo-app/static/tests/tv-nav.test.js
 demo-app/tests/test_device_mode.py
 demo-app/tests/test_rails.py
 demo-app/tests/test_tv_detail.py
+demo-app/rehearsal-attempt.txt

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://software-refactory.local/schemas/handoff-receipt-v1.json",
+  "title": "Handoff Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "role",
+    "phase",
+    "ticket",
+    "attempt",
+    "input_revisions",
+    "output_revisions",
+    "claimed_result",
+    "verification",
+    "unresolved_risks",
+    "artifacts",
+    "policy_hashes",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "role": {"type": "string", "minLength": 1},
+    "phase": {"type": "string", "enum": ["Plan", "Build", "Verify", "Review"]},
+    "ticket": {"type": ["integer", "null"]},
+    "attempt": {"type": "integer", "minimum": 1},
+    "input_revisions": {"type": "object", "additionalProperties": {"type": "string"}},
+    "output_revisions": {"type": "object", "additionalProperties": {"type": "string"}},
+    "claimed_result": {"type": "string", "minLength": 1},
+    "verification": {"type": "array", "items": {"type": "string"}},
+    "unresolved_risks": {"type": "array", "items": {"type": "string"}},
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "policy_hashes": {"type": "object", "additionalProperties": {"type": "string"}},
+    "timestamp": {"type": "string", "format": "date-time"}
+  }
+}
