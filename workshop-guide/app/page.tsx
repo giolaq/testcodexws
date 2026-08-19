@@ -5,15 +5,15 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 type Track = "rehearsal" | "live";
 
 const steps = [
-  { id: "setup", label: "Set up your workspace", time: "8 min" },
-  { id: "baseline", label: "Inspect the baseline", time: "5 min" },
-  { id: "prd", label: "Read the PRD", time: "7 min" },
-  { id: "control", label: "Run the lights-off control", time: "12 min" },
-  { id: "plan", label: "Approve product intent", time: "12 min" },
-  { id: "publish", label: "Align and publish", time: "15 min" },
-  { id: "qa", label: "Review QA tests", time: "10 min" },
-  { id: "factory", label: "Run the factory", time: "20 min" },
-  { id: "finish", label: "Compare both results", time: "11 min" },
+  { id: "setup", label: "Prepare the workshop", time: "8 min" },
+  { id: "baseline", label: "Understand the system", time: "5 min" },
+  { id: "prd", label: "Frame the outcome", time: "7 min" },
+  { id: "control", label: "Establish the control", time: "12 min" },
+  { id: "plan", label: "Align product intent", time: "12 min" },
+  { id: "publish", label: "Design delivery", time: "15 min" },
+  { id: "qa", label: "Define acceptance evidence", time: "10 min" },
+  { id: "factory", label: "Operate the factory", time: "20 min" },
+  { id: "finish", label: "Compare and adapt", time: "11 min" },
 ] as const;
 
 function CodeBlock({ children, label = "Terminal" }: { children: string; label?: string }) {
@@ -211,8 +211,12 @@ export default function Home() {
           </div>
         </div>
         <nav>
-          <p className="nav-label">Get started</p>
+          <p className="nav-label">Foundations</p>
           <a href="#start" onClick={() => setMenuOpen(false)}>Overview</a>
+          <a href="#concept" onClick={() => setMenuOpen(false)}>What is a software factory?</a>
+          <a href="#why-now" onClick={() => setMenuOpen(false)}>Why now?</a>
+          <a href="#story" onClick={() => setMenuOpen(false)}>The workshop story</a>
+          <p className="nav-label">Get started</p>
           <a href="#prerequisites" onClick={() => setMenuOpen(false)}>Prerequisites</a>
           <a href="#choose-track" onClick={() => setMenuOpen(false)}>Choose a path</a>
           <p className="nav-label">Guided lab</p>
@@ -227,6 +231,8 @@ export default function Home() {
               <span>{step.label}<small>{step.time}</small></span>
             </a>
           ))}
+          <p className="nav-label">Take it back</p>
+          <a href="#apply" onClick={() => setMenuOpen(false)}>Design your factory</a>
           <p className="nav-label">Help</p>
           <a href="#troubleshooting" onClick={() => setMenuOpen(false)}>Troubleshooting</a>
           <a href="#reference" onClick={() => setMenuOpen(false)}>Command reference</a>
@@ -236,19 +242,19 @@ export default function Home() {
       <main id="main-content">
         <section className="hero" id="start">
           <div className="hero-copy">
-            <div className="eyebrow">GUIDED LAB</div>
-            <h1>Build software with controlled AI agents</h1>
+            <div className="eyebrow">SELF-GUIDED DEVELOPER LAB</div>
+            <h1>Turn AI coding into an engineering system</h1>
             <p className="hero-lede">
-              Turn a PRD into reviewable plans, tickets, protected tests, isolated
-              changes, and merge evidence. Then compare that workflow with one
-              autonomous coding agent.
+              Learn how an AI software factory turns one product requirement into
+              aligned plans, reviewable tickets, independent tests, isolated changes,
+              and evidence a team can trust.
             </p>
             <div className="hero-meta">
               <span><b>Level</b> Intermediate</span>
               <span><b>Time</b> 100 minutes</span>
               <span><b>Modes</b> Rehearsal or live GitHub</span>
             </div>
-            <a className="primary-button" href="#prerequisites">Check prerequisites <span aria-hidden="true">→</span></a>
+            <a className="primary-button" href="#concept">Start with the concept <span aria-hidden="true">→</span></a>
           </div>
           <div className="factory-map" aria-label="Workshop flow from PRD to merged application">
             <div className="control-strip" aria-label="Lights-off control flow">
@@ -273,25 +279,120 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="intro-grid">
-          <div>
-            <h2>What you’ll build</h2>
+        <section className="concept-section" id="concept">
+          <div className="section-heading">
+            <span className="section-kicker">The operating model</span>
+            <h2>What is an AI software factory?</h2>
             <p>
-              You’ll transform <strong>Pocket Cinema</strong>, a mobile film browser, into
-              <strong> TableStory</strong>, a responsive recipe app. The result includes recipe
-              search, details, saved recipes, and keyboard-driven TV navigation.
+              An AI software factory is a repeatable delivery system in which specialized
+              agents do bounded work and humans control the decisions that carry product
+              or engineering risk.
             </p>
           </div>
-          <div>
-            <h2>What you’ll learn</h2>
-            <ul className="check-list">
-              <li>Align four expert planning contracts</li>
-              <li>Compare factory and lights-off delivery</li>
-              <li>Trace requirements to QA evidence</li>
-              <li>Run agents in safe parallel waves</li>
-              <li>Review QA-authored tests</li>
-              <li>Diagnose retries and blocked work</li>
-            </ul>
+          <div className="definition-panel">
+            <p>
+              A prompt asks for code. A factory defines how work moves from intent to
+              production—and what evidence is required before it can move again.
+            </p>
+          </div>
+          <div className="concept-grid">
+            <article>
+              <span>01</span>
+              <h3>Reviewed inputs</h3>
+              <p>A PRD becomes explicit product behavior, architecture contracts, program design, and vertical slices.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Specialist stations</h3>
+              <p>Planning, QA, and implementation agents receive one role, a bounded context, and a defined output.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Controlled movement</h3>
+              <p>Dependencies, worktrees, protected tests, automated gates, and human approvals determine what can advance.</p>
+            </article>
+            <article>
+              <span>04</span>
+              <h3>Visible evidence</h3>
+              <p>Every ticket keeps its prompt, logs, files, test results, review state, and merge outcome.</p>
+            </article>
+          </div>
+          <Callout type="note" title="The factory is not a model or a swarm">
+            It is the workflow around the agents. You can replace the model, agent CLI,
+            execution environment, or repository host while keeping the same contracts
+            and control points.
+          </Callout>
+        </section>
+
+        <section className="why-section" id="why-now">
+          <div className="section-heading">
+            <span className="section-kicker">Why now</span>
+            <h2>Agents can produce more code than teams can safely absorb</h2>
+            <p>
+              Coding agents can inspect repositories, edit several files, run commands,
+              and respond to failures. The bottleneck moves from writing code to choosing
+              the right work, coordinating changes, and proving that the result is correct.
+            </p>
+          </div>
+          <div className="why-grid">
+            <article>
+              <span className="why-icon" aria-hidden="true">{`{ }`}</span>
+              <h3>Agents can act</h3>
+              <p>They can complete repository-level tasks instead of returning only a code suggestion.</p>
+            </article>
+            <article>
+              <span className="why-icon" aria-hidden="true">⇄</span>
+              <h3>Delivery has control surfaces</h3>
+              <p>Git, worktrees, tickets, CI, and pull requests give agent work clear boundaries and observable state.</p>
+            </article>
+            <article>
+              <span className="why-icon" aria-hidden="true">✓</span>
+              <h3>Evidence can be automated</h3>
+              <p>Structured plans and executable tests let a system check more than whether an agent says it is finished.</p>
+            </article>
+          </div>
+          <h3 className="subsection-title">What the factory gives a team</h3>
+          <div className="benefit-grid">
+            <div><b>Faster feedback</b><p>Independent work starts in parallel when ownership and dependencies allow it.</p></div>
+            <div><b>Smaller reviews</b><p>Vertical slices replace one large, late implementation diff.</p></div>
+            <div><b>Earlier decisions</b><p>Product and architecture ambiguity appears before code makes it expensive.</p></div>
+            <div><b>Traceable confidence</b><p>Requirements connect to tickets, tests, gate output, and merge history.</p></div>
+          </div>
+        </section>
+
+        <section className="story-section" id="story">
+          <div className="section-heading">
+            <span className="section-kicker">The workshop story</span>
+            <h2>One PRD. Two delivery systems.</h2>
+            <p>
+              You will transform <strong>Pocket Cinema</strong>, a mobile film browser,
+              into <strong>TableStory</strong>, a responsive recipe app. First, one agent
+              receives the complete PRD. Then the factory delivers the same change with
+              explicit planning, QA, isolation, and review controls.
+            </p>
+          </div>
+          <div className="story-line" aria-label="Five-part workshop learning journey">
+            <article><span>Act 1 · Steps 1–3</span><h3>Understand</h3><p>Prepare the environment, inspect the existing product, and frame the required outcome.</p></article>
+            <article><span>Act 2 · Step 4</span><h3>Compare</h3><p>Run the lights-off control so the factory solves a visible engineering problem.</p></article>
+            <article><span>Act 3 · Steps 5–7</span><h3>Align</h3><p>Turn intent into contracts, slices, and acceptance evidence before implementation.</p></article>
+            <article><span>Act 4 · Step 8</span><h3>Operate</h3><p>Watch bounded agents work through dependencies, retries, gates, and review.</p></article>
+            <article><span>Act 5 · Step 9</span><h3>Adapt</h3><p>Compare the evidence and design the smallest useful factory for your team.</p></article>
+          </div>
+          <div className="outcome-grid">
+            <div>
+              <h3>What you will build</h3>
+              <p>Recipe search, details, saved recipes, and keyboard-driven TV navigation in a rebranded application.</p>
+            </div>
+            <div>
+              <h3>What you will be able to do</h3>
+              <ul className="check-list">
+                <li>Choose useful agent roles and boundaries</li>
+                <li>Place human approval where risk changes</li>
+                <li>Trace requirements to acceptance evidence</li>
+                <li>Decide when parallel work is safe</li>
+                <li>Diagnose retries and blocked work</li>
+              </ul>
+            </div>
           </div>
         </section>
 
@@ -388,7 +489,7 @@ git --version`}</CodeBlock>
           </Callout>
         </section>
 
-        <StepSection id="setup" number={1} title="Set up your workspace" time="8 min" completed={completed.includes("setup")} onComplete={() => toggleStep("setup")}>
+        <StepSection id="setup" number={1} title="Prepare a safe workspace" time="8 min" completed={completed.includes("setup")} onComplete={() => toggleStep("setup")}>
           <p className="goal">Create a clean checkout, initialize the demo, and pass the readiness check for your selected mode.</p>
           {track === "rehearsal" ? (
             <>
@@ -426,7 +527,7 @@ git push origin main
           )}
         </StepSection>
 
-        <StepSection id="baseline" number={2} title="Inspect the starting product" time="5 min" completed={completed.includes("baseline")} onComplete={() => toggleStep("baseline")}>
+        <StepSection id="baseline" number={2} title="Understand the product you are changing" time="5 min" completed={completed.includes("baseline")} onComplete={() => toggleStep("baseline")}>
           <p className="goal">Understand the product before an agent changes it.</p>
           <p>Start Pocket Cinema from the repository root:</p>
           <CodeBlock>{`.factory/venv/bin/python demo-app/app.py`}</CodeBlock>
@@ -445,7 +546,7 @@ git push origin main
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="prd" number={3} title="Read the product requirements" time="7 min" completed={completed.includes("prd")} onComplete={() => toggleStep("prd")}>
+        <StepSection id="prd" number={3} title="Frame the required outcome" time="7 min" completed={completed.includes("prd")} onComplete={() => toggleStep("prd")}>
           <p className="goal">Identify the user outcome, constraints, and observable definition of done.</p>
           <p>Open <code>recipe-app-prd.md</code> in your editor, or preview it in the terminal:</p>
           <CodeBlock>{`sed -n '1,240p' recipe-app-prd.md`}</CodeBlock>
@@ -471,7 +572,7 @@ git push origin main
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="control" number={4} title="Run the lights-off control" time="12 min" completed={completed.includes("control")} onComplete={() => toggleStep("control")}>
+        <StepSection id="control" number={4} title="Establish the lights-off control" time="12 min" completed={completed.includes("control")} onComplete={() => toggleStep("control")}>
           <p className="goal">Create a fair control group: one agent receives the whole PRD and implements it without factory planning, tickets, QA separation, or approval gates.</p>
           <Callout type="note" title="Compare workflows, not models">
             Use the same PRD, baseline, model, and verification criteria as the factory run. Do not deliberately weaken the direct prompt or help the control agent while it works.
@@ -507,7 +608,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           )}
         </StepSection>
 
-        <StepSection id="plan" number={5} title="Review and approve product intent" time="12 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
+        <StepSection id="plan" number={5} title="Align product intent before code" time="12 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
           <p className="goal">Agree on the problem, behavior, scope, and evidence before any agent makes a technical decision.</p>
           <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Codex CLI agent.</p>
           <CodeBlock>{track === "live"
@@ -539,7 +640,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="publish" number={6} title="Align architecture, program design, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
+        <StepSection id="publish" number={6} title="Design architecture, programs, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
           <p className="goal">Use three specialist contracts to make implementation predictable and reviewable before publishing tickets.</p>
           <p>Continue the approved plan. The experts run sequentially because each one consumes the previous contract.</p>
           <CodeBlock>{track === "live"
@@ -589,7 +690,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           )}
         </StepSection>
 
-        <StepSection id="qa" number={7} title="Let QA define the evidence" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
+        <StepSection id="qa" number={7} title="Define acceptance evidence before implementation" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
           <p className="goal">Review independent acceptance tests before implementation begins.</p>
           <p>In Terminal B, serve the dashboard from the repository root and leave it running:</p>
           <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
@@ -627,7 +728,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="factory" number={8} title="Run and observe the factory" time="20 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
+        <StepSection id="factory" number={8} title="Operate and observe the factory" time="20 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
           <p className="goal">Follow parallel implementation, verification, review, and dependency synchronization.</p>
           {track === "live" ? (
             <>
@@ -678,7 +779,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="finish" number={9} title="Compare and verify both results" time="11 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
+        <StepSection id="finish" number={9} title="Compare, decide, and adapt" time="11 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
           <p className="goal">Evaluate both workflows against the same user outcomes, then compare the human effort required to trust each result.</p>
           {track === "rehearsal" && (
             <>
@@ -745,7 +846,7 @@ git status --short`}</CodeBlock>
           <div className="activity-card final-reflection">
             <span className="activity-label">Take it back to your team</span>
             <h3>Design your first factory experiment</h3>
-            <p>Choose one repository and write down: when a direct one-agent run is sufficient, when the four planning experts add value, the QA policy, required gates, execution boundary, and human approval points you would use.</p>
+            <p>Choose one repository and identify its most expensive delivery risk. The design guide after this step helps you select only the controls that address that risk.</p>
           </div>
           <Checkpoint>
             You can explain the five factory control boundaries and use evidence—not a staged failure—to compare them with a lights-off implementation.
@@ -768,6 +869,67 @@ git status --short`}</CodeBlock>
           ) : nextStep ? (
             <a className="primary-button" href={`#${nextStep.id}`}>Continue to {nextStep.label} <span aria-hidden="true">→</span></a>
           ) : null}
+        </section>
+
+        <section className="apply-section" id="apply">
+          <div className="section-heading">
+            <span className="section-kicker">Use it for your work</span>
+            <h2>Design the factory your delivery risk requires</h2>
+            <p>
+              The goal is not to reproduce every workshop stage. Start with the smallest
+              operating model that makes your next change easier to understand, review,
+              and trust.
+            </p>
+          </div>
+          <div className="control-spectrum">
+            <article>
+              <span>LOW COORDINATION</span>
+              <h3>Direct agent</h3>
+              <p>Use for a clear, reversible change with a small diff and strong existing tests.</p>
+              <ul><li>One task</li><li>One workspace</li><li>Human diff review</li></ul>
+            </article>
+            <article className="spectrum-featured">
+              <span>SHARED CHANGE</span>
+              <h3>Guided workflow</h3>
+              <p>Use when a feature crosses files or layers but does not need several agents at once.</p>
+              <ul><li>Reviewed outcome</li><li>QA acceptance tests</li><li>Automated gates</li></ul>
+            </article>
+            <article>
+              <span>HIGH COORDINATION</span>
+              <h3>Software factory</h3>
+              <p>Use when work has shared contracts, dependent slices, parallel agents, or high failure cost.</p>
+              <ul><li>Specialist plans</li><li>Isolated execution</li><li>Approval gates and evidence</li></ul>
+            </article>
+          </div>
+
+          <h3 className="subsection-title">Patterns you can adapt</h3>
+          <div className="use-case-grid">
+            <article><b>Legacy modernization</b><p>Map existing contracts first, slice by user journey, and let regression QA protect behavior during replacement.</p></article>
+            <article><b>Platform migration</b><p>Use program design to define compatibility boundaries, then schedule dependency waves across services or packages.</p></article>
+            <article><b>Product-critical features</b><p>Add independent QA, protected acceptance tests, and a human approval before implementation changes user-visible behavior.</p></article>
+            <article><b>Multi-team delivery</b><p>Use product review and ownership maps to settle terminology, interfaces, and handoffs before parallel work begins.</p></article>
+          </div>
+
+          <div className="canvas-panel">
+            <div>
+              <span className="section-kicker">Factory design canvas</span>
+              <h3>Answer five questions</h3>
+              <p>Your answers define the first version of your operating model.</p>
+            </div>
+            <ol>
+              <li><b>Input</b><span>What must be true before an agent starts?</span></li>
+              <li><b>Roles</b><span>Which decisions need a specialist perspective?</span></li>
+              <li><b>Boundaries</b><span>How will concurrent work stay isolated?</span></li>
+              <li><b>Evidence</b><span>What proves the user outcome and engineering constraints?</span></li>
+              <li><b>Authority</b><span>Which transitions require a human decision?</span></li>
+            </ol>
+          </div>
+          <Callout type="tip" title="Run one bounded experiment next week">
+            Choose a feature that normally takes one or two days. Save the baseline,
+            add one planning contract and one independent QA gate, then compare review
+            time, rework, and confidence with your usual workflow. Keep the controls that
+            changed the outcome; remove the ones that did not.
+          </Callout>
         </section>
 
         <section className="support-section" id="troubleshooting">
@@ -888,6 +1050,7 @@ git push -u origin main`}</CodeBlock>
           <strong>{percent}% complete</strong>
           <div className="progress-track"><span style={{ width: `${percent}%` }}></span></div>
           {nextStep ? <a href={`#${nextStep.id}`}>Next: {nextStep.label} →</a> : <a href="#reference">Open reference →</a>}
+          <a href="#apply">Design your factory →</a>
         </div>
         <div className="rail-card rail-help">
           <span className="rail-help-icon" aria-hidden="true">?</span>

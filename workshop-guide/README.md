@@ -1,11 +1,12 @@
 # Software (re)-Factory workshop guide
 
 The attendee-facing, self-guided website for the Software (re)-Factory
-workshop. It includes complete mode-specific prerequisites, two workshop paths,
-the four-expert planning and traceability workflow, a fair lights-off control
-experiment, nine guided steps, progress tracking, copyable commands,
-checkpoints, exercises, troubleshooting, and the complete factory command
-reference.
+workshop. It introduces the AI software factory operating model, explains why
+it matters now, follows one PRD through two delivery systems, and helps
+attendees design the right level of control for their own work. It also
+includes complete mode-specific prerequisites, two workshop paths, nine guided
+steps, progress tracking, copyable commands, checkpoints, troubleshooting, and
+the complete factory command reference.
 
 ## Local development
 
