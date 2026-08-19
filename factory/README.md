@@ -8,9 +8,9 @@ make the factory visible: the main five-ticket exercise rebrands Pocket Cinema
 as the TableStory recipe app, while an eight-ticket TV exercise demonstrates a
 deliberately blocked requirement.
 
-## One-minute mock quickstart
+## One-minute rehearsal quickstart
 
-Mock mode needs Python 3.11+, Git, Node 20+, and no credentials or agent tokens.
+A Rehearsal Run needs Python 3.11+, Git, Node 20+, and no credentials or agent tokens.
 
 ```sh
 ./setup_demo.sh --scenario recipe-rebrand
@@ -24,7 +24,7 @@ In another terminal, serve the live board:
 python3 -m http.server 8000
 ```
 
-Open <http://localhost:8000/factory/dashboard.html>. Mock mode now exercises the
+Open <http://localhost:8000/factory/dashboard.html>. The Rehearsal Run exercises the
 same independent-QA commit and protected-test policy as real mode without using
 credentials. The `recipe-rebrand` scenario runs five deterministic TableStory
 tickets; the original `tv` scenario merges seven tickets and deliberately blocks
@@ -57,29 +57,6 @@ git push origin factory-baseline
 A checkout with no history for that commit (a downloaded archive rather than a
 clone) cannot be repaired locally; clone from `origin` instead.
 
-## Compare with a lights-off control
-
-Run the same TableStory PRD through one autonomous coding agent before starting
-the planned factory. Keep the baseline, model, prompt context, and verification
-criteria fixed; change only the delivery workflow.
-
-```sh
-./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
-cd ../software-refactory-control
-git switch -c experiment/lights-off
-python3 factory/run_lights_off.py --agent claude
-```
-
-Do not clarify or redirect the control agent while it runs. Return to the
-factory checkout and continue the guided workshop in parallel. At the end,
-score both results against the same PRD journeys, tests, terminology scan, and
-review-effort measures.
-
-See `LIGHTS_OFF_EXPERIMENT.md` for the complete protocol, built-in CLI commands,
-and the custom-adapter control procedure. Credential-free sessions can use
-`scenarios/recipe-rebrand/lights-off-sample-report.md`, which is explicitly a
-discussion fixture rather than a model benchmark.
-
 ## Architecture tour
 
 Start with `ARCHITECTURE.md`, which maps the runtime into a short reading path.
@@ -89,7 +66,7 @@ The orchestration flow is intentionally direct:
 2. Move dependency-complete, `agent-ready` tickets to Ready.
 3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and ask the independent
    QA agent to add ticket-numbered acceptance tests only.
-4. Commit and protect the QA tests; optionally pause for explicit human test approval.
+4. Commit and protect the Acceptance Tests; optionally pause for explicit human approval.
 5. Run the implementation agent. The factory rejects any implementation that
    modifies or deletes a protected test.
 6. Execute configured gates in order; feed the last 3,000 failure characters
@@ -247,7 +224,7 @@ add new files named `test_ticket_ISSUE[_topic].py` or
 `ticket-ISSUE[-topic].test.js` inside the configured test roots. The factory
 commits those files before implementation and records their Git blob hashes.
 The implementation agent sees the protected-file list in its prompt and may add
-more tests, but changing, renaming, or deleting a QA test fails verification and
+more tests, but changing, renaming, or deleting an Acceptance Test fails verification and
 is fed back into the normal retry loop.
 
 With `--review-qa-tests`, a ticket pauses in **QA Review**. Inspect its test diff

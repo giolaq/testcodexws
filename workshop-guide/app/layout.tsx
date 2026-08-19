@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "Software (re)-Factory Workshop",
       description:
-        "Learn why AI software factories matter, run one PRD through two delivery systems, and design the right controls for your team.",
+        "Learn why AI software factories matter, trace one PRD from intent to evidence, and design the right controls for your team.",
       type: "website",
       images: socialImages,
     },

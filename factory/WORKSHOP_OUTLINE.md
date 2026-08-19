@@ -1,6 +1,7 @@
 # Software (re)-Factory workshop outline
 
-Build an AI factory and compare it with the simple "one coding agent" way.
+Build an AI factory and follow one requirement from product intent to verified
+delivery.
 
 Participants use Git, their preferred agent CLIs, GitHub Projects, automated
 tests, and a local dashboard. The example converts Pocket Cinema, a multimedia
@@ -17,7 +18,7 @@ By the end of the workshop, participants can:
 - run QA and implementation agents in isolated Git worktrees;
 - inspect prompts, logs, diffs, protected tests, and gate output;
 - explain why a ticket passed, retried, or became blocked; and
-- decide when a direct agent is enough and when factory controls are useful.
+- choose factory controls that address a concrete delivery risk.
 
 ## Audience and format
 
@@ -26,22 +27,20 @@ developer-experience teams. Participants should understand branches, pull
 requests, test commands, and basic command-line use. They don't need experience
 building agent orchestrators.
 
-Use rehearsal mode for a simulated dry run. Use live mode when you want attendees to
+Use a Rehearsal Run for a simulated dry run. Use a Live Run when you want attendees to
 create real GitHub issues, Project items, worktrees, and pull requests.
 
 ## Workflow at a glance
 
 ```mermaid
 flowchart LR
-  PRD["PRD"] --> Control["One autonomous agent"] --> ControlDiff["One final diff"]
   PRD --> Product["Product Review"] --> ProductGate["Human product approval"]
   ProductGate --> Architecture["System Architecture"] --> Program["Program Design"]
   Program --> Slices["Vertical Slices"] --> AlignmentGate["Human alignment approval"]
-  AlignmentGate --> Tickets["GitHub tickets"] --> QA["Independent QA tests"]
+  AlignmentGate --> Tickets["GitHub tickets"] --> QA["Independent Acceptance Tests"]
   QA --> Build["Isolated implementation"] --> Gates["Verification gates"]
   Gates --> PR["Pull request and merge"] --> Sync["Synchronize dependencies"]
-  ControlDiff --> Compare["Compare evidence and review effort"]
-  Sync --> Compare
+  Sync --> Evidence["Inspect evidence and adapt"]
 ```
 
 ## Prerequisites
@@ -66,11 +65,11 @@ node --version
 git --version
 ```
 
-Rehearsal mode needs no GitHub write access, model credentials, or API key. It
+A Rehearsal Run needs no GitHub write access, model credentials, or API key. It
 uses deterministic planning, QA, and implementation agents while preserving the
 same worktree, dependency, protected-test, and verification flow.
 
-### Additional requirements for live mode
+### Additional requirements for a Live Run
 
 - GitHub CLI (`gh`) authenticated to an account that can create and push to a
   disposable repository.
@@ -98,7 +97,7 @@ follow `factory/CONFIGURATION.md`. Keep credentials outside the repository.
 
 ## Step 1: Set up and run preflight
 
-### Rehearsal mode
+### Rehearsal Run
 
 ```sh
 git clone https://github.com/giolaq/software-refactory-workshop.git
@@ -140,8 +139,7 @@ Use separate terminals so long-running processes remain visible:
 | --- | --- | --- |
 | A | Factory commands | `./factory/factory …` |
 | B | Dashboard server | `python3 -m http.server 8000` |
-| C | Lights-off control | `python3 factory/run_lights_off.py --agent claude` |
-| D, optional | Demo application | `.factory/venv/bin/python demo-app/app.py` |
+| C, optional | Demo application | `.factory/venv/bin/python demo-app/app.py` |
 
 Open the dashboard at `http://localhost:8000/factory/dashboard.html` and the
 application at `http://localhost:5000`.
@@ -153,12 +151,11 @@ application at `http://localhost:5000`.
 | 0–8 min | Set up the workspace | The selected mode passes its readiness check. |
 | 8–13 min | Inspect Pocket Cinema | Participants identify the existing product surface. |
 | 13–20 min | Read the TableStory PRD | The group agrees on outcomes, constraints, and risks. |
-| 20–32 min | Start the lights-off control | One agent receives the full PRD in a separate checkout. |
-| 32–44 min | Approve product intent | Product behavior becomes a reviewable contract. |
-| 44–59 min | Align and publish | Architecture, program design, slices, and traceability are reviewed. |
-| 59–69 min | Review QA tests | Acceptance evidence is approved before implementation. |
-| 69–89 min | Run the factory | Participants observe worktrees, retries, PRs, and dependency unlocks. |
-| 89–100 min | Compare both results | The group compares output quality and review effort. |
+| 20–37 min | Approve product intent | Product behavior becomes a reviewable contract. |
+| 37–57 min | Align and publish | Architecture, program design, slices, and traceability are reviewed. |
+| 57–67 min | Review Acceptance Tests | Acceptance evidence is approved before implementation. |
+| 67–89 min | Run the factory | Participants observe worktrees, retries, PRs, and dependency unlocks. |
+| 89–100 min | Verify and adapt | The group verifies TableStory and selects controls for another use case. |
 
 ## Step 2: Inspect the starting product
 
@@ -190,43 +187,15 @@ Open `recipe-app-prd.md` and identify:
 **Checkpoint:** The group can state the expected user outcome and the highest
 integration risk in one sentence each.
 
-## Step 4: Run the lights-off control
-
-For live mode, create a second checkout and start one autonomous agent:
-
-```sh
-./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
-cd ../software-refactory-control
-git switch -c experiment/lights-off
-python3 factory/run_lights_off.py --agent claude
-```
-
-Use the same PRD, baseline, model, and final verification criteria as the
-factory run. Don't clarify, redirect, split, or review the control while it
-runs. Record questions and stops as observations.
-
-For rehearsal mode, inspect the stable discussion fixture:
-
-```sh
-open factory/scenarios/recipe-rebrand/lights-off-prompt.md
-open factory/scenarios/recipe-rebrand/lights-off-sample-report.md
-```
-
-The fixture is not a model benchmark. It exists so the comparison exercise can
-run without credentials or network access.
-
-**Checkpoint:** The control is running in its own checkout, or the rehearsal
-group has read the prompt and fixture.
-
-## Step 5: Review and approve product intent
+## Step 4: Review and approve product intent
 
 Run only Product Review:
 
 ```sh
-# Live mode
+# Live Run
 ./factory/factory plan recipe-app-prd.md
 
-# Rehearsal mode
+# Rehearsal Run
 ./factory/factory plan recipe-app-prd.md --mock
 ```
 
@@ -245,13 +214,13 @@ questions.
 
 **Checkpoint:** Product Review is approved.
 
-## Step 6: Align architecture, program design, and slices
+## Step 5: Align architecture, program design, and slices
 
 ```sh
-# Live mode
+# Live Run
 ./factory/factory continue-plan PLAN_ID
 
-# Rehearsal mode
+# Rehearsal Run
 ./factory/factory continue-plan PLAN_ID --mock
 
 # Both modes
@@ -266,7 +235,7 @@ Review four things:
 3. Every requirement has architecture, program, slice, and QA evidence in the
    traceability matrix.
 
-In live mode, publish the approved plans to a new GitHub Project:
+In a Live Run, publish the approved plans to a new GitHub Project:
 
 ```sh
 ./factory/factory approve PLAN_ID \
@@ -280,7 +249,7 @@ Ready; the remaining issues should be Backlog. Seeding is not part of this path.
 **Checkpoint:** The plan has no orphan requirement, dependency cycle, or
 overlapping parallel file ownership.
 
-## Step 7: Let QA define acceptance criteria
+## Step 6: Let QA define acceptance criteria
 
 Start the dashboard in Terminal B:
 
@@ -291,10 +260,10 @@ python3 -m http.server 8000
 Start the factory in Terminal A:
 
 ```sh
-# Live mode
+# Live Run
 ./factory/factory run
 
-# Rehearsal mode
+# Rehearsal Run
 ./factory/factory run --mock \
   --scenario recipe-rebrand \
   --review-qa-tests \
@@ -306,10 +275,10 @@ test diff, and protected-test list. Approve tests only when their assertions
 prove user-visible behavior.
 
 ```sh
-# Live mode
+# Live Run
 ./factory/factory approve-tests ISSUE_NUMBER
 
-# Rehearsal mode: first execution wave
+# Rehearsal Run: first execution wave
 ./factory/factory approve-tests 1 --yes
 ./factory/factory approve-tests 2 --yes
 ```
@@ -317,7 +286,7 @@ prove user-visible behavior.
 **Checkpoint:** At least one independent test set is approved before its
 implementation starts.
 
-## Step 8: Run and observe the factory
+## Step 7: Run and observe the factory
 
 The factory resumes approved work, runs verification gates, and opens a pull
 request when the gates pass. Inspect four artifacts for each ticket:
@@ -327,28 +296,33 @@ request when the gates pass. Inspect four artifacts for each ticket:
 - changed files define the review surface; and
 - gate output explains pass, retry, or block decisions.
 
-In rehearsal mode, finish the deterministic scenario without additional human
+In a Rehearsal Run, finish the deterministic scenario without additional human
 pauses:
 
 ```sh
 ./factory/factory run --mock --scenario recipe-rebrand --once
 ```
 
-In live mode, review and merge a green pull request. Wait for the dashboard
+In a Live Run, review and merge a green pull request. Wait for the dashboard
 event **PR merged and synchronized**. A dependent ticket must not start until
 the merged commit is reachable from the local default branch.
 
 **Checkpoint:** Ticket transitions are visible.
 
-## Step 9: Compare and verify both results
+## Step 8: Verify the result and adapt the model
 
-Run the application and verify the same journeys in both results:
+Run the application and verify its required journeys:
 
 - search by recipe title and ingredient;
 - open a recipe and inspect its metadata, ingredients, and steps;
 - add and remove a recipe from My Cookbook;
 - navigate the TV app using only keys;
 - find obsolete cinema terminology in UI, APIs, metadata, tests, and docs.
+
+Then trace requirement R3 through Product Review, its Vertical Slice, the
+GitHub ticket, the approved acceptance evidence, gate output, and merge. Ask
+participants which of those controls address a real risk in one of their own
+repositories and which would add ceremony.
 
 
 ## Recovery plan

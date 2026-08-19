@@ -29,7 +29,7 @@ Or use Codex for planning, QA, and implementation:
 ./factory/factory configure --preset codex-workshop
 ```
 
-Both presets require human review of QA tests and run at most two tickets in
+Both presets require human review of Acceptance Tests and run at most two tickets in
 parallel. You can also assign different built-in adapters to each role:
 
 ```sh

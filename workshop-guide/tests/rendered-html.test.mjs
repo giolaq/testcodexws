@@ -23,7 +23,7 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /Turn AI coding into an engineering system/);
   assert.match(html, /What is an AI software factory\?/);
   assert.match(html, /Agents can produce more code than teams can safely absorb/);
-  assert.match(html, /One PRD\. Two delivery systems\./);
+  assert.match(html, /Follow one requirement from intent to evidence\./);
   assert.match(html, /Prepare your development environment/);
   assert.match(html, /Python 3\.11 or later/);
   assert.match(html, /No API key is required/);
@@ -38,12 +38,11 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /factory seed recipe-rebrand/);
   assert.match(html, /Choose your workshop path/);
   assert.match(html, /Prepare a safe workspace/);
-  assert.match(html, /Establish the lights-off control/);
   assert.match(html, /Define acceptance evidence before implementation/);
-  assert.match(html, /Compare, decide, and adapt/);
+  assert.match(html, /Verify, decide, and adapt/);
   assert.match(html, /Design the factory your delivery risk requires/);
   assert.match(html, /Factory design canvas/);
-  assert.match(html, /This fixture is not a benchmark/);
   assert.match(html, /Troubleshooting/);
+  assert.doesNotMatch(html, /lights[- ]off|control experiment|run_lights_off|two delivery systems/i);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });

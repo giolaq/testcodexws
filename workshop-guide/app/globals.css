@@ -227,12 +227,6 @@ main {
 .primary-button:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
 
 .factory-map { padding: 28px 22px; border: 1px solid #d2e3fc; border-radius: 14px; background: #fff; box-shadow: 0 12px 36px rgba(60, 64, 67, .08); }
-.control-strip { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; border: 1px dashed #f6aea9; border-radius: 7px; background: #fce8e6; color: #8c1d18; font-size: 11px; }
-.control-strip span { margin-right: 3px; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
-.control-strip b { padding: 5px 7px; border-radius: 4px; background: #fff; color: #5f2120; font-weight: 650; }
-.control-strip i { color: #b06055; font-style: normal; }
-.map-versus { display: flex; align-items: center; gap: 8px; margin: 11px 0; color: #80868b; font-size: 9px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
-.map-versus::before, .map-versus::after { height: 1px; flex: 1; background: var(--line); content: ""; }
 .map-row { display: flex; align-items: center; justify-content: center; gap: 7px; }
 .map-row i, .map-down { color: #9aa0a6; font-style: normal; }
 .map-down { margin: 7px 0; text-align: center; }
@@ -270,7 +264,7 @@ main {
 .benefit-grid > div { min-height: 120px; padding: 20px; background: #fff; }
 .benefit-grid b, .use-case-grid b { display: block; margin-bottom: 6px; }
 
-.story-line { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 34px 0; }
+.story-line { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 34px 0; }
 .story-line article { position: relative; min-height: 205px; padding: 29px 15px 18px; border-top: 3px solid #aecbfa; background: var(--surface-alt); }
 .story-line article::before { position: absolute; top: -8px; left: 14px; width: 13px; height: 13px; border: 3px solid #fff; border-radius: 50%; background: var(--blue); content: ""; }
 .story-line span { display: block; margin-bottom: 11px; color: var(--blue-deep); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
@@ -307,7 +301,7 @@ main {
 .requirement-label { color: var(--blue-deep); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .install-links { margin: -10px 0 26px; color: var(--muted); font-size: 13px; }
 .install-links a { font-weight: 650; }
-.terminal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0 6px; }
+.terminal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 6px; }
 .terminal-grid > div { display: flex; min-height: 86px; padding: 15px; flex-direction: column; border: 1px solid var(--line); border-radius: 7px; }
 .terminal-grid b { color: var(--blue-deep); font-size: 13px; }
 .terminal-grid span { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -408,12 +402,6 @@ details summary:hover { text-decoration: underline; }
 .completion-ring::before { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: #f8fbff; content: ""; }
 .completion-ring span { z-index: 1; color: var(--blue-deep); font-size: 13px; font-weight: 750; }
 
-.comparison-table { margin: 22px 0 28px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-.comparison-table table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 13px; }
-.comparison-table th, .comparison-table td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-.comparison-table th { background: var(--blue-pale); color: var(--blue-deep); font-size: 11px; letter-spacing: .03em; }
-.comparison-table th:first-child, .comparison-table td:first-child { width: 30%; color: var(--ink); font-weight: 650; }
-.comparison-table tr:last-child td { border-bottom: 0; }
 
 .accordion-list { border-top: 1px solid var(--line); }
 .accordion-list > details { border-bottom: 1px solid var(--line); }
@@ -474,7 +462,6 @@ footer button { border: 0; background: none; color: var(--blue-dark); cursor: po
   .hero-lede { font-size: 17px; }
   .hero-meta { flex-direction: column; gap: 4px; }
   .factory-map { padding: 18px 12px; }
-  .control-strip { flex-wrap: wrap; }
   .map-node { padding: 8px 4px; font-size: 9px; }
   .concept-grid, .why-grid, .benefit-grid, .story-line, .outcome-grid, .control-spectrum, .use-case-grid, .prerequisites-grid, .path-grid, .evidence-grid, .verification-grid, .next-links { grid-template-columns: 1fr; gap: 14px; }
   .terminal-grid { grid-template-columns: 1fr 1fr; }

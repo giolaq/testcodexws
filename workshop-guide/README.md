@@ -2,9 +2,9 @@
 
 The attendee-facing, self-guided website for the Software (re)-Factory
 workshop. It introduces the AI software factory operating model, explains why
-it matters now, follows one PRD through two delivery systems, and helps
+it matters now, follows one PRD from intent to verified delivery, and helps
 attendees design the right level of control for their own work. It also
-includes complete mode-specific prerequisites, two workshop paths, nine guided
+includes complete mode-specific prerequisites, two workshop paths, eight guided
 steps, progress tracking, copyable commands, checkpoints, troubleshooting, and
 the complete factory command reference. Claude is the live worked example, but
 the guide also explains how to use built-in adapters by role or register a

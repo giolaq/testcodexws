@@ -51,7 +51,7 @@ flowchart LR
 - Artifact hashes invalidate downstream work after human edits.
 - Each ticket runs in its own worktree and branch.
 - QA may add only new ticket-numbered files under configured test roots.
-- QA test hashes prevent the implementation agent from weakening those tests.
+- Acceptance Test hashes prevent the implementation agent from weakening that evidence.
 - Required gates must pass before a PR opens.
 - Humans merge PRs; the factory verifies merged code is present locally before
   unlocking dependent tickets.

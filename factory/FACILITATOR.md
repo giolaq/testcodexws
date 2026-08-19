@@ -5,8 +5,8 @@ workshop. The attendee website contains the full instructions. Your job is to
 keep time, make the control points visible, and stop the group when evidence is
 weak.
 
-For the first dry run, use rehearsal mode. It exercises the complete workflow
-without GitHub writes or model latency. Demonstrate live mode only after the
+For the first dry run, use a Rehearsal Run. It exercises the complete workflow
+without GitHub writes or model latency. Demonstrate a Live Run only after the
 rehearsal path works from a clean checkout.
 
 ## Readiness checklist
@@ -19,12 +19,11 @@ Complete this checklist before attendees arrive:
 - [ ] Ports 5000, 5050, and 8000 are free.
 - [ ] The presentation browser can open localhost pages.
 - [ ] The workshop repository is clean and synchronized with its default branch.
-- [ ] A disposable checkout exists for rehearsal mode.
-- [ ] A second checkout or the sample report is ready for the lights-off control.
+- [ ] A disposable checkout exists for a Rehearsal Run.
 - [ ] The deterministic recipe scenario completes successfully.
 - [ ] The attendee website is open at the prerequisites section.
 
-Live mode also requires:
+A Live Run also requires:
 
 - [ ] `gh auth status` succeeds.
 - [ ] GitHub authentication includes the `project` scope.
@@ -72,35 +71,22 @@ If the group uses another implementation or QA agent, register it under
 `factory configure`. Keep Claude or Codex as the structured planning adapter.
 The exact contract and wrapper requirements are in `factory/CONFIGURATION.md`.
 
-Prepare a separate control checkout:
-
-```sh
-./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
-cd ../software-refactory-control
-git switch -c experiment/lights-off
-```
-
-If a live control isn't practical, keep
-`factory/scenarios/recipe-rebrand/lights-off-sample-report.md` open. Always call
-it a discussion fixture, not a benchmark.
-
 ## Arrange the presentation workspace
 
-Use four terminals:
+Use three terminals:
 
 | Terminal | Keep visible | Purpose |
 | --- | --- | --- |
 | A | Factory checkout | Planning and factory commands |
 | B | `python3 -m http.server 8000` | Dashboard server |
-| C | Control checkout | One autonomous agent |
-| D | Demo application | Pocket Cinema or TableStory |
+| C | Demo application | Pocket Cinema or TableStory |
 
 Prepare these browser tabs:
 
 1. attendee workshop website;
 2. `http://localhost:8000/factory/dashboard.html`;
 3. `http://localhost:5000`;
-4. the disposable GitHub Project for live mode; and
+4. the disposable GitHub Project for the Live Run; and
 5. one pull request for the merge-and-unlock explanation.
 
 Don't start the application before running the live doctor. An occupied port is
@@ -113,12 +99,11 @@ reported as a warning.
 | 0–8 min | Set up the selected mode | Point to the prerequisite list and required readiness result. |
 | 8–13 min | Inspect Pocket Cinema | Ask what must change besides the logo, then stop the server. |
 | 13–20 min | Read the PRD | Identify the user journey, system constraints, and shared-data risk. |
-| 20–32 min | Start the control | Explain that the model and task stay fixed; only the workflow changes. |
-| 32–44 min | Review Product Review | Reject ambiguous behavior before technical planning begins. |
-| 44–59 min | Review technical alignment | Trace one requirement through architecture, program design, slice, and QA evidence. |
-| 59–69 min | Review QA tests | Ask whether the assertions prove behavior before approving them. |
-| 69–89 min | Observe implementation | Follow one ticket through prompt, log, diff, gate, merge, and dependency unlock. |
-| 89–100 min | Compare both results | Compare review effort and evidence, not just whether the app works. |
+| 20–37 min | Review Product Review | Reject ambiguous behavior before technical planning begins. |
+| 37–57 min | Review technical alignment | Trace one requirement through architecture, program design, slice, and QA evidence. |
+| 57–67 min | Review Acceptance Tests | Ask whether the assertions prove behavior before approving them. |
+| 67–89 min | Observe implementation | Follow one ticket through prompt, log, diff, gate, merge, and dependency unlock. |
+| 89–100 min | Verify and adapt | Verify TableStory, inspect the evidence, and identify useful controls for another use case. |
 
 ## Rehearsal command path
 
@@ -160,14 +145,6 @@ Finish the scenario:
 The commands below use Claude as a coherent worked example. If an attendee uses
 a different registered implementation or QA adapter, the remaining planning,
 GitHub Project, worktree, QA-review, and verification steps stay the same.
-
-Start the control in Terminal C and don't intervene:
-
-```sh
-python3 factory/run_lights_off.py --agent claude
-```
-
-Return to Terminal A:
 
 ```sh
 ./factory/factory plan recipe-app-prd.md
@@ -215,7 +192,7 @@ Don't click through every field. Use one ticket to show this sequence:
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |
 | The state is stale | Reset only after confirming demo changes can be discarded. |
-| The agenda is late | Show one QA approval and one dependency unlock, then move to comparison. |
+| The agenda is late | Show one QA approval and one dependency unlock, then verify the application. |
 
 If GitHub works but live planning cannot finish, use
 `./factory/factory seed recipe-rebrand` as a last-resort fixture. Tell attendees
@@ -240,4 +217,4 @@ to:
 - find the dashboard, ticket evidence, and troubleshooting section;
 - explain the two human planning approvals and the QA approval;
 - explain one dependency unlock; and
-- compare the control and factory without assuming the control must fail.
+- choose which factory controls address a concrete delivery risk.

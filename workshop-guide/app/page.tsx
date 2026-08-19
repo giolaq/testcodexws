@@ -8,12 +8,11 @@ const steps = [
   { id: "setup", label: "Prepare the workshop", time: "8 min" },
   { id: "baseline", label: "Understand the system", time: "5 min" },
   { id: "prd", label: "Frame the outcome", time: "7 min" },
-  { id: "control", label: "Establish the control", time: "12 min" },
-  { id: "plan", label: "Align product intent", time: "12 min" },
-  { id: "publish", label: "Design delivery", time: "15 min" },
+  { id: "plan", label: "Align product intent", time: "17 min" },
+  { id: "publish", label: "Design delivery", time: "20 min" },
   { id: "qa", label: "Define acceptance evidence", time: "10 min" },
-  { id: "factory", label: "Operate the factory", time: "20 min" },
-  { id: "finish", label: "Compare and adapt", time: "11 min" },
+  { id: "factory", label: "Operate the factory", time: "22 min" },
+  { id: "finish", label: "Verify and adapt", time: "11 min" },
 ] as const;
 
 function CodeBlock({ children, label = "Terminal" }: { children: string; label?: string }) {
@@ -258,10 +257,6 @@ export default function Home() {
             <a className="primary-button" href="#concept">Start with the concept <span aria-hidden="true">→</span></a>
           </div>
           <div className="factory-map" aria-label="Workshop flow from PRD to merged application">
-            <div className="control-strip" aria-label="Lights-off control flow">
-              <span>CONTROL</span><b>One prompt</b><i>→</i><b>One agent</b><i>→</i><b>One final diff</b>
-            </div>
-            <div className="map-versus"><span>compared with</span></div>
             <div className="map-row">
               <span className="map-node node-blue">PRD</span><i>→</i><span className="map-node">Product review</span><i>→</i><span className="map-node node-human">Product gate</span>
             </div>
@@ -364,20 +359,19 @@ export default function Home() {
         <section className="story-section" id="story">
           <div className="section-heading">
             <span className="section-kicker">The workshop story</span>
-            <h2>One PRD. Two delivery systems.</h2>
+            <h2>Follow one requirement from intent to evidence.</h2>
             <p>
               You will transform <strong>Pocket Cinema</strong>, a mobile film browser,
-              into <strong>TableStory</strong>, a responsive recipe app. First, one agent
-              receives the complete PRD. Then the factory delivers the same change with
-              explicit planning, QA, isolation, and review controls.
+              into <strong>TableStory</strong>, a responsive recipe app. Follow the mobile
+              recipe journey from the PRD through reviewed plans, GitHub tickets,
+              independent QA, isolated implementation, and verification.
             </p>
           </div>
-          <div className="story-line" aria-label="Five-part workshop learning journey">
+          <div className="story-line" aria-label="Four-part workshop learning journey">
             <article><span>Act 1 · Steps 1–3</span><h3>Understand</h3><p>Prepare the environment, inspect the existing product, and frame the required outcome.</p></article>
-            <article><span>Act 2 · Step 4</span><h3>Compare</h3><p>Run the lights-off control so the factory solves a visible engineering problem.</p></article>
-            <article><span>Act 3 · Steps 5–7</span><h3>Align</h3><p>Turn intent into contracts, slices, and acceptance evidence before implementation.</p></article>
-            <article><span>Act 4 · Step 8</span><h3>Operate</h3><p>Watch bounded agents work through dependencies, retries, gates, and review.</p></article>
-            <article><span>Act 5 · Step 9</span><h3>Adapt</h3><p>Compare the evidence and design the smallest useful factory for your team.</p></article>
+            <article><span>Act 2 · Steps 4–6</span><h3>Align</h3><p>Turn intent into contracts, slices, and acceptance evidence before implementation.</p></article>
+            <article><span>Act 3 · Step 7</span><h3>Operate</h3><p>Watch bounded agents work through dependencies, retries, gates, and review.</p></article>
+            <article><span>Act 4 · Step 8</span><h3>Adapt</h3><p>Inspect the evidence and design the smallest useful factory for your team.</p></article>
           </div>
           <div className="outcome-grid">
             <div>
@@ -401,7 +395,7 @@ export default function Home() {
           <div className="section-heading">
             <span className="section-kicker">Prerequisites</span>
             <h2>Prepare your development environment</h2>
-            <p>Complete these checks before the workshop. Rehearsal mode has no account or model requirement.</p>
+            <p>Complete these checks before the workshop. A Rehearsal Run has no account or model requirement.</p>
           </div>
           <div className="prerequisites-grid">
             <article>
@@ -417,7 +411,7 @@ export default function Home() {
               </ul>
             </article>
             <article>
-              <span className="requirement-label">Live mode only</span>
+              <span className="requirement-label">Live Run only</span>
               <h3>Accounts and access</h3>
               <ul>
                 <li>GitHub CLI authenticated with the <code>project</code> scope</li>
@@ -446,14 +440,13 @@ git --version`}</CodeBlock>
 claude auth login
 claude auth status --text`}</CodeBlock>
           <Callout type="note" title="No API key is required">
-            Rehearsal mode uses deterministic local agents. The Claude worked example uses your authenticated Claude Code session; it does not require <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>. You can choose another supported setup below.
+            A Rehearsal Run uses deterministic local agents. The Claude worked example uses your authenticated Claude Code session; it does not require <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>. You can choose another supported setup below.
           </Callout>
           <h3>Use separate terminals</h3>
           <div className="terminal-grid">
             <div><b>Terminal A</b><span>Factory commands</span></div>
             <div><b>Terminal B</b><span>Dashboard server</span></div>
-            <div><b>Terminal C</b><span>Lights-off control</span></div>
-            <div><b>Terminal D</b><span>Demo app, if needed</span></div>
+            <div><b>Terminal C</b><span>Demo app, if needed</span></div>
           </div>
         </section>
 
@@ -558,7 +551,7 @@ required = true`}</CodeBlock>
 ./factory/factory approve PLAN_ID \\
   --new-project-title "My workshop"`}</CodeBlock>
           <Callout type="tip" title="Project policy stays with the repository">
-            Commit agent command templates, QA test roots, retry and timeout values, and
+            Commit agent command templates, Acceptance Test roots, retry and timeout values, and
             verification gates in <code>factory/factory.toml</code>. Keep credentials and
             each attendee&apos;s selected agents and GitHub Project number outside Git in
             <code>.factory/local.toml</code>.
@@ -585,7 +578,7 @@ required = true`}</CodeBlock>
             >
               <span className="recommended">RECOMMENDED</span>
               <span className="path-icon rehearsal-icon" aria-hidden="true">▶</span>
-              <strong>Rehearsal mode</strong>
+              <strong>Rehearsal Run</strong>
               <span>Run deterministic planning, QA, implementation, and local merges. No GitHub writes or model credentials.</span>
               <small>Use this path for the dry run</small>
             </button>
@@ -602,7 +595,7 @@ required = true`}</CodeBlock>
               <small>Requires a disposable repository and authenticated agents</small>
             </button>
           </div>
-          <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub mode" : "Rehearsal mode"}`}>
+          <Callout type="note" title={`You selected ${track === "live" ? "Live GitHub Run" : "Rehearsal Run"}`}>
             The commands below now follow this path. Complete each checkpoint before moving on.
           </Callout>
         </section>
@@ -693,45 +686,9 @@ git push origin main
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="control" number={4} title="Establish the lights-off control" time="12 min" completed={completed.includes("control")} onComplete={() => toggleStep("control")}>
-          <p className="goal">Create a fair control group: one agent receives the whole PRD and implements it without factory planning, tickets, QA separation, or approval gates.</p>
-          <Callout type="note" title="Compare workflows, not models">
-            Use the same PRD, baseline, model, and verification criteria as the factory run. Do not deliberately weaken the direct prompt or help the control agent while it works.
-          </Callout>
-          {track === "live" ? (
-            <>
-              <p>Open a second terminal and create an independent checkout. Keep your original factory checkout open.</p>
-              <CodeBlock>{`./factory/new_workshop.sh ../software-refactory-control recipe-rebrand
-cd ../software-refactory-control
-git switch -c experiment/lights-off`}</CodeBlock>
-              <p>Start one autonomous Claude agent with the complete PRD:</p>
-              <CodeBlock>{`python3 factory/run_lights_off.py --agent claude`}</CodeBlock>
-              <p>Leave it running in that terminal and return to the original checkout. Do not clarify requirements, split work, review tests, or redirect it. Record assumptions later as observations.</p>
-              <Checkpoint>
-                The control agent is running—or has finished—in its own checkout, using the same PRD and model but none of the factory controls.
-              </Checkpoint>
-            </>
-          ) : (
-            <>
-              <p>Rehearsal mode uses a deterministic discussion fixture instead of a live model run. First inspect the exact one-agent prompt:</p>
-              <CodeBlock>{`sed -n '1,200p' \
-  factory/scenarios/recipe-rebrand/lights-off-prompt.md`}</CodeBlock>
-              <p>Then read the representative result and its incomplete scorecard:</p>
-              <CodeBlock>{`sed -n '1,260p' \
-  factory/scenarios/recipe-rebrand/lights-off-sample-report.md`}</CodeBlock>
-              <Callout type="warning" title="This fixture is not a benchmark">
-                It is a stable workshop case study of plausible review findings. It does not claim that a particular model always produces those defects.
-              </Callout>
-              <Checkpoint>
-                You can identify which product decisions, architectural assumptions, and test choices remained hidden until the simulated final review.
-              </Checkpoint>
-            </>
-          )}
-        </StepSection>
-
-        <StepSection id="plan" number={5} title="Align product intent before code" time="12 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
+        <StepSection id="plan" number={4} title="Align product intent before code" time="17 min" completed={completed.includes("plan")} onComplete={() => toggleStep("plan")}>
           <p className="goal">Agree on the problem, behavior, scope, and evidence before any agent makes a technical decision.</p>
-          <p>Run the first read-only expert. Rehearsal mode uses a deterministic, schema-valid artifact; live mode starts a fresh Claude Code planning agent.</p>
+          <p>Run the first read-only expert. A Rehearsal Run uses a deterministic, schema-valid artifact; a Live Run starts a fresh Claude Code planning agent.</p>
           <CodeBlock>{track === "live"
             ? `./factory/factory plan recipe-app-prd.md`
             : `./factory/factory plan recipe-app-prd.md --mock`}</CodeBlock>
@@ -761,7 +718,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="publish" number={6} title="Design architecture, programs, and slices" time="15 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
+        <StepSection id="publish" number={5} title="Design architecture, programs, and slices" time="20 min" completed={completed.includes("publish")} onComplete={() => toggleStep("publish")}>
           <p className="goal">Use three specialist contracts to make implementation predictable and reviewable before publishing tickets.</p>
           <p>Continue the approved plan. The experts run sequentially because each one consumes the previous contract.</p>
           <CodeBlock>{track === "live"
@@ -804,7 +761,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
             </>
           ) : (
             <>
-              <p>Rehearsal mode doesn’t write to GitHub. Preview the five deterministic tickets and their dependency order:</p>
+              <p>A Rehearsal Run doesn’t write to GitHub. Preview the five deterministic tickets and their dependency order:</p>
               <CodeBlock>{`./factory/factory run --mock \
   --scenario recipe-rebrand --dry-run`}</CodeBlock>
               <Checkpoint>
@@ -814,7 +771,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
           )}
         </StepSection>
 
-        <StepSection id="qa" number={7} title="Define acceptance evidence before implementation" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
+        <StepSection id="qa" number={6} title="Define acceptance evidence before implementation" time="10 min" completed={completed.includes("qa")} onComplete={() => toggleStep("qa")}>
           <p className="goal">Review independent acceptance tests before implementation begins.</p>
           <p>In Terminal B, serve the dashboard from the repository root and leave it running:</p>
           <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
@@ -834,20 +791,20 @@ git switch -c experiment/lights-off`}</CodeBlock>
             <h3>Would these tests prove the requirement?</h3>
             <p>Look for assertions that test behavior rather than implementation details. If a test is weak, stop and improve the ticket instead of approving it.</p>
           </div>
-          <p>Approve a reviewed test set from another terminal. In rehearsal mode, the first wave uses issues 1 and 2:</p>
+          <p>Approve a reviewed test set from another terminal. In a Rehearsal Run, the first wave uses issues 1 and 2:</p>
           <CodeBlock>{track === "live"
             ? `./factory/factory approve-tests ISSUE_NUMBER`
             : `./factory/factory approve-tests 1 --yes
 ./factory/factory approve-tests 2 --yes`}</CodeBlock>
           <Callout type="note" title="Protected means protected">
-            The factory records each QA test’s Git blob hash. An implementation that changes, renames, or deletes the test fails verification.
+            The factory records each Acceptance Test’s Git blob hash. An implementation that changes, renames, or deletes the test fails verification.
           </Callout>
           <Checkpoint>
-            At least one QA test has been reviewed and approved. Its ticket is ready to resume in the preserved worktree.
+            At least one Acceptance Test has been reviewed and approved. Its ticket is ready to resume in the preserved worktree.
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="factory" number={8} title="Operate and observe the factory" time="20 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
+        <StepSection id="factory" number={7} title="Operate and observe the factory" time="22 min" completed={completed.includes("factory")} onComplete={() => toggleStep("factory")}>
           <p className="goal">Follow parallel implementation, verification, review, and dependency synchronization.</p>
           {track === "live" ? (
             <>
@@ -884,7 +841,7 @@ git switch -c experiment/lights-off`}</CodeBlock>
               <p>The factory fetches and fast-forwards the default branch, verifies the merge commit, and only then unlocks dependent tickets.</p>
             </>
           ) : (
-            <p>Mock mode performs local merges automatically. Watch a completed ticket unlock the next dependency wave in the dashboard.</p>
+            <p>A Rehearsal Run performs local merges automatically. Watch a completed ticket unlock the next dependency wave in the dashboard.</p>
           )}
           <details className="failure-lab">
             <summary>Optional: run the deliberate failure lab</summary>
@@ -898,8 +855,8 @@ git switch -c experiment/lights-off`}</CodeBlock>
           </Checkpoint>
         </StepSection>
 
-        <StepSection id="finish" number={9} title="Compare, decide, and adapt" time="11 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
-          <p className="goal">Evaluate both workflows against the same user outcomes, then compare the human effort required to trust each result.</p>
+        <StepSection id="finish" number={8} title="Verify, decide, and adapt" time="11 min" completed={completed.includes("finish")} onComplete={() => toggleStep("finish")}>
+          <p className="goal">Verify the user outcome, inspect its delivery evidence, and decide which controls your own work needs.</p>
           {track === "rehearsal" && (
             <>
               <p>If you still have paused QA reviews, finish the deterministic run without human pauses:</p>
@@ -929,46 +886,21 @@ git switch -c experiment/lights-off`}</CodeBlock>
             <li>Details contain metadata, ingredients, and ordered steps.</li>
             <li>My Cookbook exposes saved state.</li>
             <li>TV navigation works entirely from the keyboard.</li>
-            <li>The dashboard shows QA tests and green gate evidence.</li>
+            <li>The dashboard shows Acceptance Tests and green gate evidence.</li>
           </ul>
-          <h3>Score the control with the same evidence</h3>
-          {track === "live" ? (
-            <>
-              <p>Return to the control checkout after its single agent finishes. Run its available gates and inspect the complete review surface:</p>
-              <CodeBlock>{`cd ../software-refactory-control
-.factory/venv/bin/python -m pytest -q demo-app/tests
-node --test demo-app/static/tests/*.test.js
-python3 -m compileall -q demo-app
-git diff --stat
-git status --short`}</CodeBlock>
-              <p>Exercise the same mobile, cookbook, and TV journeys. Search UI, APIs, metadata, tests, and documentation for obsolete cinema terminology.</p>
-            </>
-          ) : (
-            <p>Use the simulated verification in <code>lights-off-sample-report.md</code> as the control column. Keep its “discussion fixture” label visible during the comparison.</p>
-          )}
-          <div className="comparison-table" role="region" aria-label="Lights-off and factory comparison">
-            <table>
-              <thead><tr><th>Measure</th><th>Lights-off control</th><th>Factory</th></tr></thead>
-              <tbody>
-                <tr><td>Requirements fully evidenced</td><td>Record a count</td><td>Read traceability rows</td></tr>
-                <tr><td>Unresolved assumptions found in review</td><td>Inspect the final diff</td><td>Read blocking questions</td></tr>
-                <tr><td>Largest review unit</td><td>Whole implementation</td><td>One vertical slice</td></tr>
-                <tr><td>Independent acceptance evidence</td><td>Agent-authored after or during code</td><td>Protected QA tests first</td></tr>
-                <tr><td>Safe parallel work visible in advance</td><td>No</td><td>Dependency waves and file ownership</td></tr>
-                <tr><td>Human review and rework time</td><td>Measure it</td><td>Measure it</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <Callout type="tip" title="A successful control is still useful">
-            The question is not only whether both apps work. Ask how quickly a reviewer can explain the requirements, assumptions, architecture, test intent, and remaining risk from the evidence each workflow produced.
-          </Callout>
+          <h3>Review the delivery evidence</h3>
+          <ul className="check-list">
+            <li>Trace requirement R3 from Product Review to its ticket and acceptance evidence.</li>
+            <li>Explain why one dependency waited and what caused it to unlock.</li>
+            <li>Use prompt, test, gate, and merge evidence to explain why the narrative ticket is complete.</li>
+          </ul>
           <div className="activity-card final-reflection">
             <span className="activity-label">Take it back to your team</span>
             <h3>Design your first factory experiment</h3>
             <p>Choose one repository and identify its most expensive delivery risk. The design guide after this step helps you select only the controls that address that risk.</p>
           </div>
           <Checkpoint>
-            You can explain the five factory control boundaries and use evidence—not a staged failure—to compare them with a lights-off implementation.
+            You can explain the factory’s control boundaries and choose which ones address the delivery risk in your own use case.
           </Checkpoint>
         </StepSection>
 
@@ -1071,7 +1003,7 @@ git --version`}</CodeBlock>
             </details>
             <details>
               <summary>The factory reports “no git remotes found”</summary>
-              <p>Rehearsal mode does not require a remote. For live mode, create or attach a GitHub repository and push <code>main</code> before running the factory.</p>
+              <p>A Rehearsal Run does not require a remote. For a Live Run, create or attach a GitHub repository and push <code>main</code> before running the factory.</p>
               <CodeBlock>{`git remote add origin https://github.com/OWNER/REPOSITORY.git
 git push -u origin main`}</CodeBlock>
             </details>
@@ -1097,10 +1029,6 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
               <summary>The scheduler reports a deadlock</summary>
               <p>Check whether every dependency is Done and whether its pull request was merged and synchronized. A cycle or an unmerged prerequisite keeps dependent tickets in Backlog.</p>
               <CodeBlock>{`./factory/factory status`}</CodeBlock>
-            </details>
-            <details>
-              <summary>The lights-off agent asks a question or stops</summary>
-              <p>Do not answer or redirect it during the control run. Record the ambiguity, stop reason, and elapsed time as evidence. The experiment compares what each workflow exposes without intervention; it does not require the control to finish.</p>
             </details>
             <details>
               <summary>A planning artifact is blocked or stale</summary>
@@ -1131,7 +1059,6 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
           <div className="reference-table" role="table" aria-label="Factory command reference">
             <div role="row"><code>factory configure --preset claude-workshop</code><span>Save local Claude defaults for short commands.</span></div>
             <div role="row"><code>factory configure --agent NAME --qa-agent NAME</code><span>Save registered implementation and QA adapters.</span></div>
-            <div role="row"><code>run_lights_off.py --agent claude</code><span>Start the one-agent control in its checkout.</span></div>
             <div role="row"><code>factory doctor</code><span>Check whether the environment is ready.</span></div>
             <div role="row"><code>factory plan PRD.md</code><span>Run Product Review in a read-only planning run.</span></div>
             <div role="row"><code>factory review product PLAN_ID</code><span>Inspect behavior, scope, evidence, and blockers.</span></div>
@@ -1146,9 +1073,6 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <div role="row"><code>factory seed recipe-rebrand</code><span>Create deterministic fallback tickets without running planning.</span></div>
           </div>
           <div className="next-links">
-            <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/LIGHTS_OFF_EXPERIMENT.md" target="_blank" rel="noreferrer">
-              <span>COMPARE</span><b>Run the lights-off control</b><i aria-hidden="true">→</i>
-            </a>
             <a href="https://github.com/giolaq/software-refactory-workshop/blob/main/factory/ARCHITECTURE.md" target="_blank" rel="noreferrer">
               <span>UNDERSTAND</span><b>Read the architecture map</b><i aria-hidden="true">→</i>
             </a>

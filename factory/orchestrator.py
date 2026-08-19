@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Software (re)-Factory: a small, visible coding-agent pipeline.
 
-Tickets start as GitHub issues (or seed JSON in mock mode).  The scheduler
+Tickets start as GitHub issues (or seed JSON in a Rehearsal Run). The scheduler
 unlocks dependency-ready work, creates one Git worktree per ticket, asks an
 independent QA agent to commit protected acceptance tests, runs the selected
 implementation agent, verifies ordered gates, retries with the failure in the
-prompt, then publishes a PR.  Mock mode follows the implementation path but
+prompt, then publishes a PR. A Rehearsal Run (`--mock`) follows the implementation path but
 skips real QA by default and merges locally.
 Every transition is mirrored to .factory/state.json for the dashboard.
 """
@@ -133,7 +133,7 @@ def validate_qa_changes(changes: list[tuple[str, str]], ticket_number: int, test
         name = PurePosixPath(path).name
         if not (python_name.fullmatch(name) or javascript_name.fullmatch(name)):
             errors.append(
-                f"QA test {raw_path} must be named test_ticket_{ticket_number}[_topic].py "
+                f"Acceptance Test {raw_path} must be named test_ticket_{ticket_number}[_topic].py "
                 f"or ticket-{ticket_number}[-topic].test.js"
             )
     return errors
@@ -443,11 +443,11 @@ class Factory:
             if failure:
                 ticket["failure"] = failure
                 marker.unlink(missing_ok=True)
-                self.transition(ticket, "Blocked", "QA tests changed before human approval")
+                self.transition(ticket, "Blocked", "Acceptance Tests changed before human approval")
                 continue
             marker.unlink(missing_ok=True)
             ticket["qa_approved"] = True
-            self.transition(ticket, "Ready", "Human approved independent QA tests")
+            self.transition(ticket, "Ready", "Human approved independent Acceptance Tests")
 
     def dry_plan(self):
         remaining = set(self.tickets)
@@ -668,7 +668,7 @@ class Factory:
                 changed.append(f"{path} was modified")
         if not changed:
             return ""
-        return "Independent QA tests are protected:\n" + "\n".join(f"- {item}" for item in changed)
+        return "Independent Acceptance Tests are protected:\n" + "\n".join(f"- {item}" for item in changed)
 
     def commit_leftovers(self, ticket: dict, worktree: Path, message: str | None = None):
         if not self.git("status", "--porcelain", cwd=worktree).stdout.strip():
@@ -733,7 +733,7 @@ class Factory:
     def process(self, ticket: dict):
         resume_qa = bool(ticket.get("qa_approved") and ticket.get("qa_commit") and ticket.get("branch"))
         first_phase = (
-            f"Running {ticket['agent']} with approved QA tests"
+            f"Running {ticket['agent']} with approved Acceptance Tests"
             if resume_qa else (f"Running QA {self.qa_agent}" if self.qa_agent else f"Running {ticket['agent']}")
         )
         self.transition(ticket, "In Progress", first_phase)
@@ -875,7 +875,7 @@ class Factory:
             waiting_qa = tuple(t["number"] for t in self.tickets.values() if t["status"] == "QA Review")
             if waiting_qa and waiting_qa != self.last_qa_wait:
                 print(
-                    "Waiting for QA test approval: " + ", ".join(f"#{number}" for number in waiting_qa),
+                    "Waiting for Acceptance Test approval: " + ", ".join(f"#{number}" for number in waiting_qa),
                     flush=True,
                 )
                 self.last_qa_wait = waiting_qa
@@ -952,7 +952,7 @@ def approve_qa_tests(repo: Path, number: int, assume_yes=False):
         ["git", "show", "--stat", "--oneline", "--decorate", ticket["qa_commit"]],
         worktree,
     ).stdout.strip()
-    print(f"\nIndependent QA tests for #{number}: {ticket['title']}\n")
+    print(f"\nIndependent Acceptance Tests for #{number}: {ticket['title']}\n")
     print(summary)
     print("\nProtected files:")
     for path in sorted(ticket.get("qa_tests", {})):
@@ -963,11 +963,11 @@ def approve_qa_tests(repo: Path, number: int, assume_yes=False):
         except EOFError as exc:
             raise ValueError("interactive approval required; rerun in a terminal or pass --yes") from exc
         if answer != "APPROVE TESTS":
-            raise ValueError("QA test approval cancelled")
+            raise ValueError("Acceptance Test approval cancelled")
     marker = repo / ".factory/qa-approvals" / str(number)
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(now() + "\n")
-    print(f"Approved QA tests for #{number}. The running factory will resume it automatically.")
+    print(f"Approved Acceptance Tests for #{number}. The running factory will resume it automatically.")
 
 
 def positive_int(value: str) -> int:
@@ -1039,7 +1039,7 @@ def parser():
     approve.add_argument("plan"); approve.add_argument("--repo", default=".")
     approve.add_argument("--project-number", type=positive_int); approve.add_argument("--yes", action="store_true")
     approve.add_argument("--new-project-title", help="create and use a fresh GitHub Project")
-    approve_tests = sub.add_parser("approve-tests", help="approve protected QA tests for one ticket")
+    approve_tests = sub.add_parser("approve-tests", help="approve protected Acceptance Tests for one ticket")
     approve_tests.add_argument("issue", type=int); approve_tests.add_argument("--repo", default=".")
     approve_tests.add_argument("--yes", action="store_true")
     doctor = sub.add_parser("doctor", help="check workshop prerequisites and safety")
