@@ -68,6 +68,15 @@ function Checkpoint({ children }: { children: ReactNode }) {
   );
 }
 
+function CliFallback({ children }: { children: string }) {
+  return (
+    <details className="optional-detail">
+      <summary>Show equivalent CLI</summary>
+      <CodeBlock>{children}</CodeBlock>
+    </details>
+  );
+}
+
 function WorkshopMedia({
   src,
   alt,
@@ -288,7 +297,7 @@ export default function Home() {
                 <li>macOS, Linux, or Windows with WSL2</li>
                 <li>Python 3.11+ with virtual environments</li>
                 <li>Node.js 20+, Git, and a modern browser</li>
-                <li>Ports 5000 and 8000 available</li>
+                <li>Ports 5000 and 5050 available</li>
                 <li>GitHub CLI and one personal workshop repository</li>
               </ul>
             </article>
@@ -345,7 +354,8 @@ cd software-refactory-demo
 git remote rename origin upstream
 gh repo create software-refactory-demo --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
-git push origin main --follow-tags`}</CodeBlock>
+git push origin main --follow-tags
+./factory/factory control-center`}</CodeBlock>
             </>
           ) : (
             <>
@@ -358,13 +368,11 @@ git remote rename origin upstream
 gh repo create software-refactory-demo --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main --follow-tags
-./factory/factory configure --preset claude-workshop
-./factory/factory doctor --full`}</CodeBlock>
+./factory/factory control-center`}</CodeBlock>
             </>
           )}
-          <p>Start the dashboard in a second terminal.</p>
-          <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
-          <Checkpoint>Open <a href="http://localhost:8000/factory/dashboard.html">localhost:8000/factory/dashboard.html</a>. The dashboard loads; on the live path, doctor reports no blocking errors.</Checkpoint>
+          <p>In the Control Center, open <strong>Connect</strong>. Choose your agent preset and run preflight.</p>
+          <Checkpoint>Open <a href="http://localhost:5050">localhost:5050</a>. The repository is connected and preflight reports no blocking errors.</Checkpoint>
         </StepSection>
 
         <StepSection index={2} id="baseline" title="Inspect the app" goal="Understand the system before changing it." complete={completed.includes("baseline")} onToggle={() => toggleStep("baseline")}>
@@ -382,44 +390,40 @@ git push origin main --follow-tags
         </StepSection>
 
         <StepSection index={3} id="prd" title="Read the PRD" goal="Turn a broad request into a testable product outcome." complete={completed.includes("prd")} onToggle={() => toggleStep("prd")}>
-          <p>Read the supplied TableStory PRD. Confirm four things before planning:</p>
+          <p>Open <strong>PRD</strong> in the Control Center. Read the supplied TableStory requirement and confirm four things before planning:</p>
           <ul>
             <li>Who the product is for</li>
             <li>What changes for the user</li>
             <li>What must remain compatible</li>
             <li>How success will be observed</li>
           </ul>
-          <CodeBlock>{`sed -n '1,220p' recipe-app-prd.md`}</CodeBlock>
+          <CliFallback>{`sed -n '1,220p' recipe-app-prd.md`}</CliFallback>
           <Checkpoint>You can explain the change in one sentence without describing implementation.</Checkpoint>
         </StepSection>
 
         <StepSection index={4} id="plan" title="Review product intent" goal="Approve the problem and desired behavior before technical design begins." complete={completed.includes("plan")} onToggle={() => toggleStep("plan")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory plan recipe-app-prd.md --mock
-export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory plan recipe-app-prd.md
-export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
-          )}
-          <p>Open the plan in the dashboard. Review the product brief. If it is vague, revise it; when it is testable, approve it.</p>
-          <CodeBlock>{`./factory/factory review product "$PLAN_ID"
+          <p>Choose {track === "rehearsal" ? "Rehearsal" : "Live agents"}, then select <strong>Start Product Review</strong>. Review the artifact in <strong>Planning</strong>. Request a revision if it is vague; approve it when it is testable.</p>
+          <CliFallback>{`./factory/factory plan recipe-app-prd.md${track === "rehearsal" ? " --mock" : ""}
+export PLAN_ID=<plan-id-from-output>
+./factory/factory review product "$PLAN_ID"
 ./factory/factory revise "$PLAN_ID" product \\
   --feedback "Clarify the user journey and measurable outcome."${track === "rehearsal" ? " --mock" : ""}
 ./factory/factory review product "$PLAN_ID"
-./factory/factory approve-product "$PLAN_ID"`}</CodeBlock>
+./factory/factory approve-product "$PLAN_ID"`}</CliFallback>
           <Checkpoint>The product artifact shows objective <code>R4</code> and a human approval.</Checkpoint>
         </StepSection>
 
         <StepSection index={5} id="publish" title="Create tickets" goal="Agree on architecture, program design, and vertical slices before publishing work." complete={completed.includes("publish")} onToggle={() => toggleStep("publish")}>
+          <p>In <strong>Planning</strong>, select <strong>Run remaining experts</strong>. Inspect each contract, then approve alignment and create the tickets.</p>
           {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory continue-plan "$PLAN_ID" --mock
+            <CliFallback>{`./factory/factory continue-plan "$PLAN_ID" --mock
 ./factory/factory review alignment "$PLAN_ID"
 ./factory/factory approve-rehearsal "$PLAN_ID" --scenario recipe-rebrand
-./factory/factory run --mock --scenario recipe-rebrand --dry-run`}</CodeBlock>
+./factory/factory run --mock --scenario recipe-rebrand --dry-run`}</CliFallback>
           ) : (
-            <CodeBlock>{`./factory/factory continue-plan "$PLAN_ID"
+            <CliFallback>{`./factory/factory continue-plan "$PLAN_ID"
 ./factory/factory review alignment "$PLAN_ID"
-./factory/factory approve "$PLAN_ID" --new-project-title "TableStory Workshop"`}</CodeBlock>
+./factory/factory approve "$PLAN_ID" --new-project-title "TableStory Workshop"`}</CliFallback>
           )}
           <p>Four specialists contribute one artifact each:</p>
           <div className="concept-grid compact-concept-grid">
@@ -444,14 +448,9 @@ export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
         </StepSection>
 
         <StepSection index={6} id="qa" title="Approve tests" goal="Have a QA agent define acceptance evidence before implementation." complete={completed.includes("qa")} onToggle={() => toggleStep("qa")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory run --mock --scenario recipe-rebrand --review-qa-tests --once
-./factory/factory approve-tests ISSUE_NUMBER`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory run --review-qa-tests --once
-./factory/factory approve-tests ISSUE_NUMBER`}</CodeBlock>
-          )}
-          <p>Open the first ticket. Review the QA proposal, edit weak assertions, and approve only tests that prove user-visible behavior.</p>
+          <p>Open <strong>Tickets</strong> and select <strong>Run one cycle</strong>. Open the first ticket, inspect its Tests tab, and approve only tests that prove user-visible behavior.</p>
+          <CliFallback>{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""} --review-qa-tests --once
+./factory/factory approve-tests ISSUE_NUMBER`}</CliFallback>
           <WorkshopMedia
             src="/screenshots/factory-dashboard-qa-review.webp"
             alt="GitHub Project with a ticket waiting for QA test review"
@@ -464,12 +463,8 @@ export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
         </StepSection>
 
         <StepSection index={7} id="factory" title="Run the factory" goal="Observe agents implement, verify, and review isolated tickets." complete={completed.includes("factory")} onToggle={() => toggleStep("factory")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory run --mock --scenario recipe-rebrand`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory run`}</CodeBlock>
-          )}
-          <p>Follow one ticket through the dashboard. Inspect:</p>
+          <p>Select <strong>Run factory</strong>. Follow one ticket through the board and open its detail drawer. Inspect:</p>
+          <CliFallback>{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""}`}</CliFallback>
           <ul>
             <li>The exact prompt and agent log</li>
             <li>The worktree and changed files</li>
@@ -509,8 +504,9 @@ node --test demo-app/static/tests/*.test.js
             height={900}
             illustration
           />
-          <CodeBlock>{`./factory/factory canvas --output factory-canvas.md
-./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md`}</CodeBlock>
+          <p>Return to <strong>Evidence</strong> in the Control Center. Complete the Factory Canvas and select <strong>Create evidence packet</strong>.</p>
+          <CliFallback>{`./factory/factory canvas --output factory-canvas.md
+./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md`}</CliFallback>
           <Checkpoint>The app passes its tests, works at three viewport sizes, and the evidence report explains why the change is complete.</Checkpoint>
         </StepSection>
 
@@ -564,7 +560,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <details><summary>No Git remotes found</summary><p>Run <code>git remote -v</code> inside the demo repository. Add or correct <code>origin</code>; do not point the factory repository at the demo project.</p></details>
             <details><summary>Claude asks for an OpenAI API key</summary><p>Your selected adapter is still the OpenAI preset. Run <code>./factory/factory configure --preset claude-workshop</code>, confirm Claude is authenticated, then rerun doctor.</p></details>
             <details><summary>A ticket is blocked</summary><p>Open its event history and agent log. Fix the recorded cause, then run <code>./factory/factory retry ISSUE_NUMBER</code>.</p></details>
-            <details><summary>The dashboard reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
+            <details><summary>The Control Center reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
             <details><summary>Live planning is slow or inconsistent</summary><p>Use the rehearsal path to learn the workflow. Return to live mode after credentials, model access, and the PRD are stable.</p></details>
             <details><summary>A port or worktree is already in use</summary><p>Stop the stale process or inspect active worktrees with <code>git worktree list</code>. Remove only a worktree you have confirmed is disposable.</p></details>
           </div>
@@ -577,6 +573,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <p>The commands you are most likely to repeat.</p>
           </div>
           <div className="reference-table">
+            <div><code>factory control-center</code><span>Open the local operator interface.</span></div>
             <div><code>factory doctor --full</code><span>Check live prerequisites and configuration.</span></div>
             <div><code>factory plan PRD</code><span>Start the four-stage planning workflow.</span></div>
             <div><code>factory review product PLAN_ID</code><span>Read the product artifact before approval.</span></div>

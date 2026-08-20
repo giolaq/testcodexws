@@ -109,5 +109,5 @@ cat > .factory/state.json <<JSON
 JSON
 
 echo "Factory reset complete for scenario: $scenario"
-echo "Run: ./factory/factory run --mock --scenario $scenario --once"
-echo "Board: python3 -m http.server 8000, then open http://localhost:8000/factory/dashboard.html"
+echo "Next: ./factory/factory control-center"
+echo "Then open http://127.0.0.1:5050 and choose Rehearsal."

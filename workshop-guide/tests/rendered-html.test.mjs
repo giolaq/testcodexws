@@ -32,6 +32,9 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /facilitator uses a different repository/i);
   assert.match(html, /Rehearsal/);
   assert.match(html, /Live/);
+  assert.match(html, /factory control-center/);
+  assert.match(html, /localhost:5050/);
+  assert.match(html, /Control Center/);
 
   for (const heading of [
     "Set up",
@@ -71,6 +74,7 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /Ian Xiaohei illustration workflow/);
 
   assert.doesNotMatch(html, /lights[- ]off|control experiment|run_lights_off|two delivery systems/i);
+  assert.doesNotMatch(html, /localhost:8000|python3 -m http\.server 8000/i);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 

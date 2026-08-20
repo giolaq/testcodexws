@@ -16,17 +16,21 @@ A Rehearsal Run needs Python 3.11+, Git, Node 20+, and no credentials or agent t
 
 ```sh
 ./setup_demo.sh --scenario recipe-rebrand
+./factory/factory control-center
+```
+
+Open <http://127.0.0.1:5050>. The Control Center guides the complete workflow,
+shows the exact CLI command behind every action, and streams its output. Choose
+**Rehearsal** to use deterministic agents without credentials or GitHub writes.
+
+The equivalent CLI-only smoke run is:
+
+```sh
 ./factory/factory run --mock --scenario recipe-rebrand --once
 ./factory/factory status
 ```
 
-In another terminal, serve the live board:
-
-```sh
-python3 -m http.server 8000
-```
-
-Open <http://localhost:8000/factory/dashboard.html>. The Rehearsal Run exercises the
+The Rehearsal Run exercises the
 same independent-QA commit and protected-test policy as a Live Run without using
 credentials. The `recipe-rebrand` scenario runs five deterministic TableStory
 tickets; the original `tv` scenario merges seven tickets and deliberately blocks
@@ -75,9 +79,9 @@ The orchestration flow is intentionally direct:
    back to the agent for up to two retries.
 7. On green gates, push and open a PR. Humans merge; the factory fast-forwards
    the default branch and verifies the merge commit before unlocking dependants.
-8. Mirror every transition and artifact path to `.factory/state.json` for the dashboard.
+8. Mirror every transition and artifact path to `.factory/state.json` for the Control Center.
 
-The dashboard teaches four macro phases—**Plan, Build, Verify, Review**—before
+The Control Center teaches four macro phases—**Plan, Build, Verify, Review**—before
 showing detailed ticket states. Every orchestrated role writes a Handoff Receipt
 with input and output revisions, its claim, verification, unresolved risks,
 artifacts, and policy hashes.
@@ -279,7 +283,7 @@ more tests, but changing, renaming, or deleting an Acceptance Test fails verific
 is fed back into the normal retry loop.
 
 With `--review-qa-tests`, a ticket pauses in **QA Review**. Inspect its test diff
-from the dashboard or terminal, then continue it explicitly:
+from the Control Center or terminal, then continue it explicitly:
 
 ```sh
 ./factory/factory approve-tests ISSUE
@@ -470,6 +474,7 @@ factory configure [--preset claude-workshop|codex-workshop]
                   [--planning-agent claude|codex]
                   [--review-qa-tests|--no-review-qa-tests]
                   [--max-parallel N] [--project-number N]
+factory control-center [--port N] [--no-open]
 factory seed [recipe-rebrand|tv] [--github-repo OWNER/REPOSITORY] [--agent NAME]
 factory run [--repo PATH] [--profile lean|standard|assured]
             [--agent NAME] [--qa-agent NAME]
@@ -505,8 +510,10 @@ optional gate failure is recorded in the ticket's `warnings`. Killing and
 restarting the loop replays an interrupted active ticket from a clean worktree
 and reuses any already-open PR.
 
-The dashboard shows the four planning contracts and human gates above the ticket
-board. Click any planning stage or ticket to inspect its artifacts and evidence.
+The Control Center shows the four planning contracts, human gates, ticket board,
+live operations, and evidence. See `CONTROL_CENTER.md` for its workflow and
+local security boundary. The original static dashboard remains a read-only
+compatibility view.
 
 See `WORKSHOP_OUTLINE.md` for the colleague-facing teaching structure and
 `FACILITATOR.md` for the live-demo sequence and recovery notes. See

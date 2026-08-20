@@ -77,7 +77,7 @@ before a human accepts the whole package.
 
 For a credential-free rehearsal, add `--mock` to `plan` and `continue-plan`.
 The bundled TableStory artifacts follow the same schemas, validators, manifest,
-approval gates, traceability generation, and dashboard path as live agents.
+approval gates, traceability generation, and Control Center state as live agents.
 Its initial R4 evidence is deliberately vague, so the attendee must reject and
 revise it before approval.
 
