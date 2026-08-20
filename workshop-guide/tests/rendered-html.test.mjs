@@ -69,6 +69,15 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /Prepare a safe workspace/);
   assert.match(html, /Define acceptance evidence before implementation/);
   assert.match(html, /Verify, decide, and adapt/);
+  assert.match(html, /screenshots\/pocket-cinema-before\.webp/);
+  assert.match(html, /Before · Pocket Cinema/);
+  assert.match(html, /screenshots\/factory-dashboard-qa-review\.webp/);
+  assert.match(html, /Reference state · QA Review/);
+  assert.match(html, /screenshots\/factory-dashboard-complete\.webp/);
+  assert.match(html, /screenshots\/tablestory-desktop\.webp/);
+  assert.match(html, /screenshots\/tablestory-mobile\.webp/);
+  assert.match(html, /screenshots\/tablestory-tv\.webp/);
+  assert.match(html, /After · TableStory/);
   assert.match(html, /Design the factory your delivery risk requires/);
   assert.match(html, /Factory design canvas/);
   assert.match(html, /Troubleshooting/);

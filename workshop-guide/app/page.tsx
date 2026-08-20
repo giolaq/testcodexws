@@ -68,6 +68,52 @@ function Checkpoint({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkshopScreenshot({
+  src,
+  alt,
+  label,
+  caption,
+  width,
+  height,
+  portrait = false,
+}: {
+  src: string;
+  alt: string;
+  label: string;
+  caption: string;
+  width: number;
+  height: number;
+  portrait?: boolean;
+}) {
+  return (
+    <figure className={`workshop-figure ${portrait ? "workshop-figure-portrait" : ""}`}>
+      <a
+        className="workshop-screenshot"
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Open full-size screenshot: ${alt}`}
+      >
+        {/* Static documentation captures do not need the Next image runtime. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          loading="lazy"
+          decoding="async"
+        />
+        <span>Open full size <span aria-hidden="true">↗</span></span>
+      </a>
+      <figcaption>
+        <strong>{label}</strong>
+        <span>{caption}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 function StepSection({
   id,
   number,
@@ -727,6 +773,14 @@ git push origin main
           <p>Start Pocket Cinema from the repository root:</p>
           <CodeBlock>{`.factory/venv/bin/python demo-app/app.py`}</CodeBlock>
           <p>Open <a href="http://localhost:5000" target="_blank" rel="noreferrer">localhost:5000 <span aria-hidden="true">↗</span></a>. Browse the film cards, search, and open one detail page. When you finish, return to the terminal and press <code>Ctrl+C</code> so the final app can use the same port.</p>
+          <WorkshopScreenshot
+            src="/screenshots/pocket-cinema-before.webp"
+            alt="Pocket Cinema baseline with a dark film catalogue, search box, and three-column card grid"
+            width={1440}
+            height={980}
+            label="Before · Pocket Cinema"
+            caption="Record the domain language, navigation, saved-item model, and visual system. Step 8 shows the same application boundary after the factory run."
+          />
           <div className="activity-card">
             <span className="activity-label">30-second activity</span>
             <h3>Predict the rebrand surface</h3>
@@ -897,6 +951,14 @@ git push origin main
   --once`}</CodeBlock>
           )}
           <p>Wait for one or more tickets to enter <strong>QA Review</strong>. Click a ticket and inspect its specification, QA prompt, log, changed files, and protected test list.</p>
+          <WorkshopScreenshot
+            src="/screenshots/factory-dashboard-qa-review.webp"
+            alt="Factory Dashboard with two tickets in QA Review and three dependent tickets in Backlog"
+            width={1440}
+            height={980}
+            label="Reference state · QA Review"
+            caption="The first dependency wave is paused before implementation. Notice that planning is approved, tickets 1 and 2 own protected evidence, and downstream work is still waiting."
+          />
           <div className="activity-card">
             <span className="activity-label">Human control point</span>
             <h3>Would these tests prove the requirement?</h3>
@@ -970,6 +1032,14 @@ git push origin main
           ) : (
             <p>A Rehearsal Run performs local merges automatically. Watch a completed ticket unlock the next dependency wave in the dashboard.</p>
           )}
+          <WorkshopScreenshot
+            src="/screenshots/factory-dashboard-complete.webp"
+            alt="Factory Dashboard with the planning pipeline approved and all five TableStory tickets in Done"
+            width={1920}
+            height={1080}
+            label="Reference state · Completed run"
+            caption="The board is the lifecycle summary: five completed tickets, no active agents, and no blocked work. Open a ticket to inspect the evidence behind its status."
+          />
           <details className="failure-lab">
             <summary>Optional: run the deliberate failure lab</summary>
             <p>Reset to the TV scenario and run it. Ticket 8 is rejected because “It feels right” cannot be converted into an objective acceptance test.</p>
@@ -1005,6 +1075,34 @@ git push origin main
               <small>localhost:5000/?mode=tv</small>
               <p>Use Arrow keys, Enter, and Escape or Backspace without a pointer.</p>
             </a>
+          </div>
+          <h3>Compare the implemented product</h3>
+          <WorkshopScreenshot
+            src="/screenshots/tablestory-desktop.webp"
+            alt="TableStory desktop browse page with warm recipe branding, ingredient search, and recipe cards"
+            width={1440}
+            height={980}
+            label="After · TableStory"
+            caption="Compare this with the Pocket Cinema baseline in Step 2. The result changes the domain model, public language, search target, saved-item behavior, and visual system—not only the logo."
+          />
+          <div className="workshop-figure-grid" aria-label="TableStory mobile and television results">
+            <WorkshopScreenshot
+              src="/screenshots/tablestory-mobile.webp"
+              alt="TableStory at a 390 pixel mobile viewport with search and one-column recipe cards"
+              width={390}
+              height={844}
+              label="Mobile result"
+              caption="At 390 pixels, the identity, search, recipe count, and save action remain visible without horizontal scrolling."
+              portrait
+            />
+            <WorkshopScreenshot
+              src="/screenshots/tablestory-tv.webp"
+              alt="TableStory television mode with large typography and horizontal recipe rails"
+              width={1920}
+              height={1080}
+              label="TV result"
+              caption="TV mode replaces the grid with named rails and keeps keyboard focus, Enter, and Back behavior inside the ten-foot layout."
+            />
           </div>
           <h3>Complete and peer review the Factory Canvas</h3>
           <p>
