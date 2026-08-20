@@ -1,0 +1,1 @@
+The first mobile implementation omitted the user-visible TableStory journey.
