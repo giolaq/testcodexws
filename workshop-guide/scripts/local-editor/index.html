@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workshop copy editor</title>
+    <link rel="stylesheet" href="/__workshop_editor/editor.css" />
+  </head>
+  <body>
+    <header class="editor-header">
+      <div>
+        <span class="editor-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <strong>Workshop copy editor</strong>
+          <span>Local editing · changes are written to the project</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="connection" id="connection"><i></i> Connecting</span>
+        <button class="secondary-button" id="undo" type="button" disabled>Undo last save</button>
+        <button class="primary-button" id="save" type="button" disabled>Save to project</button>
+      </div>
+    </header>
+
+    <main class="editor-layout">
+      <aside class="editor-panel">
+        <div class="panel-intro">
+          <span class="eyebrow">COPY ONLY</span>
+          <h1>Edit the guide in place</h1>
+          <p>Click text in the preview, or find it below. Your draft appears immediately. Save when it reads correctly.</p>
+        </div>
+
+        <label class="search-field">
+          <span>Find text</span>
+          <input id="search" type="search" placeholder="Search headings and paragraphs" autocomplete="off" />
+        </label>
+
+        <div class="selection-empty" id="selection-empty">
+          <span aria-hidden="true">↗</span>
+          <strong>Select something to edit</strong>
+          <p>Click a paragraph or heading in the preview. Links do not navigate while the editor is open.</p>
+        </div>
+
+        <section class="selection-editor" id="selection-editor" hidden>
+          <div class="selection-context">
+            <span id="selection-section"></span>
+            <code id="selection-tag"></code>
+          </div>
+          <label for="copy-value">Text</label>
+          <textarea id="copy-value" rows="8" spellcheck="true"></textarea>
+          <div class="selection-meta">
+            <span id="character-count">0 characters</span>
+            <button id="discard" type="button">Discard draft</button>
+          </div>
+          <p class="save-hint"><kbd>⌘</kbd><span>+</span><kbd>S</kbd> saves the selected text.</p>
+        </section>
+
+        <section class="search-results" id="search-results" hidden>
+          <div class="results-heading">
+            <strong>Matches</strong>
+            <span id="result-count"></span>
+          </div>
+          <div id="result-list"></div>
+        </section>
+      </aside>
+
+      <section class="preview-panel" aria-label="Live workshop preview">
+        <div class="preview-toolbar">
+          <div><i></i><i></i><i></i></div>
+          <span>Live preview</span>
+          <button id="reload-preview" type="button">Reload</button>
+        </div>
+        <iframe id="preview" src="/" title="Workshop website preview"></iframe>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/__workshop_editor/editor.js"></script>
+  </body>
+</html>
+

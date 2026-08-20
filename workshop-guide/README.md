@@ -27,6 +27,27 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Local copy editor
+
+Use the local editor when you want to review the guide and change a word,
+phrase, heading, or paragraph without editing TSX by hand:
+
+```sh
+npm run edit
+```
+
+The command opens `http://127.0.0.1:3001/__workshop_editor` and starts the
+workshop preview if it is not already running. Click visible text in the
+preview, type in the editor, and choose **Save to project**. The draft appears
+in the preview while you type; saving writes the change to `app/page.tsx` so it
+can be reviewed with Git and included in the next commit. **Undo last save** is
+available for changes made during the current editor session.
+
+The editor listens only on the local loopback address. It is not included in
+the deployed workshop website and does not need an account, database, or API
+key. Use the normal code workflow for layout, links, commands, conditional
+logic, and component changes.
+
 ## Verification
 
 ```sh
