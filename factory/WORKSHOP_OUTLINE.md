@@ -90,6 +90,10 @@ and run preflight. In Rehearsal, credentials and GitHub writes are not required.
 **Check:** <http://127.0.0.1:5050> loads, shows the correct repository, and
 preflight reports no blocking errors.
 
+Point out the Overview before continuing: **Current phase** explains what is
+happening, **Next checkpoint** opens the next human action, and the progress row
+separates completed, current, and pending phases.
+
 ### 2. Inspect the app
 
 **Goal:** Understand the system before changing it.

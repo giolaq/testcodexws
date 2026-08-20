@@ -15,6 +15,7 @@ import re
 import shlex
 import signal
 import subprocess
+import sys
 import threading
 import time
 import tomllib
@@ -184,18 +185,205 @@ class ControlCenter:
         value["output"] = tail_text(self.repo / log) if log else ""
         return value
 
+    def journey(self, planning: dict, factory: dict, operation: dict, prd: dict, evidence: list[dict]) -> dict:
+        tickets = factory.get("tickets", [])
+        approvals = planning.get("approvals", {})
+        phase_specs = [
+            ("connect", "Connect", "Choose agents and check the repository", "connect"),
+            ("prd", "PRD", "Define the user outcome", "prd"),
+            ("plan", "Plan", "Review expert contracts", "planning"),
+            ("tickets", "Tickets", "Approve and create vertical slices", "planning"),
+            ("build", "Build & verify", "Run QA, implementation, and gates", "tickets"),
+            ("evidence", "Evidence", "Verify the integrated result", "evidence"),
+        ]
+        connected = bool(self.session_config()) or bool(planning) or bool(tickets)
+        prd_ready = bool(prd.get("saved")) or bool(planning)
+        product_ready = bool(approvals.get("product"))
+        plan_complete = planning.get("status") in {"awaiting_alignment_approval", "alignment_approved", "published"}
+        tickets_approved = bool(approvals.get("alignment"))
+        delivery_done = bool(tickets) and all(ticket.get("status") == "Done" for ticket in tickets)
+        evidence_done = any(item.get("name") == "manifest.json" for item in evidence)
+        completed = [connected, prd_ready, plan_complete, tickets_approved, delivery_done, evidence_done]
+
+        phase_index = next((index for index, done in enumerate(completed) if not done), len(phase_specs) - 1)
+        state = "ready"
+        headline = "Connect this repository"
+        detail = "Choose the agents for each role, then run preflight before planning."
+        next_label = "Open Connect"
+        next_detail = "Save a preset and fix any blocking preflight result."
+        next_view = "connect"
+        ticket_number = None
+
+        active = next((ticket for ticket in tickets if ticket.get("status") in {"In Progress", "Verifying"}), None)
+        qa_review = next((ticket for ticket in tickets if ticket.get("status") == "QA Review"), None)
+        blocked = next((ticket for ticket in tickets if ticket.get("status") == "Blocked"), None)
+        in_review = next((ticket for ticket in tickets if ticket.get("status") == "In Review"), None)
+        ready = [ticket for ticket in tickets if ticket.get("status") == "Ready"]
+
+        if not connected:
+            pass
+        elif not prd_ready:
+            phase_index = 1
+            headline = "Define the product outcome"
+            detail = "Review or replace the sample PRD before any expert agent runs."
+            next_label, next_detail, next_view = "Open the PRD", "Confirm the user, behavior, constraints, and evidence.", "prd"
+        elif not planning.get("plan_id"):
+            phase_index = 2
+            headline = "The PRD is ready for Product Review"
+            detail = "The first expert will turn the requirement into a testable product contract."
+            next_label, next_detail, next_view = "Start Product Review", "Choose Rehearsal or Live agents on the PRD screen.", "prd"
+        elif not product_ready:
+            phase_index = 2
+            product = next((stage for stage in planning.get("stages", []) if stage.get("id") == "product_review"), {})
+            if product.get("status") == "complete":
+                state = "attention"
+                headline = "Product Review needs your decision"
+                detail = "Check the problem, user journey, scope, and measurable evidence before approving it."
+                next_label, next_detail, next_view = "Review Product Review", "Approve it or request a focused revision.", "planning"
+            else:
+                headline = "Product Review is the current planning phase"
+                detail = "The product expert is preparing the behavior and evidence contract."
+                next_label, next_detail, next_view = "Open Planning", "Watch the expert output and inspect its artifact.", "planning"
+        elif not tickets_approved:
+            if planning.get("status") == "awaiting_alignment_approval":
+                phase_index = 3
+                state = "attention"
+                headline = "The delivery plan needs your approval"
+                detail = "Architecture, program design, and vertical slices are complete. No ticket is created until you approve alignment."
+                next_label, next_detail, next_view = "Review alignment", "Trace requirements through the four expert artifacts.", "planning"
+            else:
+                phase_index = 2
+                headline = "Technical planning is ready to run"
+                detail = "Architecture, program design, and vertical-slice experts run in sequence."
+                next_label, next_detail, next_view = "Run remaining experts", "Open Planning and start the remaining expert stages.", "planning"
+        elif not tickets:
+            phase_index = 4
+            headline = "Approved tickets are ready to load"
+            detail = "The plan is approved. Start the factory to load the PRD-derived tickets and begin independent QA."
+            next_label, next_detail, next_view = "Open Tickets", "Run one cycle to pause after the first QA proposal.", "tickets"
+        elif qa_review:
+            phase_index = 4
+            state = "attention"
+            ticket_number = qa_review.get("number")
+            headline = f"Acceptance tests need approval for #{ticket_number}"
+            detail = "Implementation is paused. Inspect the Tests tab and approve only evidence that proves the ticket behavior."
+            next_label, next_detail, next_view = f"Review ticket #{ticket_number}", "Open the ticket and inspect its protected tests.", "tickets"
+        elif blocked:
+            phase_index = 4
+            state = "blocked"
+            ticket_number = blocked.get("number")
+            headline = f"Ticket #{ticket_number} is blocked"
+            failure = str(blocked.get("failure") or "").strip()
+            detail = (failure.splitlines()[-1][:420] if failure else "Read the ticket history and final log to find the recorded cause.")
+            next_label, next_detail, next_view = f"Inspect blocker #{ticket_number}", "Fix the cause before retrying the ticket.", "tickets"
+        elif active:
+            phase_index = 4
+            state = "running"
+            ticket_number = active.get("number")
+            ticket_phase = active.get("phase", "implementation")
+            labels = {
+                "qa": "Independent QA is writing acceptance tests",
+                "implementation": "The implementation agent is changing the code",
+                "verifying": "Quality gates are checking the change",
+                "cleanup": "The cleanup agent is checking the change",
+                "architecture_conformance": "Architecture conformance is being checked",
+                "hardening": "The hardening agent is checking the change",
+                "final_verifier": "The final verifier is checking the change",
+            }
+            headline = f"{labels.get(ticket_phase, 'An agent is working')} for #{ticket_number}"
+            detail = f"{active.get('title', 'Ticket')} · attempt {active.get('attempt') or active.get('qa_attempt') or 1}."
+            next_label, next_detail, next_view = f"Inspect ticket #{ticket_number}", "Follow its prompt, live log, diff, tests, and history.", "tickets"
+        elif in_review:
+            phase_index = 4
+            state = "attention"
+            ticket_number = in_review.get("number")
+            headline = f"Pull request for #{ticket_number} needs human review"
+            detail = "All required gates passed. Merge the pull request before dependent tickets can start."
+            next_label, next_detail, next_view = f"Review ticket #{ticket_number}", "Open its pull request and verification evidence.", "tickets"
+        elif ready:
+            phase_index = 4
+            headline = f"{len(ready)} ticket{'s are' if len(ready) != 1 else ' is'} ready"
+            detail = "Dependencies are satisfied. The next run will dispatch QA and implementation in isolated worktrees."
+            next_label, next_detail, next_view = "Run the factory", "Open Tickets and start the available work.", "tickets"
+        elif delivery_done and not evidence_done:
+            phase_index = 5
+            headline = "Implementation is complete"
+            detail = "Verify the integrated application and collect the evidence that justifies completion."
+            next_label, next_detail, next_view = "Verify the result", "Complete the Factory Canvas and create the evidence packet.", "evidence"
+        elif delivery_done and evidence_done:
+            phase_index = 5
+            state = "complete"
+            headline = "The workshop run is complete"
+            detail = "Planning approvals, ticket evidence, required gates, and the Evidence Packet are available for review."
+            next_label, next_detail, next_view = "Review the evidence", "Inspect the packet, or start a new rehearsal when ready.", "evidence"
+        else:
+            phase_index = 4
+            state = "attention"
+            headline = "No ticket can start"
+            detail = "Inspect dependencies and ticket history. A cycle or unmet dependency may be preventing progress."
+            next_label, next_detail, next_view = "Inspect Tickets", "Find the first dependency that cannot be satisfied.", "tickets"
+
+        operation_phase = {
+            "doctor": 0, "configure": 0, "plan": 2, "revise-product": 2,
+            "approve-product": 2, "continue-plan": 2, "publish-plan": 3,
+            "approve-tests": 4, "run": 4, "run-once": 4, "dry-run": 4,
+            "retry": 4, "evidence": 5, "reset-run": 4, "reset-all": 0,
+        }.get(operation.get("action"), phase_index)
+        if operation.get("status") in {"running", "stopping"}:
+            phase_index = operation_phase
+            if qa_review or blocked or in_review:
+                # A required human decision is more useful than the fact that the
+                # scheduler process remains alive while it waits.
+                pass
+            elif active:
+                state = "running"
+            else:
+                state = "running"
+                headline = operation.get("title") or "Factory operation is running"
+                detail = "Output is streaming in the operation console. You can inspect tickets while it runs."
+                next_label, next_detail, next_view = "Watch live output", "The current command and its latest output are shown below.", "overview"
+        elif operation.get("status") == "failed":
+            phase_index = operation_phase
+            state = "blocked"
+            headline = f"{operation.get('title') or 'The last operation'} failed"
+            detail = operation.get("error") or "Read the final output lines to find the cause."
+            next_label, next_detail, next_view = "Read the failure output", "Fix the first reported error, then repeat the action.", "overview"
+
+        phases = []
+        for index, (phase_id, label, description, view) in enumerate(phase_specs):
+            status = "complete" if completed[index] else ("current" if index == phase_index else "pending")
+            phases.append({"id": phase_id, "label": label, "description": description, "view": view, "status": status})
+        return {
+            "state": state,
+            "phase_index": phase_index,
+            "phase_number": phase_index + 1,
+            "phase_count": len(phases),
+            "phase_label": phases[phase_index]["label"],
+            "headline": headline,
+            "detail": detail,
+            "ticket": ticket_number,
+            "next": {"label": next_label, "detail": next_detail, "view": next_view},
+            "phases": phases,
+        }
+
     def snapshot(self) -> dict:
+        planning = read_json(self.repo / ".factory" / "planning-state.json", {})
+        factory = read_json(self.repo / ".factory" / "state.json", {"tickets": []})
+        operation = self.operation_snapshot()
+        prd = {key: value for key, value in self.prd().items() if key != "text"}
+        evidence = self.evidence_files()
         return {
             "server_time": utc_now(),
             "repo": self.repo_info(),
             "config": self.session_config(),
             "adapters": self.adapters(),
             "profiles": sorted(PROFILES),
-            "planning": read_json(self.repo / ".factory" / "planning-state.json", {}),
-            "factory": read_json(self.repo / ".factory" / "state.json", {"tickets": []}),
-            "operation": self.operation_snapshot(),
-            "prd": {key: value for key, value in self.prd().items() if key != "text"},
-            "evidence": self.evidence_files(),
+            "planning": planning,
+            "factory": factory,
+            "operation": operation,
+            "prd": prd,
+            "evidence": evidence,
+            "journey": self.journey(planning, factory, operation, prd, evidence),
         }
 
     @staticmethod
@@ -351,6 +539,19 @@ class ControlCenter:
             return "Create evidence packet", [
                 base + ["evidence", plan, "--canvas", str(self.canvas_path), "--output", str(output)],
             ]
+        if action in {"reset-run", "reset-all"}:
+            if mode == "live":
+                raise InputError("Live GitHub runs cannot be reset safely. Use a fresh workshop repository.")
+            scenario = self._string(payload, "scenario") or "recipe-rebrand"
+            if scenario not in SCENARIOS:
+                raise InputError("Unknown rehearsal scenario.")
+            command = [str(self.repo / "setup_demo.sh"), "--scenario", scenario]
+            if action == "reset-all":
+                if self._string(payload, "confirm") != "START OVER":
+                    raise InputError("Type START OVER to clear the workshop run.")
+                command.append("--start-over")
+                return "Start the workshop over", [command]
+            return "Reset ticket execution", [command]
         raise InputError("This control-center action is not available.")
 
     def start(self, action: str, payload: dict) -> dict:
@@ -621,6 +822,11 @@ class ControlCenterServer(ThreadingHTTPServer):
     def __init__(self, address, center: ControlCenter):
         super().__init__(address, Handler)
         self.center = center
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            return
+        super().handle_error(request, client_address)
 
 
 def serve(repo: Path, host="127.0.0.1", port=5050, open_browser=True):

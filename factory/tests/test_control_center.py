@@ -87,6 +87,25 @@ class ControlCenterTests(unittest.TestCase):
             self.assertIn("--yes", publish[0])
             self.assertIn("approve-rehearsal", publish[0])
 
+    def test_reset_actions_are_rehearsal_only_and_full_reset_requires_a_phrase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            (center.repo / "setup_demo.sh").write_text("#!/bin/sh\n")
+
+            _, run_reset = center.build_commands("reset-run", {"mode": "rehearsal"})
+            self.assertIn("--scenario", run_reset[0])
+            self.assertNotIn("--start-over", run_reset[0])
+
+            with self.assertRaisesRegex(InputError, "START OVER"):
+                center.build_commands("reset-all", {"mode": "rehearsal"})
+            _, full_reset = center.build_commands("reset-all", {
+                "mode": "rehearsal", "confirm": "START OVER",
+            })
+            self.assertIn("--start-over", full_reset[0])
+
+            with self.assertRaisesRegex(InputError, "fresh workshop repository"):
+                center.build_commands("reset-run", {"mode": "live"})
+
     def test_live_publication_reuses_the_saved_github_project(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))
@@ -184,6 +203,33 @@ class ControlCenterTests(unittest.TestCase):
             self.assertEqual(snapshot["factory"]["tickets"][0]["status"], "Done")
             self.assertIn("adapters", snapshot)
             self.assertIn("operation", snapshot)
+            self.assertEqual(snapshot["journey"]["phase_label"], "Plan")
+
+    def test_journey_names_the_active_role_and_human_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            planning = {
+                "plan_id": "abc12345",
+                "status": "alignment_approved",
+                "approvals": {"product": {"at": "now"}, "alignment": {"at": "now"}},
+            }
+            prd = {"saved": True}
+            active_factory = {"tickets": [{
+                "number": 3, "title": "Recipe details", "status": "In Progress",
+                "phase": "qa", "qa_attempt": 1,
+            }]}
+            running = {"status": "running", "action": "run", "title": "Run the factory"}
+
+            active = center.journey(planning, active_factory, running, prd, [])
+            self.assertEqual(active["phase_label"], "Build & verify")
+            self.assertEqual(active["ticket"], 3)
+            self.assertIn("Independent QA", active["headline"])
+
+            active_factory["tickets"][0]["status"] = "QA Review"
+            review = center.journey(planning, active_factory, running, prd, [])
+            self.assertEqual(review["state"], "attention")
+            self.assertIn("need approval", review["headline"])
+            self.assertEqual(review["next"]["view"], "tickets")
 
     def test_frontend_contains_the_complete_operator_workflow(self):
         source = (Path(__file__).parents[1] / "control_center/index.html").read_text()
@@ -197,6 +243,9 @@ class ControlCenterTests(unittest.TestCase):
             "Live log",
             "Diff",
             "Factory Canvas",
+            "Current phase",
+            "Reset or start again",
+            "Start workshop over",
         ):
             self.assertIn(label, source)
 

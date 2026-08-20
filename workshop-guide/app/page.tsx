@@ -372,6 +372,9 @@ git push origin main --follow-tags
             </>
           )}
           <p>In the Control Center, open <strong>Connect</strong>. Choose your agent preset and run preflight.</p>
+          <Callout type="tip" title="Use the Overview as your guide">
+            <p><strong>Current phase</strong> explains what is running. <strong>Next checkpoint</strong> opens the next decision. Use <strong>Reset or start again</strong> to repeat a Rehearsal while keeping either the approved plan or only your configuration.</p>
+          </Callout>
           <Checkpoint>Open <a href="http://localhost:5050">localhost:5050</a>. The repository is connected and preflight reports no blocking errors.</Checkpoint>
         </StepSection>
 
@@ -563,6 +566,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <details><summary>The Control Center reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
             <details><summary>Live planning is slow or inconsistent</summary><p>Use the rehearsal path to learn the workflow. Return to live mode after credentials, model access, and the PRD are stable.</p></details>
             <details><summary>A port or worktree is already in use</summary><p>Stop the stale process or inspect active worktrees with <code>git worktree list</code>. Remove only a worktree you have confirmed is disposable.</p></details>
+            <details><summary>I want to repeat the workshop</summary><p>Open <strong>Reset or start again</strong> in the local Control Center. Reset ticket execution to keep the approved PRD plan, or type <code>START OVER</code> to return to the beginning. For Live mode, create a fresh repository.</p></details>
           </div>
         </section>
 

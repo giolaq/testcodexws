@@ -231,14 +231,17 @@ Project board.
 | QA Review takes too long | Review one test set, then finish without `--review-qa-tests`. |
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |
-| The state is stale | Reset only after confirming demo changes can be discarded. |
+| The state is stale | Use **Reset current run** in the Control Center after confirming demo changes can be discarded. |
 | The agenda is late | Show one Acceptance Test approval and one dependency unlock, then verify the application. |
 
 If GitHub works but live planning cannot finish, use
 `./factory/factory seed recipe-rebrand` as a last-resort fixture. Tell attendees
 that it bypasses PRD planning and both human alignment gates.
 
-Reset a disposable rehearsal only when its demo changes can be discarded:
+Reset a disposable rehearsal only when its demo changes can be discarded. The
+Control Center offers two scopes: reset execution while keeping the approved
+plan, or type `START OVER` to clear all workshop work while keeping attendee
+configuration. The equivalent execution reset is:
 
 ```sh
 ./setup_demo.sh --scenario recipe-rebrand --force

@@ -225,6 +225,59 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(tagged, expected, proc.stdout + proc.stderr)
             self.assertNotEqual(tagged, rehearsal)
 
+    def test_start_over_clears_workshop_state_but_keeps_local_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            git(repo, "init", "-q", "-b", "main")
+            git(repo, "config", "user.name", "Factory Test")
+            git(repo, "config", "user.email", "factory@example.test")
+            (repo / "demo-app").mkdir()
+            (repo / "demo-app/app.py").write_text("")
+            (repo / "demo-app/requirements.txt").write_text("")
+            (repo / "factory").mkdir()
+            (repo / "factory/orchestrator.py").write_text("")
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "chore: establish factory workshop baseline")
+            (repo / "demo-app/finished.txt").write_text("rehearsal\n")
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "feat: finish rehearsal")
+
+            script = repo / "factory/setup_demo.sh"
+            script.write_bytes((Path(__file__).parents[1] / "setup_demo.sh").read_bytes())
+            script.chmod(0o755)
+            stub = repo / ".factory/venv/bin"
+            stub.mkdir(parents=True)
+            (stub / "python").write_text("#!/bin/sh\nexit 0\n")
+            (stub / "python").chmod(0o755)
+            (repo / ".factory/plans/run").mkdir(parents=True)
+            (repo / ".factory/plans/run/manifest.json").write_text("{}\n")
+            (repo / ".factory/rehearsal/run").mkdir(parents=True)
+            (repo / ".factory/rehearsal/run/tickets.json").write_text("[]\n")
+            (repo / ".factory/control-center/evidence-run").mkdir(parents=True)
+            (repo / ".factory/control-center/evidence-run/evidence-manifest.json").write_text("{}\n")
+            (repo / ".factory/control-center/workshop-prd.md").write_text("# PRD\n")
+            (repo / ".factory/control-center/factory-canvas.md").write_text("# Canvas\n")
+            (repo / ".factory/control-center/operation.json").write_text("{}\n")
+            (repo / ".factory/planning-state.json").write_text("{}\n")
+            (repo / ".factory/local.toml").write_text("agent = 'claude'\n")
+
+            proc = subprocess.run(
+                ["sh", str(script), "--scenario", "recipe-rebrand", "--force", "--start-over"],
+                cwd=repo, text=True, capture_output=True, timeout=120,
+            )
+
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertFalse((repo / ".factory/plans").exists())
+            self.assertFalse((repo / ".factory/rehearsal").exists())
+            self.assertFalse((repo / ".factory/planning-state.json").exists())
+            self.assertFalse((repo / ".factory/control-center/workshop-prd.md").exists())
+            self.assertFalse((repo / ".factory/control-center/factory-canvas.md").exists())
+            self.assertTrue((repo / ".factory/control-center/operation.json").is_file())
+            self.assertTrue((repo / ".factory/local.toml").is_file())
+            state = json.loads((repo / ".factory/state.json").read_text())
+            self.assertEqual(state["tickets"], [])
+
     def test_recipe_mobile_ticket_fails_verification_once_then_passes_with_receipts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

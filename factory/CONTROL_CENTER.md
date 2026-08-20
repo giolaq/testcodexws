@@ -27,6 +27,23 @@ Every operation shows the exact equivalent CLI command and streams its output.
 The interface runs one command at a time, so two buttons cannot start competing
 factory processes.
 
+## Read the overview
+
+The first panel is the operating summary:
+
+- **Current phase** names the active workshop phase and, during execution, the
+  ticket and role doing the work—for example independent QA, implementation,
+  or verification gates.
+- **Next checkpoint** names the next human action and opens the relevant screen.
+- **Workshop progress** separates completed, current, and pending phases.
+- **Waiting for you** lists approvals and blockers that pause automation.
+- **Operation** shows the exact command and its live output. It explains a
+  failure until the next command runs.
+
+When the scheduler remains open while waiting for QA approval or a pull-request
+merge, the required human decision takes priority over the generic “running”
+state.
+
 ## Rehearsal and live modes
 
 Choose **Rehearsal** to use deterministic local planning, QA, and implementation.
@@ -63,6 +80,21 @@ If an agent is still running, select **Stop operation**. A later Factory Run
 recovers interrupted ticket work through the normal orchestrator logic. Use the
 ticket History and Live log tabs to find the recorded blocker, then use
 **Retry ticket** after the cause is fixed.
+
+Use **Reset or start again** from the Overview or sidebar for a Rehearsal:
+
+- **Reset current run** restores Pocket Cinema and clears ticket execution,
+  worktrees, branches, test approvals, implementation evidence, and run state.
+  It keeps the PRD, approved expert plan, Factory Canvas, agents, and Project
+  choice, so you can demonstrate the same tickets again.
+- **Start workshop over** also clears the saved PRD, expert artifacts, human
+  approvals, rehearsal tickets, Canvas, and Evidence Packets. It keeps only the
+  attendee's agent and GitHub Project configuration.
+
+Both reset options refuse to overwrite uncommitted `demo-app` changes. Reset is
+disabled for Live mode because local cleanup cannot safely undo GitHub issues,
+branches, pull requests, or another person's work. Use a fresh repository for a
+new Live run.
 
 The original `factory/dashboard.html` remains available as a read-only static
 view. Use the Control Center for the workshop path because it includes setup,

@@ -18,7 +18,7 @@
     <div class="repo-chip"><span class="status-dot" id="repo-dot"></span><span id="repo-name">Connecting…</span><b id="repo-branch"></b></div>
     <div class="top-actions">
       <span class="live-status"><i></i><span id="connection-label">Connecting</span></span>
-      <button class="button button-primary" type="button" data-action="run">Run factory</button>
+      <button class="button button-primary" id="global-next" type="button">Open current phase</button>
     </div>
   </header>
 
@@ -36,6 +36,7 @@
       <div class="profile-line"><span>Factory profile</span><strong id="sidebar-profile">Standard</strong></div>
       <div class="profile-line"><span>Mode</span><strong id="sidebar-mode">Rehearsal</strong></div>
       <button class="text-button" id="command-help" type="button">Show CLI mapping</button>
+      <button class="text-button reset-link" id="open-reset" type="button">Reset or start again</button>
     </div>
   </aside>
   <button class="sidebar-scrim" id="sidebar-scrim" type="button" aria-label="Close navigation" hidden></button>
@@ -43,9 +44,28 @@
   <main id="workspace">
     <section class="view active" data-view="overview" aria-labelledby="overview-title">
       <div class="page-heading">
-        <div><span class="eyebrow">Current run</span><h1 id="overview-title">Factory overview</h1><p>Follow product intent from PRD to verified delivery.</p></div>
-        <div class="heading-actions"><button class="button" type="button" data-action="dry-run">Preview waves</button><button class="button button-primary" type="button" data-action="run">Run factory</button></div>
+        <div><span class="eyebrow">Current run</span><h1 id="overview-title">Factory overview</h1><p>See what is happening now, what needs attention, and what comes next.</p></div>
+        <div class="heading-actions"><button class="button" id="open-reset-overview" type="button">Reset or start again</button></div>
       </div>
+
+      <section class="surface now-surface" aria-live="polite">
+        <div class="now-main">
+          <div class="now-heading"><span class="now-pulse" id="journey-pulse"></span><span class="section-label" id="journey-kicker">Current phase</span><span class="journey-state" id="journey-state">Loading</span></div>
+          <h2 id="journey-headline">Reading factory state…</h2>
+          <p id="journey-detail">The Control Center is combining planning, ticket, and running-operation state.</p>
+        </div>
+        <aside class="next-checkpoint">
+          <span class="section-label">Next checkpoint</span>
+          <h3 id="journey-next-label">Wait for state</h3>
+          <p id="journey-next-detail">Your next decision will appear here.</p>
+          <button class="button button-primary" id="journey-next" type="button">Open current phase</button>
+        </aside>
+      </section>
+
+      <section class="surface journey-surface">
+        <div class="surface-heading"><div><span class="section-label">Workshop progress</span><h2>PRD → Plan → Tickets → Verified change</h2></div><span class="updated" id="state-updated">Waiting for state</span></div>
+        <ol class="journey-steps" id="journey-steps" aria-label="Factory phases"></ol>
+      </section>
 
       <div class="health-grid">
         <article><span class="health-icon blue">P</span><div><strong id="metric-plan">No plan</strong><span>Planning</span></div></article>
@@ -54,24 +74,10 @@
         <article><span class="health-icon green">✓</span><div><strong id="metric-done">0</strong><span>Completed</span></div></article>
       </div>
 
-      <section class="surface workflow-surface">
-        <div class="surface-heading"><div><span class="section-label">Delivery path</span><h2>Plan → Build → Verify → Review</h2></div><span class="updated" id="state-updated">Waiting for state</span></div>
-        <div class="flow-line" id="flow-line">
-          <button type="button" data-view-link="prd"><span>1</span><b>PRD</b><small>Define outcome</small></button>
-          <i>→</i>
-          <button type="button" data-view-link="planning"><span>2</span><b>Plan</b><small>Align contracts</small></button>
-          <i>→</i>
-          <button type="button" data-view-link="tickets"><span>3</span><b>Build</b><small>Isolated agents</small></button>
-          <i>→</i>
-          <button type="button" data-view-link="tickets"><span>4</span><b>Verify</b><small>Tests and gates</small></button>
-          <i>→</i>
-          <button type="button" data-view-link="evidence"><span>5</span><b>Evidence</b><small>Review decision</small></button>
-        </div>
-      </section>
-
       <div class="overview-grid">
         <section class="surface operation-surface">
           <div class="surface-heading"><div><span class="section-label">Operation</span><h2 id="operation-title">No operation running</h2></div><span class="operation-status idle" id="operation-status">Idle</span></div>
+          <p class="operation-context" id="operation-context">No command is running. Use the next checkpoint above.</p>
           <div class="command-line" id="operation-command">Actions show their exact CLI command here.</div>
           <pre class="console" id="operation-output" tabindex="0">Select a workflow action to begin.</pre>
           <div class="operation-actions"><button class="button button-danger" id="stop-operation" type="button" hidden>Stop operation</button><button class="text-button" id="copy-operation" type="button">Copy command</button></div>
@@ -153,6 +159,27 @@
     <nav class="drawer-tabs" aria-label="Ticket details"><button class="active" type="button" data-drawer-tab="summary">Summary</button><button type="button" data-drawer-tab="prompt">Prompt</button><button type="button" data-drawer-tab="log">Live log</button><button type="button" data-drawer-tab="diff">Diff</button><button type="button" data-drawer-tab="tests">Tests</button><button type="button" data-drawer-tab="history">History</button></nav>
     <div class="drawer-content" id="drawer-content"></div>
   </aside>
+
+  <dialog class="reset-dialog" id="reset-dialog" aria-labelledby="reset-title">
+    <div class="dialog-heading"><div><span class="section-label">Recovery</span><h2 id="reset-title">Reset or start again</h2></div><button class="icon-button" id="close-reset" type="button" aria-label="Close reset dialog">×</button></div>
+    <p class="dialog-intro">Choose how much workshop state to keep. Neither option changes your saved agent or GitHub Project configuration.</p>
+    <div class="reset-options">
+      <section>
+        <span class="reset-scope">Keep PRD and plan</span>
+        <h3>Reset ticket execution</h3>
+        <p>Restore Pocket Cinema and clear ticket worktrees, branches, logs, approvals, and run state. Use this to demonstrate the same approved tickets again.</p>
+        <button class="button" id="reset-run" type="button">Reset current run</button>
+      </section>
+      <section class="start-over-option">
+        <span class="reset-scope">Clear workshop work</span>
+        <h3>Start from the beginning</h3>
+        <p>Also clear the saved PRD, expert plans, human approvals, rehearsal tickets, Factory Canvas, and evidence exports.</p>
+        <label>Type <strong>START OVER</strong> to confirm<input id="reset-all-confirm" autocomplete="off" spellcheck="false"></label>
+        <button class="button button-danger" id="reset-all" type="button" disabled>Start workshop over</button>
+      </section>
+    </div>
+    <div class="reset-note" id="reset-note"><b>Rehearsal only.</b> A live GitHub run may contain issues, branches, and pull requests other people can see. Start live work again in a fresh workshop repository.</div>
+  </dialog>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
   <script src="/app.js" defer></script>

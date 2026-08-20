@@ -2,10 +2,12 @@
 set -eu
 
 force=false
+start_over=false
 scenario=tv
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --force) force=true ;;
+    --start-over) start_over=true ;;
     --scenario)
       shift
       [ "$#" -gt 0 ] || { echo "--scenario requires tv or recipe-rebrand" >&2; exit 2; }
@@ -90,8 +92,23 @@ git for-each-ref --format='%(refname:short)' 'refs/heads/factory/*' | while IFS=
 done
 
 mkdir -p .factory
-find .factory/logs .factory/prompts .factory/qa-approvals -type f -delete 2>/dev/null || true
+find .factory/logs -type f ! -name 'control-center-*' -delete 2>/dev/null || true
+find .factory/prompts .factory/qa-approvals -type f -delete 2>/dev/null || true
 rm -f .factory/state.json .factory/state.tmp .factory/ids.json
+if [ -d .factory/receipts ]; then
+  find .factory/receipts -type f \( -name 'build-*' -o -name 'verify-*' -o -name 'review-*' \) -delete
+fi
+if [ -d .factory/control-center ]; then
+  find .factory/control-center -mindepth 1 -maxdepth 1 -type d -name 'evidence-*' -exec rm -rf -- {} +
+fi
+
+if [ "$start_over" = true ]; then
+  rm -rf .factory/plans .factory/rehearsal .factory/receipts
+  rm -f .factory/planning-state.json .factory/planning-state.tmp
+  rm -f .factory/control-center/workshop-prd.md
+  rm -f .factory/control-center/factory-canvas.md
+  rm -f .factory/control-center/product-feedback.md
+fi
 
 if [ ! -x .factory/venv/bin/python ]; then
   python3 -m venv .factory/venv
@@ -109,5 +126,8 @@ cat > .factory/state.json <<JSON
 JSON
 
 echo "Factory reset complete for scenario: $scenario"
+if [ "$start_over" = true ]; then
+  echo "Planning, tickets, saved PRD, and evidence were cleared. Agent configuration was kept."
+fi
 echo "Next: ./factory/factory control-center"
 echo "Then open http://127.0.0.1:5050 and choose Rehearsal."

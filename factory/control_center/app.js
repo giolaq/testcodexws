@@ -124,6 +124,7 @@ function renderSnapshot(data) {
   $("#state-updated").textContent = data.factory?.updated_at ? `Updated ${formatTime(data.factory.updated_at)}` : "Waiting for state";
 
   renderOperation(data.operation || {});
+  renderJourney(data.journey || {});
   renderDecisions(data);
   renderPlanning(data.planning || {});
   renderTickets(data.factory || {});
@@ -135,6 +136,29 @@ function renderSnapshot(data) {
       if (!$("#ticket-drawer").hidden) renderDrawer();
     }
   }
+}
+
+function renderJourney(journey) {
+  if (!journey.phases?.length) return;
+  $("#journey-kicker").textContent = `Phase ${journey.phase_number} of ${journey.phase_count} · ${journey.phase_label}`;
+  $("#journey-state").textContent = journey.state || "ready";
+  $("#journey-state").className = `journey-state ${journey.state || "ready"}`;
+  $("#journey-pulse").className = `now-pulse ${journey.state || "ready"}`;
+  $("#journey-headline").textContent = journey.headline;
+  $("#journey-detail").textContent = journey.detail;
+  $("#journey-next-label").textContent = journey.next?.label || "Open current phase";
+  $("#journey-next-detail").textContent = journey.next?.detail || "Continue with the current workshop phase.";
+  $("#journey-next").textContent = journey.next?.label || "Open current phase";
+  $("#global-next").textContent = `Next: ${journey.next?.label || journey.phase_label}`;
+  $("#journey-steps").innerHTML = journey.phases.map((phase, index) => `<li class="journey-step ${esc(phase.status)}"><button type="button" data-journey-view="${esc(phase.view)}"><i>${phase.status === "complete" ? "✓" : index + 1}</i><b>${esc(phase.label)}</b><small>${esc(phase.description)}</small></button></li>`).join("");
+  $$('[data-journey-view]').forEach((button) => button.addEventListener("click", () => showView(button.dataset.journeyView)));
+}
+
+function followJourney() {
+  const journey = app.snapshot?.journey;
+  if (!journey) return;
+  showView(journey.next?.view || "overview");
+  if (journey.ticket && journey.next?.view === "tickets") openTicket(journey.ticket);
 }
 
 let configHydrated = false;
@@ -157,6 +181,13 @@ function renderOperation(operation) {
   badge.textContent = status;
   badge.className = `operation-status ${status}`;
   $("#operation-command").textContent = operation.command || "Actions show their exact CLI command here.";
+  $("#operation-context").textContent = ["running", "stopping"].includes(status)
+    ? "This is the active factory command. Output streams below until it finishes or is stopped."
+    : status === "failed"
+      ? "The command stopped at an error. Fix the first reported cause before repeating it."
+      : status === "succeeded"
+        ? "The command completed. The current phase and next checkpoint above have been updated."
+        : "No command is running. Use the next checkpoint above.";
   const output = $("#operation-output");
   const newOutput = operation.output || "Select a workflow action to begin.";
   const nearBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
@@ -345,6 +376,39 @@ async function action(name, extra = {}) {
   }
 }
 
+function openResetDialog() {
+  const dialog = $("#reset-dialog");
+  const live = mode() === "live";
+  const busy = ["running", "stopping"].includes(app.snapshot?.operation?.status);
+  $("#reset-run").disabled = live || busy;
+  $("#reset-all-confirm").disabled = live || busy;
+  $("#reset-all").disabled = true;
+  $("#reset-all-confirm").value = "";
+  $("#reset-note").innerHTML = live
+    ? "<b>Live reset is disabled.</b> GitHub issues, branches, and pull requests may be visible to other people. Create a fresh workshop repository instead."
+    : busy
+      ? "<b>Wait for the current operation.</b> Stop it from the operation console before resetting."
+      : "<b>Rehearsal only.</b> Reset uses the tagged Pocket Cinema baseline. Uncommitted demo-app changes are protected and make the reset fail safely.";
+  dialog.showModal();
+}
+
+async function resetRun() {
+  if (!window.confirm("Reset ticket execution? The saved PRD, approved plan, and agent configuration will be kept.")) return;
+  $("#reset-dialog").close();
+  await action("reset-run");
+}
+
+async function resetAll() {
+  const confirmation = $("#reset-all-confirm").value;
+  if (confirmation !== "START OVER") return;
+  $("#reset-dialog").close();
+  app.prdLoaded = false;
+  app.canvasLoaded = false;
+  app.selectedPlanning = "";
+  app.loadedPlanningArtifact = "";
+  await action("reset-all", { confirm: confirmation });
+}
+
 async function submitConfig(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -461,6 +525,14 @@ function wireEvents() {
   $("#stop-operation").addEventListener("click", async () => { if (!window.confirm("Stop the running factory process? The next run will recover interrupted tickets.")) return; try { await request("/api/stop", { method: "POST", body: "{}" }); toast("Stopping operation."); } catch (error) { toast(error.message, true); } });
   $("#copy-operation").addEventListener("click", async () => { const command = app.snapshot?.operation?.command; if (!command) return toast("No command to copy."); await navigator.clipboard.writeText(command); toast("Command copied."); });
   $("#command-help").addEventListener("click", () => { showView("overview"); toast("Every operation displays its exact CLI command above the live output."); });
+  $("#global-next").addEventListener("click", followJourney);
+  $("#journey-next").addEventListener("click", followJourney);
+  $("#open-reset").addEventListener("click", openResetDialog);
+  $("#open-reset-overview").addEventListener("click", openResetDialog);
+  $("#close-reset").addEventListener("click", () => $("#reset-dialog").close());
+  $("#reset-run").addEventListener("click", resetRun);
+  $("#reset-all").addEventListener("click", resetAll);
+  $("#reset-all-confirm").addEventListener("input", (event) => { $("#reset-all").disabled = event.target.value !== "START OVER"; });
   $("#close-drawer").addEventListener("click", closeDrawer);
   $("#drawer-scrim").addEventListener("click", closeDrawer);
   $$('.drawer-tabs button').forEach((button) => button.addEventListener("click", () => { app.drawerTab = button.dataset.drawerTab; renderDrawer(); }));
