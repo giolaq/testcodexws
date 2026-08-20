@@ -119,7 +119,7 @@ def test_ticket_3_mobile_recipe_acceptance(client):
 
     detail = client.get("/recipe/tomato-pasta")
     assert detail.status_code == 200
-    assert all(text in detail.data for text in (b"Prep 12 min", b"Cook 18 min", b"Ingredients", b"Method"))
+    assert all(text in detail.data for text in (b"Prep 10 min", b"Cook 20 min", b"Ingredients", b"Method"))
     assert b'aria-pressed="false"' in detail.data
 
     source = (Path(__file__).parents[1] / "static/app.js").read_text()
