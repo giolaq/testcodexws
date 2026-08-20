@@ -1,28 +1,38 @@
-import {matchesMovie} from './app-logic.js';
-
 const search = document.querySelector('#search');
-const cards = [...document.querySelectorAll('.movie-card')];
+const cards = [...document.querySelectorAll('.recipe-card')];
+const count = document.querySelector('#count');
+const empty = document.querySelector('#empty');
 
 search?.addEventListener('input', () => {
+  const query = search.value.trim().toLowerCase();
   let visible = 0;
   for (const card of cards) {
-    const show = matchesMovie(card.dataset.title, search.value);
-    card.hidden = !show;
-    visible += Number(show);
+    card.hidden = !card.dataset.search.includes(query);
+    if (!card.hidden) visible += 1;
   }
-  document.querySelector('#count').textContent = `${visible} title${visible === 1 ? '' : 's'}`;
-  document.querySelector('#empty').hidden = visible !== 0;
+  count.textContent = `${visible} ${visible === 1 ? 'recipe' : 'recipes'}`;
+  empty.hidden = visible !== 0;
 });
 
-for (const button of document.querySelectorAll('.watchlist')) {
-  button.addEventListener('click', async () => {
-    const saved = button.classList.toggle('saved');
-    button.textContent = saved ? '✓' : '+';
-    button.setAttribute('aria-label', `${saved ? 'Remove from' : 'Add to'} watchlist`);
-    await fetch(saved ? '/api/watchlist' : `/api/watchlist/${button.dataset.movieId}`, {
-      method: saved ? 'POST' : 'DELETE',
-      headers: {'Content-Type': 'application/json'},
-      body: saved ? JSON.stringify({id: button.dataset.movieId}) : undefined,
-    });
-  });
+let saved = new Set();
+function render(button) {
+  const active = saved.has(button.dataset.recipeId);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = active ? 'Saved' : (button.closest('.detail-content') ? 'Save to My Cookbook' : 'Save');
+  const title = button.closest('.recipe-card')?.querySelector('h3')?.textContent || document.querySelector('h1')?.textContent || 'recipe';
+  button.setAttribute('aria-label', `${active ? 'Remove' : 'Add'} ${title} ${active ? 'from' : 'to'} My Cookbook`);
 }
+
+const buttons = [...document.querySelectorAll('.cookbook[data-recipe-id]')];
+fetch('/api/cookbook').then(response => response.json()).then(recipes => {
+  saved = new Set(recipes.map(recipe => recipe.id)); buttons.forEach(render);
+});
+for (const button of buttons) button.addEventListener('click', async () => {
+  const id = button.dataset.recipeId;
+  const active = saved.has(id);
+  await fetch(active ? `/api/cookbook/${id}` : '/api/cookbook', {
+    method: active ? 'DELETE' : 'POST', headers: {'Content-Type':'application/json'},
+    body: active ? undefined : JSON.stringify({id}),
+  });
+  active ? saved.delete(id) : saved.add(id); render(button);
+});
