@@ -2,6 +2,10 @@
 
 Release: `workshop-v1.0.0`
 
+Use [WORKSHOP_OUTLINE.md](WORKSHOP_OUTLINE.md) for the presentation path. This
+runbook is the detailed preparation, release, and recovery reference; do not
+read it as the attendee script.
+
 Use this runbook to prepare and deliver the 100-minute Software (re)-Factory
 workshop. The attendee website contains the full instructions. Your job is to
 keep time, make the control points visible, and stop the group when evidence is
