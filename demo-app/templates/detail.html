@@ -5,26 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ movie.title }} · Pocket Cinema</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='tv-detail.css') }}">
 </head>
-<body class="detail-page {{ 'tv' if tv_mode else 'mobile' }}" style="--poster-a:{{ movie.colors[0] }};--poster-b:{{ movie.colors[1] }}">
-  <main class="detail-shell" data-browse-url="{{ url_for('index', mode='tv') if tv_mode else url_for('index') }}">
-    <a class="back detail-action" data-tv-action href="{{ url_for('index', mode='tv') if tv_mode else url_for('index') }}">← Browse</a>
-    <div class="detail-poster poster" aria-hidden="true">
+<body class="detail-page">
+  <main class="detail-shell">
+    <a class="back" href="/">← Browse</a>
+    <div class="detail-poster poster" style="--poster-a:{{ movie.colors[0] }};--poster-b:{{ movie.colors[1] }}">
       <span class="poster-mark">{{ movie.title[0] }}</span>
       <span class="poster-title">{{ movie.title }}</span>
     </div>
-    <section class="detail-content" aria-labelledby="movie-title">
-      <p class="eyebrow">{{ movie.genres|join(' · ') }}</p>
-      <h1 id="movie-title">{{ movie.title }}</h1>
-      <p class="meta">{{ movie.year }} · {{ movie.runtime }} minutes · {{ movie.rating }}</p>
-      <p class="synopsis">{{ movie.synopsis }}</p>
-      <div class="detail-actions">
-        <button class="primary watchlist detail-action" type="button" data-tv-action data-tv-primary data-movie-id="{{ movie.id }}">+ Add to watchlist</button>
-      </div>
-    </section>
+    <p class="eyebrow">{{ movie.genres|join(' · ') }}</p>
+    <h1>{{ movie.title }}</h1>
+    <p class="meta">{{ movie.year }} · {{ movie.runtime }} minutes · {{ movie.rating }}</p>
+    <p class="synopsis">{{ movie.synopsis }}</p>
+    <button class="primary watchlist" data-movie-id="{{ movie.id }}">+ Add to watchlist</button>
   </main>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
-  <script type="module" src="{{ url_for('static', filename='tv-detail.js') }}"></script>
 </body>
 </html>

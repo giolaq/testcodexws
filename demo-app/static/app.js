@@ -14,16 +14,15 @@ search?.addEventListener('input', () => {
   document.querySelector('#empty').hidden = visible !== 0;
 });
 
-document.addEventListener('click', async event => {
-  const button = event.target.closest('.watchlist');
-  if (!button) return;
-
-  const saved = button.classList.toggle('saved');
-  button.textContent = saved ? '✓' : '+';
-  button.setAttribute('aria-label', `${saved ? 'Remove from' : 'Add to'} watchlist`);
-  await fetch(saved ? '/api/watchlist' : `/api/watchlist/${button.dataset.movieId}`, {
-    method: saved ? 'POST' : 'DELETE',
-    headers: {'Content-Type': 'application/json'},
-    body: saved ? JSON.stringify({id: button.dataset.movieId}) : undefined,
+for (const button of document.querySelectorAll('.watchlist')) {
+  button.addEventListener('click', async () => {
+    const saved = button.classList.toggle('saved');
+    button.textContent = saved ? '✓' : '+';
+    button.setAttribute('aria-label', `${saved ? 'Remove from' : 'Add to'} watchlist`);
+    await fetch(saved ? '/api/watchlist' : `/api/watchlist/${button.dataset.movieId}`, {
+      method: saved ? 'POST' : 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: saved ? JSON.stringify({id: button.dataset.movieId}) : undefined,
+    });
   });
-});
+}
