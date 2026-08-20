@@ -3,43 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pocket Cinema</title>
+  <title>TableStory · Good food, clearly told.</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='table-story.css') }}">
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="Pocket Cinema home"><span>PC</span>Pocket Cinema</a>
-    <button class="avatar" aria-label="Open profile">GA</button>
-  </header>
+<body class="mobile">
+  <header class="topbar"><a class="brand" href="/" aria-label="TableStory home"><span>TS</span>TableStory</a><a href="#recipes">My Cookbook</a></header>
   <main>
-    <section class="hero">
-      <p class="eyebrow">Tonight's collection</p>
-      <h1>Small screen.<br>Big stories.</h1>
-      <p>Twenty-four films from places that almost exist.</p>
-    </section>
-    <label class="search">
-      <span aria-hidden="true">⌕</span>
-      <input id="search" type="search" placeholder="Search films or genres" autocomplete="off">
-    </label>
-    <div class="section-heading"><h2>All films</h2><span id="count">{{ movies|length }} titles</span></div>
-    <section class="movie-grid" id="movie-grid" aria-live="polite">
-      {% for movie in movies %}
-      <article class="movie-card" data-title="{{ (movie.title ~ ' ' ~ movie.genres|join(' '))|lower }}">
-        <a href="{{ url_for('detail', movie_id=movie.id) }}" aria-label="View {{ movie.title }}">
-          <div class="poster" style="--poster-a:{{ movie.colors[0] }};--poster-b:{{ movie.colors[1] }}">
-            <span class="poster-mark">{{ movie.title[0] }}</span>
-            <span class="poster-title">{{ movie.title }}</span>
-          </div>
-          <h3>{{ movie.title }}</h3>
-          <p>{{ movie.year }} · {{ movie.runtime }}m</p>
+    <section class="hero"><p class="eyebrow">RECIPES FOR REAL LIFE</p><h1>Good food,<br>clearly told.</h1><p>Find dependable recipes for everyday cooking.</p></section>
+    <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search dishes or ingredients" autocomplete="off"></label>
+    <div class="section-heading"><h2>Explore recipes</h2><span id="count">{{ recipes|length }} recipes</span></div>
+    <section class="recipe-grid" id="recipes" aria-live="polite">
+      {% for recipe in recipes %}
+      <article class="recipe-card" data-search="{{ ([recipe.title, recipe.description, recipe.category] + recipe.dietary_tags + recipe.ingredients)|join(' ')|lower }}">
+        <a href="{{ url_for('detail', recipe_id=recipe.id) }}" aria-label="View recipe for {{ recipe.title }}">
+          <div class="recipe-art" style="--art-a:{{ recipe.colors[0] }};--art-b:{{ recipe.colors[1] }}"><span>{{ recipe.title }}</span></div>
+          <div class="recipe-copy"><h3>{{ recipe.title }}</h3><p>{{ recipe.prep_minutes + recipe.cook_minutes }} min · {{ recipe.difficulty }} · {{ recipe.category }}</p></div>
         </a>
-        <button class="watchlist" data-movie-id="{{ movie.id }}" aria-label="Add {{ movie.title }} to watchlist">+</button>
+        <button class="cookbook" data-recipe-id="{{ recipe.id }}" aria-label="Add {{ recipe.title }} to My Cookbook" aria-pressed="false">Save</button>
       </article>
       {% endfor %}
     </section>
-    <p class="empty" id="empty" hidden>No films found. Try another search.</p>
+    <p class="empty" id="empty" hidden>No recipes found. Try another ingredient or dish.</p>
   </main>
-  <nav class="tabbar" aria-label="Primary"><a class="active" href="/">Browse</a><a href="#watchlist">Watchlist</a><a href="#profile">Profile</a></nav>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
