@@ -159,12 +159,12 @@ def test_ticket_5_documentation_acceptance():
     readme = (root / "README.md").read_text()
     assert "TableStory" in readme
     assert "?mode=tv" in readme
-    assert "pytest" in readme and "npm test" in readme
+    assert "pytest" in readme and "node --test" in readme
     assert not (root / "catalog.json").exists()
     terminology_test = root / "tests/test_terminology.py"
     assert terminology_test.is_file()
     source = terminology_test.read_text().lower()
-    assert "pocket cinema" in source and "watchlist" in source and "movie" in source
+    assert all(marker in source for marker in ("forbidden", "violations", '"watch" + "list"'))
 ''',
 }
 
