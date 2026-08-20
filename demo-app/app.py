@@ -1,4 +1,4 @@
-"""Pocket Cinema: the intentionally mobile-shaped workshop workpiece."""
+"""Pocket Cinema with a parallel recipe API for the staged rebrand."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, render_template, request
+
+from recipe_api import create_recipe_blueprint, load_recipes
 
 ROOT = Path(__file__).parent
 
@@ -16,9 +18,10 @@ def load_catalog() -> list[dict]:
 
 def create_app(testing: bool = False) -> Flask:
     app = Flask(__name__)
-    app.config.update(TESTING=testing, WATCHLIST=set())
+    app.config.update(TESTING=testing, WATCHLIST=set(), COOKBOOK=set())
     catalog = load_catalog()
     by_id = {movie["id"]: movie for movie in catalog}
+    app.register_blueprint(create_recipe_blueprint(load_recipes(ROOT), app.config["COOKBOOK"]))
 
     @app.get("/")
     def index():
@@ -34,8 +37,7 @@ def create_app(testing: bool = False) -> Flask:
     @app.get("/api/movies")
     def movies_api():
         query = request.args.get("q", "").strip().lower()
-        movies = [m for m in catalog if query in (m["title"] + " " + " ".join(m["genres"])).lower()]
-        return jsonify(movies)
+        return jsonify([m for m in catalog if query in (m["title"] + " " + " ".join(m["genres"])).lower()])
 
     @app.get("/api/movies/<movie_id>")
     def movie_api(movie_id: str):
