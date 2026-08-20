@@ -84,11 +84,11 @@ function previewRoot(entry) {
 }
 
 function findPreviewNode(entry) {
-  if (entry.kind !== "text") return null;
+  if (!entry.previewSelector) return null;
   const root = previewRoot(entry);
   if (!root) return null;
   const matches = [];
-  for (const candidate of root.querySelectorAll(entry.tag)) {
+  for (const candidate of root.querySelectorAll(entry.previewSelector)) {
     for (const child of candidate.childNodes) {
       if (child.nodeType === Node.TEXT_NODE && normalize(child.nodeValue) === entry.value) {
         matches.push({ node: child, element: candidate });
@@ -177,14 +177,16 @@ function candidateEntries(target) {
   let element = target?.nodeType === 1 ? target : target?.parentElement;
   const candidates = [];
   for (let depth = 0; element && depth < 4; depth += 1, element = element.parentElement) {
-    const tag = element.tagName.toLowerCase();
     const section = element.closest("section[id]")?.id || "page";
     for (const child of element.childNodes) {
       if (child.nodeType !== Node.TEXT_NODE) continue;
       const value = normalize(child.nodeValue);
       if (!value) continue;
       const entry = state.snapshot.entries.find(
-        (item) => item.kind === "text" && item.section === section && item.tag === tag && item.value === value,
+        (item) => item.section === section
+          && item.value === value
+          && item.previewSelector
+          && (item.previewSelector === "*" || element.matches(item.previewSelector)),
       );
       if (entry) candidates.push(entry);
     }

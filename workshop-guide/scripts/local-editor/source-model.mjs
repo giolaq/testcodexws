@@ -57,6 +57,10 @@ function tagName(node) {
   return node.getText();
 }
 
+function isComponentTag(tag) {
+  return /^[A-Z]/.test(tag);
+}
+
 function stringAttribute(opening, name, sourceFile, source) {
   const attribute = opening.attributes.properties.find(
     (candidate) => ts.isJsxAttribute(candidate) && candidate.name.text === name,
@@ -104,12 +108,13 @@ export function buildSnapshot(source) {
       const raw = source.slice(start, end);
       const value = normalizeText(raw);
 
-      if (editableTags.has(tag) && value) {
+      if ((editableTags.has(tag) || isComponentTag(tag)) && value) {
         entries.push({
           id: makeId("text", start, end, raw),
           kind: "text",
           section: activeSection,
           tag,
+          previewSelector: editableTags.has(tag) ? tag : "*",
           value,
           start,
           end,
@@ -136,6 +141,7 @@ export function buildSnapshot(source) {
             attribute: node.name.text,
             section: activeSection,
             tag,
+            previewSelector: isComponentTag(tag) ? "*" : null,
             value,
             start,
             end,
@@ -152,7 +158,7 @@ export function buildSnapshot(source) {
 
   const occurrences = new Map();
   const publicEntries = entries.map((entry) => {
-    const key = `${entry.section}\u0000${entry.tag}\u0000${entry.value}`;
+    const key = `${entry.section}\u0000${entry.previewSelector}\u0000${entry.value}`;
     const occurrence = occurrences.get(key) || 0;
     occurrences.set(key, occurrence + 1);
     return {
@@ -161,6 +167,7 @@ export function buildSnapshot(source) {
       attribute: entry.attribute,
       section: entry.section,
       tag: entry.tag,
+      previewSelector: entry.previewSelector,
       value: entry.value,
       occurrence,
     };
