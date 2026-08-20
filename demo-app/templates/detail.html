@@ -1,26 +1,27 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ recipe.title }} · TableStory</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='table-story.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='recipe-tv.css') }}">
 </head>
-<body class="mobile detail-page">
-  <main class="detail-shell" data-browse-url="/">
-    <a class="back detail-action" href="/">← Browse recipes</a>
+<body class="{{ 'tv' if tv_mode else 'mobile' }} detail-page">
+  <main class="detail-shell" data-browse-url="{{ url_for('index', mode='tv') if tv_mode else url_for('index') }}">
+    <a class="back detail-action" data-tv-action href="{{ url_for('index', mode='tv') if tv_mode else url_for('index') }}">← Browse recipes</a>
     <div class="detail-art recipe-art" style="--art-a:{{ recipe.colors[0] }};--art-b:{{ recipe.colors[1] }}"><span>{{ recipe.title }}</span></div>
     <article class="detail-content">
       <p class="eyebrow">{{ recipe.category }}{% for tag in recipe.dietary_tags %} · {{ tag }}{% endfor %}</p>
       <h1>{{ recipe.title }}</h1>
       <p class="meta">Prep {{ recipe.prep_minutes }} min · Cook {{ recipe.cook_minutes }} min · {{ recipe.difficulty }} · Serves {{ recipe.servings }}</p>
       <p class="description">{{ recipe.description }}</p>
-      <button class="cookbook detail-action" data-recipe-id="{{ recipe.id }}" aria-label="Add {{ recipe.title }} to My Cookbook" aria-pressed="false">Save to My Cookbook</button>
+      <button class="cookbook detail-action" data-tv-action data-recipe-id="{{ recipe.id }}" aria-label="Add {{ recipe.title }} to My Cookbook" aria-pressed="false">Save to My Cookbook</button>
       <section><h2>Ingredients</h2><ul>{% for ingredient in recipe.ingredients %}<li>{{ ingredient }}</li>{% endfor %}</ul></section>
       <section><h2>Method</h2><ol>{% for step in recipe.steps %}<li>{{ step }}</li>{% endfor %}</ol></section>
     </article>
   </main>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='recipe-tv-detail.js') }}"></script>
 </body>
 </html>
