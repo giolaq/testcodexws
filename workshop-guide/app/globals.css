@@ -374,6 +374,11 @@ details summary:hover { text-decoration: underline; }
 .workshop-figure-portrait .workshop-screenshot { padding: 16px; background: #f8f9fa; }
 .workshop-figure-portrait .workshop-screenshot img { width: auto; max-width: 100%; max-height: 540px; margin: auto; }
 .workshop-figure-grid .workshop-figure figcaption { grid-template-columns: 1fr; gap: 2px; }
+.workshop-illustration { max-width: 900px; }
+.workshop-illustration .workshop-screenshot { border-color: #e0e3e7; background: #fff; box-shadow: 0 4px 16px rgba(60, 64, 67, .08); }
+.illustration-credit { margin: 6px 0 0; color: #80868b; font-size: 10px; line-height: 1.45; }
+.illustration-credit a { color: #5f6368; text-underline-offset: 2px; }
+.illustration-credit a:hover { color: var(--blue); }
 
 .waves { display: flex; align-items: stretch; gap: 8px; margin: 22px 0 28px; overflow-x: auto; }
 .waves > div { display: flex; min-width: 128px; padding: 12px; flex: 1; flex-direction: column; gap: 5px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-alt); }

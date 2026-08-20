@@ -78,6 +78,11 @@ test("server-renders the self-guided workshop", async () => {
   assert.match(html, /screenshots\/tablestory-mobile\.webp/);
   assert.match(html, /screenshots\/tablestory-tv\.webp/);
   assert.match(html, /After · TableStory/);
+  assert.match(html, /illustrations\/01-from-prompt-to-evidence\.png/);
+  assert.match(html, /illustrations\/02-four-planning-perspectives\.png/);
+  assert.match(html, /illustrations\/03-evidence-controls-merge\.png/);
+  assert.match(html, /Ian Xiaohei Illustrations/);
+  assert.match(html, /used under the MIT License/);
   assert.match(html, /Design the factory your delivery risk requires/);
   assert.match(html, /Factory design canvas/);
   assert.match(html, /Troubleshooting/);

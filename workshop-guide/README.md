@@ -48,6 +48,15 @@ the deployed workshop website and does not need an account, database, or API
 key. Use the normal code workflow for layout, links, commands, conditional
 logic, and component changes.
 
+## Illustration assets
+
+The concept illustrations in `public/illustrations/` were generated for this
+workshop using the visual language and QA guidance from
+[Ian Xiaohei Illustrations](https://github.com/helloianneo/ian-xiaohei-illustrations)
+by Ian. The source skill is MIT-licensed; the workshop preserves visible
+attribution as requested by its notice. The installed skill was audited and
+pinned from upstream commit `91b560849e8f883922cc2fa8a358a668caa94105`.
+
 ## Verification
 
 ```sh

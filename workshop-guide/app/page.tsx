@@ -114,6 +114,57 @@ function WorkshopScreenshot({
   );
 }
 
+function WorkshopIllustration({
+  src,
+  alt,
+  label,
+  caption,
+}: {
+  src: string;
+  alt: string;
+  label: string;
+  caption: string;
+}) {
+  return (
+    <figure className="workshop-figure workshop-illustration">
+      <a
+        className="workshop-screenshot"
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Open full-size illustration: ${alt}`}
+      >
+        {/* Generated workshop assets are already sized for this layout. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          width={1672}
+          height={941}
+          loading="lazy"
+          decoding="async"
+        />
+        <span>Open full size <span aria-hidden="true">↗</span></span>
+      </a>
+      <figcaption>
+        <strong>{label}</strong>
+        <span>{caption}</span>
+      </figcaption>
+      <p className="illustration-credit">
+        Visual language adapted from{" "}
+        <a
+          href="https://github.com/helloianneo/ian-xiaohei-illustrations"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Ian Xiaohei Illustrations
+        </a>{" "}
+        by Ian, used under the MIT License.
+      </p>
+    </figure>
+  );
+}
+
 function StepSection({
   id,
   number,
@@ -338,6 +389,12 @@ export default function Home() {
               production—and what evidence is required before it can move again.
             </p>
           </div>
+          <WorkshopIllustration
+            src="/illustrations/01-from-prompt-to-evidence.png"
+            alt="A serious black hand-drawn character operating levers that turn loose code scraps into a reviewed evidence packet"
+            label="From prompt to controlled delivery"
+            caption="A prompt may produce code. A factory controls how that code moves through planning, tests, review, and retained evidence."
+          />
           <h3 className="subsection-title">The delivery loop</h3>
           <div className="state-line" aria-label="Factory macro phases">
             <span>Plan</span><i>→</i><span>Build</span><i>→</i><span>Verify</span><i>→</i><span>Review</span>
@@ -883,6 +940,12 @@ git push origin main
             <div><span>03</span><b>Program Design</b><p>Modules, types, signatures, calls, errors, and test seams.</p></div>
             <div><span>04</span><b>Vertical Slices</b><p>End-to-end outcomes, dependencies, file ownership, and QA evidence.</p></div>
           </div>
+          <WorkshopIllustration
+            src="/illustrations/02-four-planning-perspectives.png"
+            alt="Four serious black hand-drawn characters using different tools to turn one large PRD into a clean strip of tickets"
+            label="One PRD, four expert perspectives"
+            caption="Product, architecture, program, and slicing experts work on the same requirement. Tickets are published only after their contracts agree."
+          />
           <Callout type="note" title="Tickets come from the PRD">
             The Vertical Slices expert creates the backlog from the approved PRD, architecture, and program design. Seeding is not part of the normal path; <code>factory seed recipe-rebrand</code> is a deterministic recovery option when live planning cannot finish.
           </Callout>
@@ -1112,6 +1175,12 @@ git push origin main
           </p>
           <CodeBlock>{`./factory/factory canvas --output factory-canvas.md
 # Edit factory-canvas.md, then ask a peer to review it.`}</CodeBlock>
+          <WorkshopIllustration
+            src="/illustrations/03-evidence-controls-merge.png"
+            alt="A serious black hand-drawn character balancing a code change against tests, logs, and review to open a merge gate"
+            label="Evidence controls merge"
+            caption="A change reaches the merge gate only when independent tests, execution logs, and review balance the implementation claim."
+          />
           <h3>Export the Evidence Packet</h3>
           <CodeBlock>{`./factory/factory evidence PLAN_ID --canvas factory-canvas.md`}</CodeBlock>
           <p>
