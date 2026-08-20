@@ -10,7 +10,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from doctor import baseline_check, version_tuple
-from orchestrator import Factory, approve_qa_tests
+from orchestrator import Factory, approve_qa_tests, worktree_path
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -20,6 +20,15 @@ def git(cwd: Path, *args: str) -> str:
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_worktree_paths_are_scoped_to_the_repository(self):
+        root = Path("/tmp/workshops")
+        first = worktree_path(root / "attendee-one", 4)
+        second = worktree_path(root / "attendee-two", 4)
+
+        self.assertEqual(first, root / "attendee-one-wt-4")
+        self.assertEqual(second, root / "attendee-two-wt-4")
+        self.assertNotEqual(first, second)
+
     def factory_args(self, repo: Path):
         return SimpleNamespace(
             repo=str(repo), qa_agent=None, no_qa=True, mock=True, project_number=None,
@@ -107,7 +116,7 @@ class RuntimeTests(unittest.TestCase):
     def test_qa_approval_writes_resume_marker_after_hash_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory) / "repo"
-            worktree = Path(directory) / "wt-12"
+            worktree = Path(directory) / "repo-wt-12"
             repo.mkdir(); worktree.mkdir()
             git(worktree, "init", "-q", "-b", "main")
             git(worktree, "config", "user.name", "Factory Test")
@@ -222,7 +231,14 @@ class RuntimeTests(unittest.TestCase):
             repo = root / "repo"
             source = Path(__file__).parents[2]
             shutil.copytree(source / "factory", repo / "factory")
-            shutil.copytree(source / "demo-app", repo / "demo-app")
+            baseline_archive = root / "baseline.tar"
+            subprocess.run([
+                "git", "archive", "--format=tar", "factory-baseline",
+                "demo-app", "-o", str(baseline_archive),
+            ], cwd=source, check=True)
+            subprocess.run([
+                "tar", "-xf", str(baseline_archive), "-C", str(repo),
+            ], check=True)
             for prerequisite in ("1", "2"):
                 shutil.copytree(
                     source / "factory/scenarios/recipe-rebrand/steps" / prerequisite / "demo-app",

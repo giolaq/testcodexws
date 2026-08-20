@@ -66,7 +66,7 @@ The orchestration flow is intentionally direct:
 
 1. Load issues and parse `Depends-on: #…` plus `agent: …` from each body.
 2. Move dependency-complete, `agent-ready` tickets to Ready.
-3. Create `../wt-<issue>` on `factory/<issue>-<slug>` and ask the independent
+3. Create `../<repository>-wt-<issue>` on `factory/<issue>-<slug>` and ask the independent
    QA agent to add ticket-numbered acceptance tests only.
 4. Commit and protect the Acceptance Tests; optionally pause for explicit human approval.
 5. Run the implementation agent. The factory rejects any implementation that

@@ -82,6 +82,16 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def worktree_path(repo: Path, ticket_number: int) -> Path:
+    """Return a sibling path scoped to this repository.
+
+    A generic ``../wt-4`` collides as soon as two workshop repositories run the
+    same Ticket number. Including the repository name keeps each run isolated
+    while leaving worktrees easy to find and inspect beside the checkout.
+    """
+    return repo.parent / f"{repo.name}-wt-{ticket_number}"
+
+
 def run(cmd, cwd: Path, *, timeout=None, check=True, shell=False):
     result = subprocess.run(
         cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout,
@@ -546,7 +556,7 @@ class Factory:
             marker = approval_dir / str(ticket["number"])
             if ticket["status"] != "QA Review" or not marker.is_file():
                 continue
-            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            worktree = worktree_path(self.repo, ticket["number"])
             failure = self.verify_qa_tests_unchanged(ticket, worktree)
             if failure:
                 ticket["failure"] = failure
@@ -591,7 +601,7 @@ class Factory:
 
     def create_worktree(self, ticket: dict):
         branch = f"factory/{ticket['number']}-{slugify(ticket['title'])}"
-        worktree = self.repo.parent / f"wt-{ticket['number']}"
+        worktree = worktree_path(self.repo, ticket["number"])
         with self.merge_lock:
             self.git("worktree", "remove", "--force", str(worktree), check=False)
             self.git("branch", "-D", branch, check=False)
@@ -1045,7 +1055,7 @@ class Factory:
         )
         self.transition(ticket, "In Progress", first_phase)
         if resume_qa:
-            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            worktree = worktree_path(self.repo, ticket["number"])
             base_sha = ticket.get("base_sha", "")
             if not worktree.is_dir() or self.verify_qa_tests_unchanged(ticket, worktree):
                 ticket["failure"] = "Approved QA worktree or protected tests are missing"
@@ -1209,7 +1219,7 @@ class Factory:
                 verification=[f"Merge commit is reachable from {self.backend.default_branch}."],
                 artifacts=[ticket.get("pr_url", "")],
             )
-            worktree = self.repo.parent / f"wt-{ticket['number']}"
+            worktree = worktree_path(self.repo, ticket["number"])
             self.git("worktree", "remove", "--force", str(worktree), check=False)
 
     def run_loop(self):
@@ -1306,7 +1316,7 @@ def approve_qa_tests(repo: Path, number: int, assume_yes=False):
         raise ValueError(f"Ticket #{number} not found in factory state")
     if ticket.get("status") != "QA Review":
         raise ValueError(f"Ticket #{number} is {ticket.get('status')}, not QA Review")
-    worktree = repo.parent / f"wt-{number}"
+    worktree = worktree_path(repo, number)
     if not worktree.is_dir():
         raise ValueError(f"QA worktree is missing: {worktree}")
     failures = []

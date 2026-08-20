@@ -19,6 +19,7 @@ case "$scenario" in tv|recipe-rebrand) ;; *) echo "Unknown scenario: $scenario" 
 
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 repo_parent=$(CDPATH= cd -- "$repo/.." && pwd)
+repo_name=$(basename "$repo")
 cd "$repo"
 
 if [ ! -f factory/orchestrator.py ] || [ ! -f demo-app/app.py ]; then
@@ -42,7 +43,7 @@ git config user.email >/dev/null 2>&1 || git config user.email "factory@example.
 
 git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while IFS= read -r worktree; do
   case "$worktree" in
-    "$repo_parent"/wt-[0-9]*) git worktree remove --force "$worktree" >/dev/null 2>&1 || true ;;
+    "$repo_parent"/"$repo_name"-wt-[0-9]*) git worktree remove --force "$worktree" >/dev/null 2>&1 || true ;;
   esac
 done
 git worktree prune
