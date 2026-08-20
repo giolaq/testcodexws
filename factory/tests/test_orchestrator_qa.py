@@ -10,12 +10,26 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from orchestrator import DEFAULT_AGENTS, Factory, validate_qa_changes, validate_qa_config
+from mock_qa_agent import RECIPE_TESTS
 
 
 TEST_ROOTS = ["demo-app/tests", "demo-app/static/tests"]
 
 
 class QaPolicyTests(unittest.TestCase):
+    def test_recipe_rehearsal_qa_covers_each_ticket_contract(self):
+        self.assertIn("len(recipes) >= 12", RECIPE_TESTS[1])
+        self.assertIn("/api/cookbook", RECIPE_TESTS[1])
+        self.assertIn("recipe_ids", RECIPE_TESTS[1])
+        self.assertIn(":focus-visible", RECIPE_TESTS[2])
+        self.assertIn("aria-pressed", RECIPE_TESTS[2])
+        self.assertIn("addEventListener('input'", RECIPE_TESTS[3])
+        self.assertIn("Ingredients", RECIPE_TESTS[3])
+        self.assertIn("Backspace", RECIPE_TESTS[4])
+        self.assertIn("scrollIntoView", RECIPE_TESTS[4])
+        self.assertIn("catalog.json", RECIPE_TESTS[5])
+        self.assertIn("test_terminology.py", RECIPE_TESTS[5])
+
     def test_standard_profile_cannot_disable_independent_qa(self):
         with tempfile.TemporaryDirectory() as directory:
             args = SimpleNamespace(

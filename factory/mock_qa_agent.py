@@ -69,8 +69,31 @@ RECIPE_TESTS = {
     response = client.get("/api/recipes")
     assert response.status_code == 200
     recipes = response.get_json()
-    assert len(recipes) >= 6
-    assert {"ingredients", "steps", "prep_minutes", "cook_minutes"} <= set(recipes[0])
+    assert len(recipes) >= 12
+    required = {
+        "id", "title", "description", "category", "dietary_tags",
+        "ingredients", "steps", "prep_minutes", "cook_minutes",
+    }
+    assert all(required <= set(recipe) for recipe in recipes)
+
+    assert {recipe["id"] for recipe in client.get("/api/recipes?q=weeknight").get_json()} == {"tomato-pasta"}
+    assert "tomato-pasta" in {recipe["id"] for recipe in client.get("/api/recipes?q=dinner").get_json()}
+    assert "miso-noodles" in {recipe["id"] for recipe in client.get("/api/recipes?q=vegan").get_json()}
+    assert {recipe["id"] for recipe in client.get("/api/recipes?q=tomatoes").get_json()} == {"tomato-pasta"}
+
+    known_ids = {recipe["id"] for recipe in recipes}
+    rails = client.get("/api/rails").get_json()
+    assert rails and all(set(rail["recipe_ids"]) <= known_ids for rail in rails)
+    assert client.get("/api/recipes/not-a-recipe").status_code == 404
+
+
+def test_ticket_1_cookbook_acceptance(client):
+    assert client.get("/api/cookbook").get_json() == []
+    added = client.post("/api/cookbook", json={"id": "tomato-pasta"})
+    assert added.status_code == 201
+    assert added.get_json()["ids"] == ["tomato-pasta"]
+    assert [recipe["id"] for recipe in client.get("/api/cookbook").get_json()] == ["tomato-pasta"]
+    assert client.delete("/api/cookbook/tomato-pasta").get_json()["ids"] == []
 ''',
     2: '''from pathlib import Path
 
@@ -78,15 +101,36 @@ RECIPE_TESTS = {
 def test_ticket_2_brand_tokens_acceptance():
     css = (Path(__file__).parents[1] / "static/table-story.css").read_text().lower()
     assert all(color in css for color in ("#fff8ed", "#c9472d", "#3f6b4f", "#26231f", "#e9b44c"))
+    assert ".recipe-grid" in css and "minmax(220px,1fr)" in css
+    assert "@media (max-width: 520px)" in css and "grid-template-columns:1fr" in css
+    assert ":focus-visible" in css and "outline" in css
+    assert '.cookbook[aria-pressed="true"]' in css
 ''',
-    3: '''def test_ticket_3_mobile_recipe_acceptance(client):
+    3: '''from pathlib import Path
+
+
+def test_ticket_3_mobile_recipe_acceptance(client):
     home = client.get("/")
     assert home.status_code == 200
     assert b"TableStory" in home.data
     assert b"Good food, clearly told." in home.data
-    assert client.get("/recipe/tomato-pasta").status_code == 200
+    assert b'Search dishes or ingredients' in home.data
+    assert b'data-search=' in home.data
+
+    detail = client.get("/recipe/tomato-pasta")
+    assert detail.status_code == 200
+    assert all(text in detail.data for text in (b"Prep 12 min", b"Cook 18 min", b"Ingredients", b"Method"))
+    assert b'aria-pressed="false"' in detail.data
+
+    source = (Path(__file__).parents[1] / "static/app.js").read_text()
+    assert "addEventListener('input'" in source and "card.hidden" in source
+    assert "No recipes found" in home.data.decode()
+    assert "aria-pressed" in source and "/api/cookbook" in source
 ''',
-    4: '''def test_ticket_4_tv_recipe_acceptance(client):
+    4: '''from pathlib import Path
+
+
+def test_ticket_4_tv_recipe_acceptance(client):
     home = client.get("/?mode=tv")
     assert home.status_code == 200
     assert b'class="tv"' in home.data
@@ -94,6 +138,18 @@ def test_ticket_2_brand_tokens_acceptance():
     assert [rail["title"] for rail in rails] == [
         "Popular this week", "Ready in 30 minutes", "Vegetarian favourites", "My Cookbook",
     ]
+    assert all(len(rail["recipe_ids"]) >= 2 for rail in rails[:3])
+    assert b"recipe-rails.js" in home.data and b"recipe-tv-nav.js" in home.data
+
+    root = Path(__file__).parents[1] / "static"
+    browse = (root / "recipe-tv-nav.js").read_text()
+    detail = (root / "recipe-tv-detail.js").read_text()
+    rails_source = (root / "recipe-rails.js").read_text()
+    assert all(key in browse for key in ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter"))
+    assert "scrollIntoView" in browse
+    assert "Escape" in detail and "Backspace" in detail
+    assert "/api/rails" in rails_source and "recipe_ids" in rails_source
+    assert b"/?mode=tv" in client.get("/recipe/tomato-pasta?mode=tv").data
 ''',
     5: '''from pathlib import Path
 
@@ -103,6 +159,12 @@ def test_ticket_5_documentation_acceptance():
     readme = (root / "README.md").read_text()
     assert "TableStory" in readme
     assert "?mode=tv" in readme
+    assert "pytest" in readme and "npm test" in readme
+    assert not (root / "catalog.json").exists()
+    terminology_test = root / "tests/test_terminology.py"
+    assert terminology_test.is_file()
+    source = terminology_test.read_text().lower()
+    assert "pocket cinema" in source and "watchlist" in source and "movie" in source
 ''',
 }
 
