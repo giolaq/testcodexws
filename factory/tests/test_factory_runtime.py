@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import shutil
 import subprocess
@@ -6,10 +8,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from doctor import baseline_check, version_tuple
+from doctor import baseline_check, run_doctor, version_tuple
 from orchestrator import Factory, approve_qa_tests, worktree_path
 
 
@@ -144,6 +147,22 @@ class RuntimeTests(unittest.TestCase):
     def test_version_parser_handles_cli_prefixes(self):
         self.assertEqual(version_tuple("v22.4.1"), (22, 4, 1))
         self.assertEqual(version_tuple("3.11.9"), (3, 11, 9))
+
+    def test_basic_doctor_does_not_call_agent_authentication(self):
+        config = {
+            "agents": {},
+            "qa": {"agent": "mock-qa", "max_retries": 1, "test_roots": ["tests"]},
+            "gate": [{"name": "tests", "cmd": "true"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch("doctor.shutil.which", return_value=None) as which,
+                mock.patch("doctor.codex_candidates", side_effect=AssertionError("agent auth called")),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                run_doctor(Path(directory), config, full=False)
+
+        which.assert_called_once_with("gh")
 
     def baseline_repo(self, root: Path) -> Path:
         """Build a repo whose history holds a mobile baseline and a later rehearsal."""

@@ -122,7 +122,6 @@ is the worked example, not a factory requirement.
 curl -fsSL https://claude.ai/install.sh | bash  # omit when already installed
 claude auth login
 ./factory/factory configure --preset claude-workshop
-./factory/factory doctor
 ./factory/factory doctor --full
 ```
 

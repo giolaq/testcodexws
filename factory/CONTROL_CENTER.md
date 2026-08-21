@@ -48,11 +48,14 @@ state.
 
 Choose **Rehearsal** to use deterministic local planning, QA, and implementation.
 It requires no model credentials and makes no GitHub Project writes.
+Its preflight checks the local repository and workshop tools without calling an
+agent CLI.
 
 Choose **Live** to use the configured agent CLIs and GitHub. In this mode,
 GitHub Issues and Projects remain the shared source of truth. The Control Center
 is the detailed operator view for the local prompts, worktrees, tests, and logs
-that GitHub does not contain.
+that GitHub does not contain. Live preflight also verifies agent authentication
+and runs the configured gates.
 
 ## Safety boundary
 

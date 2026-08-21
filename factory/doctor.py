@@ -129,7 +129,6 @@ def run_doctor(
 
     gh = shutil.which("gh")
     checks.append(Check("PASS" if gh else "FAIL", "GitHub CLI", gh or "install gh"))
-    repo_details = None
     if gh:
         auth = command([gh, "auth", "status"], repo)
         auth_text = (auth.stdout + auth.stderr).strip()
@@ -152,51 +151,52 @@ def run_doctor(
         else:
             checks.append(Check("FAIL", "GitHub repository", view.stderr.strip() or "no connected repository"))
 
-    required_agents = {
-        implementation_agent,
-        qa_agent or cfg.get("qa", {}).get("agent"),
-        planning_agent,
-    }
-    for name in ("codex", "claude", "cursor"):
-        if name == "codex":
-            available = False
-            detail = "not found or not signed in"
-            for candidate in codex_candidates():
-                status = command([candidate, "login", "status"], repo)
-                help_result = command([candidate, "exec", "--help"], repo)
-                if status.returncode == 0 and help_result.returncode == 0:
-                    available, detail = True, candidate
-                    break
-        elif name == "claude":
-            found = shutil.which("claude")
-            if found:
-                status = command([found, "auth", "status", "--text"], repo)
-                help_result = command([found, "--help"], repo)
-                structured = "--json-schema" in help_result.stdout + help_result.stderr
-                available = status.returncode == 0 and (planning_agent != "claude" or structured)
-                if status.returncode:
-                    detail = "not signed in; run claude auth login"
-                elif planning_agent == "claude" and not structured:
-                    detail = "update Claude Code; --json-schema is required for planning"
+    if full:
+        required_agents = {
+            implementation_agent,
+            qa_agent or cfg.get("qa", {}).get("agent"),
+            planning_agent,
+        }
+        for name in ("codex", "claude", "cursor"):
+            if name == "codex":
+                available = False
+                detail = "not found or not signed in"
+                for candidate in codex_candidates():
+                    status = command([candidate, "login", "status"], repo)
+                    help_result = command([candidate, "exec", "--help"], repo)
+                    if status.returncode == 0 and help_result.returncode == 0:
+                        available, detail = True, candidate
+                        break
+            elif name == "claude":
+                found = shutil.which("claude")
+                if found:
+                    status = command([found, "auth", "status", "--text"], repo)
+                    help_result = command([found, "--help"], repo)
+                    structured = "--json-schema" in help_result.stdout + help_result.stderr
+                    available = status.returncode == 0 and (planning_agent != "claude" or structured)
+                    if status.returncode:
+                        detail = "not signed in; run claude auth login"
+                    elif planning_agent == "claude" and not structured:
+                        detail = "update Claude Code; --json-schema is required for planning"
+                    else:
+                        detail = found
                 else:
-                    detail = found
+                    available, detail = False, "not installed"
             else:
-                available, detail = False, "not installed"
-        else:
-            found = shutil.which("cursor-agent")
-            available, detail = bool(found), found or "not installed"
-        required_agent = name in required_agents
-        checks.append(Check("PASS" if available else ("FAIL" if required_agent else "WARN"), f"{name} adapter", detail))
+                found = shutil.which("cursor-agent")
+                available, detail = bool(found), found or "not installed"
+            required_agent = name in required_agents
+            checks.append(Check("PASS" if available else ("FAIL" if required_agent else "WARN"), f"{name} adapter", detail))
 
-    for name in sorted(required_agents - {"codex", "claude", "cursor", None}):
-        registered = name in cfg.get("agents", {})
-        detail = (
-            "registered in factory/factory.toml; run the adapter command once to verify its own authentication"
-            if registered else "not registered in factory/factory.toml [agents]"
-        )
-        checks.append(Check("PASS" if registered else "FAIL", f"{name} adapter", detail))
+        for name in sorted(required_agents - {"codex", "claude", "cursor", None}):
+            registered = name in cfg.get("agents", {})
+            detail = (
+                "registered in factory/factory.toml; run the adapter command once to verify its own authentication"
+                if registered else "not registered in factory/factory.toml [agents]"
+            )
+            checks.append(Check("PASS" if registered else "FAIL", f"{name} adapter", detail))
 
-    checks.extend(port_check(port) for port in (5000, 5050, 8000))
+    checks.extend(port_check(port) for port in (5000, 5050))
 
     qa = cfg.get("qa", {})
     roots = qa.get("test_roots")

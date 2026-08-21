@@ -842,12 +842,17 @@ class Factory:
                 command, cwd=worktree, text=True, shell=True, executable="/bin/sh",
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             )
+            stdout = process.stdout
+            assert stdout is not None
 
             def copy_output():
-                for chunk in iter(process.stdout.readline, ""):
-                    chunks.append(chunk)
-                    stream.write(chunk)
-                    stream.flush()
+                try:
+                    for chunk in iter(stdout.readline, ""):
+                        chunks.append(chunk)
+                        stream.write(chunk)
+                        stream.flush()
+                except (OSError, ValueError):
+                    pass
 
             reader = threading.Thread(target=copy_output, daemon=True)
             reader.start()
@@ -855,10 +860,14 @@ class Factory:
                 returncode = process.wait(timeout=self.adapter_timeout())
             except subprocess.TimeoutExpired:
                 process.kill()
+                process.wait()
                 returncode = 124
                 timeout_message = f"Agent timed out after {self.cfg['factory']['agent_timeout']}s\n"
                 chunks.append(timeout_message); stream.write(timeout_message); stream.flush()
             reader.join(timeout=5)
+            stdout.close()
+            if reader.is_alive():
+                reader.join(timeout=1)
         output = "".join(chunks)
         ticket.update(last_agent_exit=returncode, phase_finished_at=now())
         self._sync_store()

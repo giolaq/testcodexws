@@ -36,7 +36,7 @@ function toast(message, error = false) {
 }
 
 function showView(name, updateHash = true) {
-  if (!$( `[data-view="${name}"]`)) name = "overview";
+  if (!$(`[data-view="${name}"]`)) name = "overview";
   app.view = name;
   $$(".view").forEach((view) => {
     const active = view.dataset.view === name;
@@ -64,12 +64,13 @@ function closeSidebar() {
 }
 
 function mode() {
-  return $("#run-mode")?.value || $("#planning-mode")?.value || localStorage.getItem("factory-control-mode") || "rehearsal";
+  return $("#connect-mode")?.value || $("#run-mode")?.value || $("#planning-mode")?.value || localStorage.getItem("factory-control-mode") || "rehearsal";
 }
 
 function setMode(value) {
   const next = value === "live" ? "live" : "rehearsal";
   localStorage.setItem("factory-control-mode", next);
+  if ($("#connect-mode")) $("#connect-mode").value = next;
   if ($("#run-mode")) $("#run-mode").value = next;
   if ($("#planning-mode")) $("#planning-mode").value = next;
   $("#sidebar-mode").textContent = next;
@@ -102,7 +103,7 @@ function renderSnapshot(data) {
   $("#repo-name").textContent = repo.name || "Unknown repository";
   $("#repo-branch").textContent = repo.branch || "—";
   $("#repo-dot").className = `status-dot ${repo.dirty ? "warn" : "good"}`;
-  $("#connection-label").textContent = "Live";
+  $("#connection-label").textContent = "Connected";
   $("#connect-repo").textContent = repo.name || "—";
   $("#connect-branch").textContent = repo.branch || "—";
   $("#connect-remote").textContent = repo.remote || "No origin remote";
@@ -251,6 +252,7 @@ function renderPlanning(planning) {
 }
 
 async function loadPlanningArtifact(item) {
+  const selectedId = item.id;
   const artifactKey = `${item.markdown || item.json || ""}:${item.sha256 || item.status || ""}`;
   if (app.loadedPlanningArtifact === artifactKey) return;
   app.loadedPlanningArtifact = artifactKey;
@@ -261,10 +263,13 @@ async function loadPlanningArtifact(item) {
   $("#open-artifact").hidden = !app.artifactPath;
   try {
     const value = await request(`/api/artifact?path=${encodeURIComponent(app.artifactPath)}`);
-    if (app.selectedPlanning === id) $("#artifact-content").textContent = value.content;
+    if (app.selectedPlanning !== selectedId) return;
+    $("#artifact-content").textContent = value.content;
   } catch (error) {
+    if (app.selectedPlanning !== selectedId) return;
     $("#artifact-content").textContent = error.message;
   }
+  if (app.selectedPlanning !== selectedId) return;
   $("#approval-panel").innerHTML = `<span class="section-label">Expert contract</span><h2>${esc(item.title)}</h2><p>${item.questions?.length ? `${item.questions.length} blocking question(s) must be resolved.` : "No blocking questions recorded."}</p><div class="approval-card"><b>Artifact hash</b><p><code>${esc(item.sha256 || "Pending")}</code></p></div>`;
 }
 
@@ -307,11 +312,15 @@ function renderTickets(factory) {
 
 function renderEvidence(data) {
   const tickets = data.factory?.tickets || [];
+  const requiredGatesPass = tickets.length > 0 && tickets.every((ticket) => {
+    const required = (ticket.gate_results || []).filter((gate) => gate.required);
+    return required.length > 0 && required.every((gate) => gate.exit_code === 0);
+  });
   const checks = [
     [Boolean(data.planning?.approvals?.product), "Product intent approved", "Problem and behavior accepted by a person"],
     [Boolean(data.planning?.approvals?.alignment), "Delivery plan approved", "Architecture and slices accepted"],
     [tickets.length > 0 && tickets.every((ticket) => Object.keys(ticket.qa_tests || {}).length), "Acceptance tests recorded", "Independent QA evidence exists for every ticket"],
-    [tickets.length > 0 && tickets.every((ticket) => (ticket.gate_results || []).every((gate) => !gate.required || gate.exit_code === 0)), "Required gates pass", "No required verification failure remains"],
+    [requiredGatesPass, "Required gates pass", "Every ticket has a successful required gate"],
     [tickets.length > 0 && tickets.every((ticket) => ticket.status === "Done"), "All tickets complete", "Integrated delivery has no unfinished work"],
   ];
   $("#evidence-checks").innerHTML = checks.map(([complete, title, text]) => `<div class="evidence-check ${complete ? "complete" : ""}"><span>${complete ? "✓" : "·"}</span><div><b>${esc(title)}</b><small>${esc(text)}</small></div></div>`).join("");
@@ -358,7 +367,7 @@ function basePayload(extra = {}) {
     mode: mode(),
     scenario: "recipe-rebrand",
     plan_id: app.snapshot?.planning?.plan_id || "",
-    review_qa_tests: true,
+    review_qa_tests: app.snapshot?.config?.review_qa_tests ?? true,
     ...extra,
   };
 }
@@ -430,13 +439,18 @@ function openTicket(number) {
   if (!ticket) return;
   app.selectedTicket = ticket;
   app.drawerTab = "summary";
-  $("#drawer-issue").textContent = `#${ticket.number} · ${ticket.status}`;
-  $("#ticket-drawer-title").textContent = ticket.title;
+  showDrawer(`#${ticket.number} · ${ticket.status}`, ticket.title, true);
+  renderDrawer();
+  $("#close-drawer").focus();
+}
+
+function showDrawer(label, title, showTabs) {
+  $("#drawer-issue").textContent = label;
+  $("#ticket-drawer-title").textContent = title;
+  $(".drawer-tabs").hidden = !showTabs;
   $("#ticket-drawer").hidden = false;
   $("#drawer-scrim").hidden = false;
   document.body.style.overflow = "hidden";
-  renderDrawer();
-  $("#close-drawer").focus();
 }
 
 function closeDrawer() {
@@ -448,6 +462,7 @@ function closeDrawer() {
 async function renderDrawer() {
   const ticket = app.selectedTicket;
   if (!ticket) return;
+  const requestedTab = app.drawerTab;
   $$('.drawer-tabs button').forEach((button) => button.classList.toggle("active", button.dataset.drawerTab === app.drawerTab));
   const content = $("#drawer-content");
   if (app.drawerTab === "summary") {
@@ -472,29 +487,26 @@ async function renderDrawer() {
   try {
     let value;
     let title;
-    if (app.drawerTab === "diff") {
+    if (requestedTab === "diff") {
       value = await request(`/api/tickets/${ticket.number}/diff`);
       title = "Ticket diff";
     } else {
-      const path = app.drawerTab === "prompt" ? ticket.current_prompt : ticket.current_log;
-      if (!path) throw new Error(`No ${app.drawerTab} is available yet.`);
+      const path = requestedTab === "prompt" ? ticket.current_prompt : ticket.current_log;
+      if (!path) throw new Error(`No ${requestedTab} is available yet.`);
       value = await request(`/api/artifact?path=${encodeURIComponent(path)}`);
-      title = `${app.drawerTab === "prompt" ? "Agent prompt" : "Agent log"} · ${path.split("/").at(-1)}`;
+      title = `${requestedTab === "prompt" ? "Agent prompt" : "Agent log"} · ${path.split("/").at(-1)}`;
     }
-    if (app.selectedTicket?.number === ticket.number && app.drawerTab) content.innerHTML = `<section class="detail-panel"><h3>${esc(title)}</h3><pre>${esc(value.content)}</pre></section>`;
+    if (app.selectedTicket?.number === ticket.number && app.drawerTab === requestedTab) content.innerHTML = `<section class="detail-panel"><h3>${esc(title)}</h3><pre>${esc(value.content)}</pre></section>`;
   } catch (error) {
-    content.innerHTML = `<section class="detail-panel"><h3>Not available</h3><pre>${esc(error.message)}</pre></section>`;
+    if (app.selectedTicket?.number === ticket.number && app.drawerTab === requestedTab) content.innerHTML = `<section class="detail-panel"><h3>Not available</h3><pre>${esc(error.message)}</pre></section>`;
   }
 }
 
 async function openArtifact(path) {
   try {
     const value = await request(`/api/artifact?path=${encodeURIComponent(path)}`);
-    app.selectedTicket = { number: "Evidence", title: path };
-    $("#drawer-issue").textContent = "Factory artifact";
-    $("#ticket-drawer-title").textContent = path.split("/").at(-1);
-    $("#ticket-drawer").hidden = false;
-    $("#drawer-scrim").hidden = false;
+    app.selectedTicket = null;
+    showDrawer("Factory artifact", path.split("/").at(-1), false);
     $("#drawer-content").innerHTML = `<section class="detail-panel"><h3>${esc(path)}</h3><pre>${esc(value.content)}</pre></section>`;
   } catch (error) { toast(error.message, true); }
 }
@@ -510,17 +522,18 @@ function connectEvents() {
 }
 
 function wireEvents() {
-  $$('[data-view-link]').forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showView(link.dataset.viewLink); if (link.dataset.viewLink === "prd") loadPrd(); }));
-  $$('[data-action]').forEach((button) => button.addEventListener("click", () => action(button.dataset.action, button.dataset.action === "doctor" ? { full: true } : {})));
+  $$('[data-view-link]').forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showView(link.dataset.viewLink); }));
+  $$('[data-action]').forEach((button) => button.addEventListener("click", () => action(button.dataset.action, button.dataset.action === "doctor" ? { full: mode() === "live" } : {})));
   $("#menu-button").addEventListener("click", openSidebar);
   $("#sidebar-scrim").addEventListener("click", closeSidebar);
   $("#config-form").addEventListener("submit", submitConfig);
   $("#save-prd").addEventListener("click", async () => { try { await savePrd(); toast("PRD saved."); } catch (error) { toast(error.message, true); } });
   $("#prd-editor").addEventListener("input", () => { $("#prd-save-state").textContent = "Unsaved changes"; });
-  $("#start-planning").addEventListener("click", async () => { try { await savePrd(); setMode($("#planning-mode").value); await action("plan", { profile: $("#planning-profile").value }); } catch (error) { toast(error.message, true); } });
+  $("#start-planning").addEventListener("click", async () => { try { await savePrd(); setMode($("#planning-mode").value); await action("plan"); } catch (error) { toast(error.message, true); } });
   $("#continue-plan").addEventListener("click", () => action("continue-plan"));
   $("#publish-plan").addEventListener("click", () => action("publish-plan", { project_title: "TableStory Workshop" }));
   $("#planning-mode").addEventListener("change", (event) => { setMode(event.target.value); renderPlanning(app.snapshot?.planning || {}); });
+  $("#connect-mode").addEventListener("change", (event) => setMode(event.target.value));
   $("#run-mode").addEventListener("change", (event) => setMode(event.target.value));
   $("#stop-operation").addEventListener("click", async () => { if (!window.confirm("Stop the running factory process? The next run will recover interrupted tickets.")) return; try { await request("/api/stop", { method: "POST", body: "{}" }); toast("Stopping operation."); } catch (error) { toast(error.message, true); } });
   $("#copy-operation").addEventListener("click", async () => { const command = app.snapshot?.operation?.command; if (!command) return toast("No command to copy."); await navigator.clipboard.writeText(command); toast("Command copied."); });
@@ -548,7 +561,6 @@ async function boot() {
   wireEvents();
   setMode(localStorage.getItem("factory-control-mode") || "rehearsal");
   showView(app.view, false);
-  if (app.view === "prd") loadPrd();
   try { renderSnapshot(await request("/api/snapshot")); } catch (error) { toast(error.message, true); }
   connectEvents();
 }

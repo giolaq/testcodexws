@@ -396,11 +396,11 @@ git push origin main --follow-tags`}</CodeBlock>
           </div>
 
           <WorkshopPaths
-            click={<>In the browser that just opened, select <strong>Connect</strong>, choose your agent preset, then select <strong>Run preflight</strong>.</>}
-            inspect={<>Confirm the repository, branch, remote, agent roles, QA approval, and parallel-ticket limit.</>}
+            click={<>In the browser that just opened, select <strong>Connect</strong>, choose <strong>{track === "live" ? "Live" : "Rehearsal"}</strong> and your agent preset, then select <strong>Run preflight</strong>.</>}
+            inspect={<>Confirm the run mode, repository, branch, remote, agent roles, QA approval, and parallel-ticket limit.</>}
             continueWhen={<>Preflight reports no blockers and the header shows the correct repository.</>}
           >{`./factory/factory configure --preset claude-workshop
-./factory/factory doctor --full`}</WorkshopPaths>
+./factory/factory doctor${track === "live" ? " --full" : ""}`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-connect.jpg"
             alt="Control Center Connect screen with agent presets, repository details, and preflight button"
@@ -526,10 +526,11 @@ export PLAN_ID=<plan-id-from-output>
 
         <StepSection index={7} id="factory" title="Run the factory" goal="Observe agents implement, verify, and review isolated tickets." complete={completed.includes("factory")} onToggle={() => toggleStep("factory")}>
           <WorkshopPaths
-            click={<>Open <strong>Tickets</strong> and select <strong>Run factory</strong>. Open a moving ticket; use Prompt, Live log, Diff, Tests, and History.</>}
-            inspect={<>Follow its state, attempt count, dependencies, exact prompt, worktree changes, gate output, and review decisions.</>}
+            click={track === "live" ? <>Keep your <strong>GitHub Project</strong> open, then open <strong>Tickets</strong> in the Control Center and select <strong>Run factory</strong>.</> : <>Open <strong>Tickets</strong> and select <strong>Run factory</strong>.</>}
+            inspect={track === "live" ? <>Use GitHub Projects for shared ticket state. Open a moving ticket in the Control Center for its prompt, live log, diff, tests, and history.</> : <>Open a moving ticket and follow its state, attempt count, dependencies, prompt, worktree changes, gates, and review decisions.</>}
             continueWhen={<>At least one ticket reaches Done and its detail drawer contains the evidence for that state.</>}
-          >{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""}`}</WorkshopPaths>
+          >{track === "live" ? `gh project view <project-number> --owner "@me" --web
+./factory/factory run` : `./factory/factory run --mock --scenario recipe-rebrand`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-tickets.jpg"
             alt="Control Center Tickets board with backlog and QA Review columns"
@@ -549,6 +550,9 @@ export PLAN_ID=<plan-id-from-output>
           <Callout type="tip" title="Retries are evidence">
             <p>A failed gate should return the ticket to the agent with a clear reason. Do not hide the loop.</p>
           </Callout>
+          {track === "live" && <Callout type="tip" title="Two views, one run">
+            <p>GitHub Projects is the shared work-management view. The local Control Center is the engine room for prompts, worktrees, tests, logs, and verification evidence.</p>
+          </Callout>}
           <Checkpoint>At least one ticket reaches Done, and you can open its log, diff, tests, and review evidence.</Checkpoint>
         </StepSection>
 

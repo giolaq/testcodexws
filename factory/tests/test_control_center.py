@@ -71,6 +71,21 @@ class ControlCenterTests(unittest.TestCase):
             self.assertIn(str(center.prd_path), commands[0])
             self.assertIn("--mock", commands[0])
 
+    def test_planning_uses_the_profile_saved_for_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            local = center.repo / ".factory/local.toml"
+            local.parent.mkdir(parents=True, exist_ok=True)
+            local.write_text('profile = "lean"\n')
+            center.save_prd("# Recipe app\n")
+
+            _, commands = center.build_commands("plan", {
+                "mode": "rehearsal", "profile": "assured",
+            })
+
+            self.assertIn("lean", commands[0])
+            self.assertNotIn("assured", commands[0])
+
     def test_human_gate_commands_are_noninteractive(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))
@@ -156,6 +171,35 @@ class ControlCenterTests(unittest.TestCase):
             self.assertEqual(finished["status"], "succeeded")
             self.assertIn("factory args: doctor --full", finished["output"])
 
+    def test_shutdown_stops_and_joins_an_active_factory_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            factory = center.repo / "factory/factory"
+            factory.write_text("#!/bin/sh\nprintf 'started\\n'\nsleep 30\n")
+
+            center.start("doctor", {})
+            deadline = time.monotonic() + 2
+            while center.process is None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertIsNotNone(center.process)
+
+            center.shutdown(timeout=2)
+
+            self.assertIsNone(center.process)
+            self.assertIsNone(center.worker)
+            self.assertEqual(center.operation_snapshot()["status"], "stopped")
+
+    def test_restart_recovers_an_operation_interrupted_while_stopping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            center = ControlCenter(repo)
+            center.operation_path.write_text(json.dumps({"status": "stopping"}))
+
+            recovered = ControlCenter(repo).operation_snapshot()
+
+            self.assertEqual(recovered["status"], "interrupted")
+            self.assertIn("restarted while this operation was running", recovered["error"])
+
     def test_http_api_serves_state_and_rejects_foreign_origins(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))
@@ -232,7 +276,9 @@ class ControlCenterTests(unittest.TestCase):
             self.assertEqual(review["next"]["view"], "tickets")
 
     def test_frontend_contains_the_complete_operator_workflow(self):
-        source = (Path(__file__).parents[1] / "control_center/index.html").read_text()
+        frontend = Path(__file__).parents[1] / "control_center"
+        source = (frontend / "index.html").read_text()
+        javascript = (frontend / "app.js").read_text()
 
         for label in (
             "Connect the factory",
@@ -246,8 +292,15 @@ class ControlCenterTests(unittest.TestCase):
             "Current phase",
             "Reset or start again",
             "Start workshop over",
+            "Plan, build, verify, review",
         ):
             self.assertIn(label, source)
+
+        self.assertIn("app.selectedPlanning !== selectedId", javascript)
+        self.assertNotIn("app.selectedPlanning === id", javascript)
+        self.assertNotIn('id="planning-profile"', source)
+        self.assertIn('id="connect-mode"', source)
+        self.assertIn('full: mode() === "live"', javascript)
 
 
 if __name__ == "__main__":

@@ -97,4 +97,6 @@ test("attendee page stays within its copy budget", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const words = source.trim().split(/\s+/).length;
   assert.ok(words < 4500, `page.tsx contains ${words} words; expected fewer than 4500`);
+  assert.match(source, /doctor\$\{track === "live" \? " --full" : ""\}/);
+  assert.match(source, /gh project view <project-number>/);
 });

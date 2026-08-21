@@ -27,11 +27,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
+from session_config import (
+    AGENT_NAME,
+    FACTORY_PROFILES,
+    PLANNING_AGENTS,
+    PRESETS,
+    load_session_config,
+)
+
 
 PLAN_ID = re.compile(r"[a-f0-9]{8,64}")
-ADAPTER = re.compile(r"[a-z][a-z0-9_-]{0,31}")
-PROFILES = {"lean", "standard", "assured"}
-PRESETS = {"claude-workshop", "codex-workshop"}
 SCENARIOS = {"recipe-rebrand", "tv"}
 DEFAULT_AGENTS = {"claude", "codex", "cursor", "mock", "mock-qa"}
 MAX_BODY = 256_000
@@ -81,8 +86,9 @@ class ControlCenter:
         self.canvas_path = self.runtime / "factory-canvas.md"
         self.lock = threading.RLock()
         self.process: subprocess.Popen | None = None
+        self.worker: threading.Thread | None = None
         self.operation: dict = read_json(self.operation_path, {})
-        if self.operation.get("status") == "running":
+        if self.operation.get("status") in {"running", "stopping"}:
             self.operation.update(
                 status="interrupted",
                 finished_at=utc_now(),
@@ -124,10 +130,9 @@ class ControlCenter:
         }
 
     def session_config(self) -> dict:
-        path = self.repo / ".factory" / "local.toml"
         try:
-            return tomllib.loads(path.read_text())
-        except (OSError, tomllib.TOMLDecodeError):
+            return load_session_config(self.repo)
+        except ValueError:
             return {}
 
     def prd(self) -> dict:
@@ -155,11 +160,12 @@ class ControlCenter:
             paths.append(self.canvas_path)
         for path in paths:
             if path.is_file():
+                stat = path.stat()
                 candidates.append({
                     "path": str(path.relative_to(self.repo)),
                     "name": path.name,
-                    "size": path.stat().st_size,
-                    "updated_at": datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
+                    "size": stat.st_size,
+                    "updated_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(timespec="seconds"),
                 })
         return sorted(candidates, key=lambda item: item["updated_at"], reverse=True)
 
@@ -185,7 +191,15 @@ class ControlCenter:
         value["output"] = tail_text(self.repo / log) if log else ""
         return value
 
-    def journey(self, planning: dict, factory: dict, operation: dict, prd: dict, evidence: list[dict]) -> dict:
+    def journey(
+        self,
+        planning: dict,
+        factory: dict,
+        operation: dict,
+        prd: dict,
+        evidence: list[dict],
+        config: dict | None = None,
+    ) -> dict:
         tickets = factory.get("tickets", [])
         approvals = planning.get("approvals", {})
         phase_specs = [
@@ -196,7 +210,7 @@ class ControlCenter:
             ("build", "Build & verify", "Run QA, implementation, and gates", "tickets"),
             ("evidence", "Evidence", "Verify the integrated result", "evidence"),
         ]
-        connected = bool(self.session_config()) or bool(planning) or bool(tickets)
+        connected = bool(config if config is not None else self.session_config()) or bool(planning) or bool(tickets)
         prd_ready = bool(prd.get("saved")) or bool(planning)
         product_ready = bool(approvals.get("product"))
         plan_complete = planning.get("status") in {"awaiting_alignment_approval", "alignment_approved", "published"}
@@ -372,18 +386,17 @@ class ControlCenter:
         operation = self.operation_snapshot()
         prd = {key: value for key, value in self.prd().items() if key != "text"}
         evidence = self.evidence_files()
+        config = self.session_config()
         return {
-            "server_time": utc_now(),
             "repo": self.repo_info(),
-            "config": self.session_config(),
+            "config": config,
             "adapters": self.adapters(),
-            "profiles": sorted(PROFILES),
             "planning": planning,
             "factory": factory,
             "operation": operation,
             "prd": prd,
             "evidence": evidence,
-            "journey": self.journey(planning, factory, operation, prd, evidence),
+            "journey": self.journey(planning, factory, operation, prd, evidence, config),
         }
 
     @staticmethod
@@ -446,19 +459,19 @@ class ControlCenter:
                 command += ["--preset", preset]
             profile = self._string(payload, "profile")
             if profile:
-                if profile not in PROFILES:
+                if profile not in FACTORY_PROFILES:
                     raise InputError("Unknown factory profile.")
                 command += ["--profile", profile]
             known = set(self.adapters())
             for field, flag in (("agent", "--agent"), ("qa_agent", "--qa-agent")):
                 value = self._string(payload, field)
                 if value:
-                    if not ADAPTER.fullmatch(value) or value not in known:
+                    if not AGENT_NAME.fullmatch(value) or value not in known:
                         raise InputError(f"Unknown {field.replace('_', ' ')} adapter.")
                     command += [flag, value]
             planning = self._string(payload, "planning_agent")
             if planning:
-                if planning not in {"claude", "codex"}:
+                if planning not in PLANNING_AGENTS:
                     raise InputError("Planning must use Claude or Codex.")
                 command += ["--planning-agent", planning]
             parallel = self._positive_int(payload, "max_parallel")
@@ -475,8 +488,8 @@ class ControlCenter:
         if action == "plan":
             if not self.prd_path.is_file():
                 raise InputError("Save the PRD before starting Product Review.")
-            profile = self._string(payload, "profile") or "standard"
-            if profile not in PROFILES:
+            profile = self.session_config().get("profile") or "standard"
+            if profile not in FACTORY_PROFILES:
                 raise InputError("Unknown factory profile.")
             command = base + ["plan", str(self.prd_path), "--profile", profile]
             if mock:
@@ -576,8 +589,10 @@ class ControlCenter:
                 "error": "",
             }
             self._save_operation()
-        thread = threading.Thread(target=self._run, args=(commands, log), daemon=True)
-        thread.start()
+        worker = threading.Thread(target=self._run, args=(commands, log), daemon=True)
+        with self.lock:
+            self.worker = worker
+        worker.start()
         return self.operation_snapshot()
 
     def _run(self, commands: list[list[str]], log: Path):
@@ -622,6 +637,7 @@ class ControlCenter:
                 elif exit_code and status != "stopped":
                     self.operation["error"] = "The operation failed. Read the final log lines for the cause."
                 self.process = None
+                self.worker = None
                 self._save_operation()
 
     def stop(self) -> dict:
@@ -632,8 +648,36 @@ class ControlCenter:
             self.operation["status"] = "stopping"
             self._save_operation()
             if process and process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
         return self.operation_snapshot()
+
+    def shutdown(self, timeout: float = 5.0):
+        """Stop and join the active factory command before closing the server."""
+        with self.lock:
+            worker = self.worker
+            process = self.process
+            if self.operation.get("status") in {"running", "stopping"}:
+                self.operation["status"] = "stopping"
+                self._save_operation()
+            if process and process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+        if worker and worker is not threading.current_thread():
+            worker.join(timeout=timeout)
+        with self.lock:
+            process = self.process
+        if process and process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            if worker and worker is not threading.current_thread():
+                worker.join(timeout=1)
 
     def artifact(self, raw_path: str) -> str:
         path = PurePosixPath(raw_path)
@@ -788,11 +832,21 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
+        previous = ""
+        last_write = 0.0
         try:
             while True:
                 data = json.dumps(self.server.center.snapshot())
-                self.wfile.write(f"data: {data}\n\n".encode())
-                self.wfile.flush()
+                current = time.monotonic()
+                if data != previous:
+                    self.wfile.write(f"data: {data}\n\n".encode())
+                    previous = data
+                    last_write = current
+                    self.wfile.flush()
+                elif current - last_write >= 15:
+                    self.wfile.write(b": keepalive\n\n")
+                    last_write = current
+                    self.wfile.flush()
                 time.sleep(1)
         except (BrokenPipeError, ConnectionResetError):
             return
@@ -844,4 +898,5 @@ def serve(repo: Path, host="127.0.0.1", port=5050, open_browser=True):
     except KeyboardInterrupt:
         pass
     finally:
+        center.shutdown()
         server.server_close()

@@ -85,6 +85,13 @@ main { min-height: 100vh; margin-left: var(--sidebar); padding: calc(var(--topba
 .surface-heading h2, .surface > h2 { margin: 3px 0 0; font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
 .updated { color: var(--muted); font-size: 11px; }
 
+.macro-phase-strip { display: grid; grid-template-columns: minmax(180px,.55fr) minmax(0,1.45fr); margin-bottom: 14px; padding: 18px 24px; align-items: center; gap: 24px; }
+.macro-phase-strip h2 { margin: 3px 0 0; font-size: 18px; text-transform: capitalize; }
+.macro-phase-strip ol { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 0; padding: 0; list-style: none; }
+.macro-phase-strip li { display: flex; min-height: 48px; padding: 3px 15px; flex-direction: column; border-left: 1px solid var(--line); }
+.macro-phase-strip li b { color: var(--blue); font-size: 12px; text-transform: uppercase; }
+.macro-phase-strip li span { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+
 .health-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 18px; }
 .health-grid article { display: flex; min-height: 90px; padding: 18px; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .health-grid article > div { display: flex; min-width: 0; flex-direction: column; }
@@ -176,6 +183,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 
 .prd-checklist li { position: relative; margin: 11px 0; padding-left: 25px; }
 .prd-checklist li::before { position: absolute; left: 0; color: var(--green); content: "✓"; font-weight: 800; }
 .prd-checklist label { margin-top: 15px; }
+.config-reminder { margin: 18px 0 0; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .save-state { color: var(--muted); font-size: 11px; }
 
 .planning-pipeline { display: grid; grid-template-columns: repeat(6,minmax(150px,1fr)); gap: 9px; margin-bottom: 18px; overflow-x: auto; }
@@ -250,6 +258,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 
 .drawer h2 { margin: 4px 0 0; font-size: 23px; line-height: 1.25; letter-spacing: -.025em; }
 .issue-label { color: var(--blue); font: 700 11px "SFMono-Regular", Consolas, monospace; }
 .drawer-tabs { position: sticky; top: 88px; z-index: 3; display: flex; padding: 0 20px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; }
+.drawer-tabs[hidden] { display: none; }
 .drawer-tabs button { min-height: 46px; padding: 0 12px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
 .drawer-tabs button.active { border-color: var(--blue); color: var(--blue); }
 .drawer-content { padding: 22px 25px 60px; }
@@ -289,7 +298,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 
 
 @media (max-width: 1100px) {
   .health-grid { grid-template-columns: 1fr 1fr; }
-  .overview-grid, .two-column, .prd-grid, .planning-grid, .evidence-grid, .now-surface { grid-template-columns: 1fr; }
+  .overview-grid, .two-column, .prd-grid, .planning-grid, .evidence-grid, .now-surface, .macro-phase-strip { grid-template-columns: 1fr; }
   .next-checkpoint { border-top: 1px solid #d2e3fc; border-left: 0; }
   .readiness-surface, .prd-checklist { order: -1; }
   .journey-steps { grid-template-columns: repeat(6,minmax(120px,1fr)); overflow-x: auto; }
@@ -307,6 +316,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 
   .page-heading { display: block; }
   .heading-actions { justify-content: flex-start; padding-top: 15px; }
   .health-grid, .form-grid { grid-template-columns: 1fr; }
+  .macro-phase-strip ol { grid-template-columns: 1fr 1fr; row-gap: 12px; }
   .journey-surface, .operation-surface, .decisions-surface, .form-surface, .readiness-surface, .artifact-preview, .approval-panel { padding: 18px; }
   .now-main { min-height: 0; padding: 23px 20px; }
   .reset-options { grid-template-columns: 1fr; }

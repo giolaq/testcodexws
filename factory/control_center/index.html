@@ -48,6 +48,16 @@
         <div class="heading-actions"><button class="button" id="open-reset-overview" type="button">Reset or start again</button></div>
       </div>
 
+      <section class="surface macro-phase-strip" aria-labelledby="macro-phases-title">
+        <div><span class="section-label">Delivery loop</span><h2 id="macro-phases-title">Plan, build, verify, review</h2></div>
+        <ol>
+          <li><b>Plan</b><span>PRD to approved slices</span></li>
+          <li><b>Build</b><span>Agents work in isolation</span></li>
+          <li><b>Verify</b><span>Tests and gates produce evidence</span></li>
+          <li><b>Review</b><span>People accept or send work back</span></li>
+        </ol>
+      </section>
+
       <section class="surface now-surface" aria-live="polite">
         <div class="now-main">
           <div class="now-heading"><span class="now-pulse" id="journey-pulse"></span><span class="section-label" id="journey-kicker">Current phase</span><span class="journey-state" id="journey-state">Loading</span></div>
@@ -97,6 +107,7 @@
           <form id="config-form">
             <label>Quick preset<select name="preset"><option value="claude-workshop">Claude workshop</option><option value="codex-workshop">Codex workshop</option><option value="">Custom roles</option></select></label>
             <div class="form-grid">
+              <label>Run mode<select id="connect-mode"><option value="rehearsal">Rehearsal</option><option value="live">Live</option></select></label>
               <label>Profile<select name="profile"><option value="standard">Standard</option><option value="lean">Lean</option><option value="assured">Assured</option></select></label>
               <label>Parallel tickets<input name="max_parallel" type="number" min="1" max="12" value="1"></label>
               <label>Planning<select name="planning_agent" data-agent-select="planning"></select></label>
@@ -120,7 +131,7 @@
       <div class="page-heading"><div><span class="eyebrow">Step 2</span><h1 id="prd-title">Define the outcome</h1><p>Write the product requirement the planning experts will receive.</p></div><div class="heading-actions"><span class="save-state" id="prd-save-state">Not edited</span><button class="button" id="save-prd" type="button">Save PRD</button><button class="button button-primary" id="start-planning" type="button">Start Product Review</button></div></div>
       <div class="prd-grid">
         <section class="surface editor-surface"><textarea id="prd-editor" aria-label="Product requirements document" spellcheck="true"></textarea></section>
-        <aside class="surface prd-checklist"><span class="section-label">Before planning</span><h2>A useful PRD answers</h2><ul><li>Who is the product for?</li><li>What changes for the user?</li><li>What must remain compatible?</li><li>What evidence proves success?</li></ul><label>Planning mode<select id="planning-mode"><option value="rehearsal">Rehearsal</option><option value="live">Live agents</option></select></label><label>Factory profile<select id="planning-profile"><option value="standard">Standard</option><option value="lean">Lean</option><option value="assured">Assured</option></select></label></aside>
+        <aside class="surface prd-checklist"><span class="section-label">Before planning</span><h2>A useful PRD answers</h2><ul><li>Who is the product for?</li><li>What changes for the user?</li><li>What must remain compatible?</li><li>What evidence proves success?</li></ul><label>Planning mode<select id="planning-mode"><option value="rehearsal">Rehearsal</option><option value="live">Live agents</option></select></label><p class="config-reminder">The Factory Profile selected in Connect applies to planning and execution.</p></aside>
       </div>
     </section>
 

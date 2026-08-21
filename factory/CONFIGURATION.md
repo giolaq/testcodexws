@@ -186,13 +186,15 @@ will remember its number automatically:
 Run preflight before dispatching tickets:
 
 ```sh
-./factory/factory doctor
-./factory/factory doctor --full
+./factory/factory doctor         # Rehearsal Run
+./factory/factory doctor --full  # Live Run
 ./factory/factory run --dry-run
 ```
 
-`doctor` verifies built-in CLI authentication when it knows how. For a custom
-adapter, it verifies registration; run the wrapper once yourself to confirm its
-provider authentication and noninteractive behavior. `doctor --full` also runs
-the configured verification gates. The dry run reads the GitHub Project and
-prints dependency waves without creating worktrees or running agents.
+`doctor` checks the local repository and workshop prerequisites without calling
+an agent CLI. Use `doctor --full` for a Live Run: it verifies built-in CLI
+authentication, checks custom adapter registration, and runs the configured
+verification gates. Run a custom wrapper once yourself to confirm its provider
+authentication and noninteractive behavior. The dry run reads the GitHub
+Project and prints dependency waves without creating worktrees or running
+agents.
