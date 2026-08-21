@@ -78,14 +78,24 @@ Repeat the same pattern for every step:
 
 **Goal:** Start with a healthy factory and a separate demo repository.
 
-**Do:** Reset Pocket Cinema to the exercise baseline, then start the local
-Control Center. Open **Connect**, choose the selected agent preset, save it,
-and run preflight. In Rehearsal, credentials and GitHub writes are not required.
+**Do:** Reset Pocket Cinema to the exercise baseline. Then open a second
+terminal tab at the repository root and start the local Control Center:
 
 ```bash
 ./setup_demo.sh --scenario recipe-rebrand
+```
+
+Keep this second command running for the rest of the workshop:
+
+```bash
 ./factory/factory control-center
 ```
+
+Wait for `Factory Control Center: http://127.0.0.1:5050`. The browser should
+open automatically; otherwise open that address yourself. In the browser,
+select **Connect**, choose the agent preset, save it, and run preflight. Press
+`Ctrl+C` only when you want to stop the Control Center. In Rehearsal,
+credentials and GitHub writes are not required.
 
 **Check:** <http://127.0.0.1:5050> loads, shows the correct repository, and
 preflight reports no blocking errors.

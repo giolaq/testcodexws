@@ -5,9 +5,9 @@ Release: `workshop-v1.0.0`
 The attendee-facing, self-guided website for the Software (re)-Factory
 workshop. It follows one PRD from intent to verified delivery using a repeated
 **Goal → Do → Check** pattern. The main path contains only the decisions,
-Control Center actions, and evidence attendees need. Equivalent CLI commands,
-optional agent configuration, and recovery guidance stay collapsed until
-needed.
+Control Center actions, and evidence attendees need. Equivalent CLI commands
+are shown beside every Control Center step. Optional agent configuration and
+recovery guidance remain in the reference sections.
 
 The guide supports deterministic rehearsal and live GitHub paths. Claude is
 the worked example, but attendees can use Codex, Cursor, or a custom CLI.
