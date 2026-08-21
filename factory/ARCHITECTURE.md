@@ -27,7 +27,7 @@ flowchart LR
   Gates -->|pass| PR["Pull request + human merge"]
   PR --> Sync["Fetch, fast-forward, verify merge commit"]
   Sync --> Scheduler
-  Scheduler --> State["planning-state.json + state.json + dashboard"]
+  Scheduler --> State["planning-state.json + state.json + Control Center"]
   Product -.-> Receipts["Handoff Receipts"]
   QA -.-> Receipts
   Implementer -.-> Receipts
@@ -42,14 +42,16 @@ flowchart LR
    and gates; `.factory/local.toml` — ignored attendee defaults and Project selection.
 3. `factory/CONFIGURATION.md` — built-in, mixed-role, and custom adapter setup.
 4. `factory/planning_pipeline.py` — profile-driven expert contracts, hashes, approvals,
-   traceability, validation, and planning dashboard state.
+   traceability, validation, and planning UI state.
 5. `factory/planner.py` — ticket-plan validation and GitHub publication.
 6. `factory/orchestrator.py` — CLI, dependency scheduler, and ticket lifecycle.
 7. `factory/evidence_packet.py` — Canvas validation and sanitized Evidence Packet export.
 8. `factory/github_backend.py` — Issues, Projects, PRs, and merge observation.
 9. `factory/doctor.py` — workshop safety and environment diagnostics.
-10. `factory/dashboard.html` — read-only visualization of planning and execution.
-11. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
+10. `factory/control_center.py` and `factory/control_center/` — local allowlisted
+    command API and operator interface for planning, execution, and evidence.
+11. `factory/dashboard.html` — legacy read-only visualization of planning and execution.
+12. `factory/mock_agent.py` and `mock_qa_agent.py` — deterministic rehearsal adapters.
 
 ## Control boundaries
 
@@ -70,7 +72,7 @@ flowchart LR
   commands with container or remote-runner wrappers when stronger isolation is
 required.
 
-The dashboard exposes local engine-room evidence. GitHub Projects remains the
+The Control Center exposes local engine-room evidence. GitHub Projects remains the
 shared backlog and dependency view; the two interfaces are deliberately not
 presented as the same system.
 

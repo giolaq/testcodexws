@@ -22,7 +22,7 @@ Complete this checklist before attendees arrive:
 - [ ] macOS, Linux, or WSL 2 is available.
 - [ ] Python 3.11 or later includes the `venv` module.
 - [ ] Node.js 20 or later and Git are on `PATH`.
-- [ ] Ports 5000, 5050, and 8000 are free.
+- [ ] Ports 5000 and 5050 are free.
 - [ ] The presentation browser can open localhost pages.
 - [ ] The workshop repository is clean and synchronized with its default branch.
 - [ ] A disposable checkout exists for a Rehearsal Run.
@@ -84,24 +84,27 @@ The exact contract and wrapper requirements are in `factory/CONFIGURATION.md`.
 
 ## Arrange the presentation workspace
 
-Use three terminals:
+Use two terminals:
 
 | Terminal | Keep visible | Purpose |
 | --- | --- | --- |
-| A | Factory checkout | Planning and factory commands |
-| B | `python3 -m http.server 8000` | Dashboard server |
-| C | Demo application | Pocket Cinema or TableStory |
+| A | `./factory/factory control-center --no-open` | Local factory server and fallback command output |
+| B | Demo application | Pocket Cinema or TableStory |
 
 Prepare these browser tabs:
 
 1. attendee workshop website;
-2. `http://localhost:8000/factory/dashboard.html`;
+2. `http://127.0.0.1:5050`;
 3. `http://localhost:5000`;
 4. the disposable GitHub Project for the Live Run; and
 5. one pull request for the merge-and-unlock explanation.
 
 Don't start the application before running the live doctor. An occupied port is
 reported as a warning.
+
+The Control Center is the attendee path. Keep terminal commands below as a
+facilitator recovery reference and to explain that the UI calls the same
+versioned CLI. Do not tunnel or publicly expose port 5050.
 
 ## Timing and presenter cues
 
@@ -215,9 +218,9 @@ Don't click through every field. Use one ticket to show this sequence:
 8. **History:** merge synchronization and dependency unlock.
 
 Use GitHub Projects for shared backlog ownership and dependencies. Use the
-Factory Dashboard for local prompts, logs, worktree changes, protected tests,
-gate results, and receipts. Do not describe the dashboard as a hosted Project
-board.
+Control Center for local prompts, logs, worktree changes, protected tests,
+gate results, and receipts. Do not describe the Control Center as a hosted
+Project board.
 
 ## Recovery during the session
 
@@ -228,14 +231,17 @@ board.
 | QA Review takes too long | Review one test set, then finish without `--review-qa-tests`. |
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |
-| The state is stale | Reset only after confirming demo changes can be discarded. |
+| The state is stale | Use **Reset current run** in the Control Center after confirming demo changes can be discarded. |
 | The agenda is late | Show one Acceptance Test approval and one dependency unlock, then verify the application. |
 
 If GitHub works but live planning cannot finish, use
 `./factory/factory seed recipe-rebrand` as a last-resort fixture. Tell attendees
 that it bypasses PRD planning and both human alignment gates.
 
-Reset a disposable rehearsal only when its demo changes can be discarded:
+Reset a disposable rehearsal only when its demo changes can be discarded. The
+Control Center offers two scopes: reset execution while keeping the approved
+plan, or type `START OVER` to clear all workshop work while keeping attendee
+configuration. The equivalent execution reset is:
 
 ```sh
 ./setup_demo.sh --scenario recipe-rebrand --force
@@ -250,8 +256,8 @@ The workshop is ready when a colleague can use the website without verbal help
 to:
 
 - select a path and verify its prerequisites;
-- reach every checkpoint using the displayed commands;
-- find the dashboard, ticket evidence, and troubleshooting section;
+- reach every checkpoint using the Control Center, with equivalent commands available;
+- find the ticket board, ticket evidence, and troubleshooting section;
 - explain the two human planning approvals and the Acceptance Test approval;
 - explain one dependency unlock;
 - complete and peer review a Factory Canvas;

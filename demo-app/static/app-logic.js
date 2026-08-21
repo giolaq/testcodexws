@@ -1,9 +1,9 @@
-export function matchesRecipe(recipe, query) {
-  return recipe.toLowerCase().includes(query.trim().toLowerCase());
+export function matchesMovie(haystack, query) {
+  return haystack.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
 }
 
-export function cookbookState(saved, id) {
-  const next = new Set(saved);
-  next.has(id) ? next.delete(id) : next.add(id);
-  return next;
+export function nextWatchlist(current, id) {
+  const values = new Set(current);
+  values.has(id) ? values.delete(id) : values.add(id);
+  return [...values].sort();
 }

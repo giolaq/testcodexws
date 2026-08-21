@@ -253,8 +253,8 @@ main {
 .concept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .concept-grid article { position: relative; min-height: 160px; padding: 23px 22px 20px 58px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .concept-grid article > span { position: absolute; top: 24px; left: 21px; color: var(--blue); font-size: 11px; font-weight: 800; }
-.concept-grid h3, .why-grid h3, .story-line h3, .outcome-grid h3, .control-spectrum h3, .canvas-panel h3 { margin: 0 0 7px; font-size: 19px; }
-.concept-grid p, .why-grid p, .story-line p, .outcome-grid p, .benefit-grid p, .control-spectrum p, .use-case-grid p, .canvas-panel p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.concept-grid h3, .why-grid h3, .story-line h3, .outcome-grid h3, .canvas-panel h3 { margin: 0 0 7px; font-size: 19px; }
+.concept-grid p, .why-grid p, .story-line p, .outcome-grid p, .benefit-grid p, .use-case-grid p, .canvas-panel p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 
 .why-section { background: linear-gradient(90deg, transparent, #fbfcff 12%, #fbfcff 88%, transparent); }
 .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -273,13 +273,6 @@ main {
 .outcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 38px; padding: 27px; border: 1px solid var(--line); border-radius: 9px; }
 .outcome-grid .check-list { margin: 0; }
 
-.control-spectrum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 42px; }
-.control-spectrum article { min-height: 275px; padding: 23px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
-.control-spectrum article > span { color: #80868b; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
-.control-spectrum h3 { margin-top: 9px; }
-.control-spectrum ul { margin: 19px 0 0; padding-left: 19px; color: #3c4043; font-size: 13px; }
-.control-spectrum li { margin: 6px 0; }
-.control-spectrum .spectrum-featured { border-color: #aecbfa; background: #f8fbff; box-shadow: inset 0 3px 0 var(--blue); }
 .use-case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .use-case-grid article { min-height: 140px; padding: 20px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-alt); }
 .canvas-panel { display: grid; grid-template-columns: .7fr 1.3fr; gap: 30px; margin: 34px 0 28px; padding: 27px; border-radius: 10px; background: #202124; color: #fff; }
@@ -349,6 +342,21 @@ main {
 .code-toolbar button { padding: 5px 9px; border: 1px solid #5f6368; border-radius: 4px; background: transparent; color: #e8eaed; font-size: 11px; cursor: pointer; }
 .code-toolbar button:hover { background: #3c4043; }
 .code-block pre { margin: 0; padding: 18px; overflow-x: auto; color: #e8eaed; font-size: 13px; line-height: 1.65; tab-size: 2; }
+
+.instruction-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 26px 0 30px; }
+.instruction-card { min-width: 0; padding: 21px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.instruction-card h3 { margin: 8px 0 18px; font-size: 19px; line-height: 1.3; }
+.path-label { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 4px; color: var(--blue-deep); background: var(--blue-pale); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.control-center-card { border-top: 4px solid var(--blue); }
+.cli-card { border-top: 4px solid #5f6368; background: var(--surface-alt); }
+.cli-card .path-label { color: #3c4043; background: #e8eaed; }
+.cli-card .code-block { margin: 0; }
+.cli-card .code-block pre { padding: 15px; font-size: 11px; line-height: 1.6; }
+.instruction-list { margin: 0; }
+.instruction-list > div { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 11px 0; border-top: 1px solid #eceff1; }
+.instruction-list > div:first-child { border-top: 0; padding-top: 0; }
+.instruction-list dt { color: var(--blue-deep); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.instruction-list dd { margin: 0; color: #3c4043; font-size: 13px; line-height: 1.5; }
 
 .checkpoint { margin: 26px 0 8px; padding: 18px 20px; border: 1px solid #a8dab5; border-radius: 7px; background: #f7fcf8; color: #3c4043; }
 .checkpoint-title { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--green); font-size: 13px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
@@ -488,18 +496,19 @@ footer button { border: 0; background: none; color: var(--blue-dark); cursor: po
   .hero-meta { flex-direction: column; gap: 4px; }
   .factory-map { padding: 18px 12px; }
   .map-node { padding: 8px 4px; font-size: 9px; }
-  .concept-grid, .why-grid, .benefit-grid, .story-line, .outcome-grid, .control-spectrum, .use-case-grid, .prerequisites-grid, .path-grid, .evidence-grid, .verification-grid, .workshop-figure-grid, .next-links { grid-template-columns: 1fr; gap: 14px; }
+  .concept-grid, .why-grid, .benefit-grid, .story-line, .outcome-grid, .use-case-grid, .prerequisites-grid, .path-grid, .evidence-grid, .verification-grid, .workshop-figure-grid, .instruction-paths, .next-links { grid-template-columns: 1fr; gap: 14px; }
   .terminal-grid { grid-template-columns: 1fr 1fr; }
   .concept-section, .why-section, .story-section, .prerequisites-section, .path-section, .apply-section, .support-section, .reference-section, .lesson { padding: 48px 0; }
   .definition-panel { padding: 21px 20px; }
   .definition-panel p { font-size: 18px; }
-  .story-line article, .control-spectrum article, .use-case-grid article { min-height: 0; }
+  .story-line article, .use-case-grid article { min-height: 0; }
   .canvas-panel { grid-template-columns: 1fr; gap: 22px; padding: 22px; }
   .canvas-panel li { grid-template-columns: 24px 72px 1fr; }
   .section-heading h2, .lesson-heading h2 { font-size: 28px; }
   .lesson-heading { gap: 12px; }
   .step-number { flex-basis: 36px; width: 36px; height: 36px; }
   .lesson-body { margin-left: 0; }
+  .instruction-list > div { grid-template-columns: 86px 1fr; }
   .workshop-figure figcaption { grid-template-columns: 1fr; gap: 2px; }
   .workshop-figure-portrait .workshop-screenshot img { max-height: 620px; }
   .lesson-footer { justify-content: stretch; }

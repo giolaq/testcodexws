@@ -68,6 +68,37 @@ function Checkpoint({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkshopPaths({
+  click,
+  inspect,
+  continueWhen,
+  children,
+}: {
+  click: ReactNode;
+  inspect: ReactNode;
+  continueWhen: ReactNode;
+  children: string;
+}) {
+  return (
+    <div className="instruction-paths">
+      <section className="instruction-card control-center-card" aria-label="Control Center path">
+        <span className="path-label">Control Center</span>
+        <h3>Use the web interface</h3>
+        <dl className="instruction-list">
+          <div><dt>Click</dt><dd>{click}</dd></div>
+          <div><dt>Inspect</dt><dd>{inspect}</dd></div>
+          <div><dt>Continue when</dt><dd>{continueWhen}</dd></div>
+        </dl>
+      </section>
+      <section className="instruction-card cli-card" aria-label="CLI path">
+        <span className="path-label">CLI</span>
+        <h3>Run the equivalent commands</h3>
+        <CodeBlock label="CLI">{children}</CodeBlock>
+      </section>
+    </div>
+  );
+}
+
 function WorkshopMedia({
   src,
   alt,
@@ -288,7 +319,7 @@ export default function Home() {
                 <li>macOS, Linux, or Windows with WSL2</li>
                 <li>Python 3.11+ with virtual environments</li>
                 <li>Node.js 20+, Git, and a modern browser</li>
-                <li>Ports 5000 and 8000 available</li>
+                <li>Ports 5000 and 5050 available</li>
                 <li>GitHub CLI and one personal workshop repository</li>
               </ul>
             </article>
@@ -336,40 +367,61 @@ gh --version`}</CodeBlock>
         </section>
 
         <StepSection index={1} id="setup" title="Set up" goal="Start from a clean, personal workshop repository." complete={completed.includes("setup")} onToggle={() => toggleStep("setup")}>
-          {track === "rehearsal" ? (
-            <>
-              <p>Clone the workshop, make it your own repository, and reset Pocket Cinema to the exercise baseline.</p>
-              <CodeBlock>{`gh auth login
+          <p>Clone the workshop and create your own repository first.</p>
+          <CodeBlock label="Terminal 1 — repository setup">{track === "rehearsal" ? `gh auth login
 git clone https://github.com/giolaq/software-refactory-workshop.git software-refactory-demo
 cd software-refactory-demo
 git remote rename origin upstream
 gh repo create software-refactory-demo --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
-git push origin main --follow-tags`}</CodeBlock>
-            </>
-          ) : (
-            <>
-              <p>Clone the workshop, make it your own repository, and configure the factory for Claude.</p>
-              <CodeBlock>{`gh auth login
+git push origin main --follow-tags` : `gh auth login
 gh auth refresh -s project
 git clone https://github.com/giolaq/software-refactory-workshop.git software-refactory-demo
 cd software-refactory-demo
 git remote rename origin upstream
 gh repo create software-refactory-demo --private --source=. --remote=origin --push
 ./setup_demo.sh --scenario recipe-rebrand
-git push origin main --follow-tags
-./factory/factory configure --preset claude-workshop
-./factory/factory doctor --full`}</CodeBlock>
-            </>
-          )}
-          <p>Start the dashboard in a second terminal.</p>
-          <CodeBlock>{`python3 -m http.server 8000`}</CodeBlock>
-          <Checkpoint>Open <a href="http://localhost:8000/factory/dashboard.html">localhost:8000/factory/dashboard.html</a>. The dashboard loads; on the live path, doctor reports no blocking errors.</Checkpoint>
+git push origin main --follow-tags`}</CodeBlock>
+
+          <div className="activity-card launch-card">
+            <span className="activity-label">Do this before using the screenshots</span>
+            <h3>Open the Control Center</h3>
+            <p>Open another terminal tab in the <code>software-refactory-demo</code> repository. Run:</p>
+            <CodeBlock label="Terminal 2 — keep this running">{`./factory/factory control-center`}</CodeBlock>
+            <ol>
+              <li>Wait for <code>Factory Control Center: http://127.0.0.1:5050</code>.</li>
+              <li>Your browser should open automatically. If it does not, open <a href="http://127.0.0.1:5050">127.0.0.1:5050</a> yourself.</li>
+              <li>Leave this terminal running for the workshop. Press <code>Ctrl+C</code> only when you want to stop the Control Center.</li>
+            </ol>
+          </div>
+
+          <WorkshopPaths
+            click={<>In the browser that just opened, select <strong>Connect</strong>, choose your agent preset, then select <strong>Run preflight</strong>.</>}
+            inspect={<>Confirm the repository, branch, remote, agent roles, QA approval, and parallel-ticket limit.</>}
+            continueWhen={<>Preflight reports no blockers and the header shows the correct repository.</>}
+          >{`./factory/factory configure --preset claude-workshop
+./factory/factory doctor --full`}</WorkshopPaths>
+          <WorkshopMedia
+            src="/screenshots/control-center-connect.jpg"
+            alt="Control Center Connect screen with agent presets, repository details, and preflight button"
+            label="Connect"
+            caption="Click Connect in the left navigation. Check the repository panel before running preflight."
+            width={1440}
+            height={900}
+          />
+          <Callout type="tip" title="Use the Overview as your guide">
+            <p><strong>Current phase</strong> explains what is running. <strong>Next checkpoint</strong> opens the next decision. Use <strong>Reset or start again</strong> to repeat a Rehearsal while keeping either the approved plan or only your configuration.</p>
+          </Callout>
+          <Checkpoint><a href="http://127.0.0.1:5050">127.0.0.1:5050</a> is open, the repository is connected, and preflight reports no blocking errors.</Checkpoint>
         </StepSection>
 
         <StepSection index={2} id="baseline" title="Inspect the app" goal="Understand the system before changing it." complete={completed.includes("baseline")} onToggle={() => toggleStep("baseline")}>
           <p>The demo begins as Pocket Cinema. Open it and identify its navigation, data flow, responsive layouts, and existing tests.</p>
-          <CodeBlock>{`.factory/venv/bin/python demo-app/app.py`}</CodeBlock>
+          <WorkshopPaths
+            click={<>Open <strong>Overview</strong> and check that the factory is at <strong>Define the PRD</strong>.</>}
+            inspect={<>Confirm no ticket work has started. The Control Center monitors the factory; the app itself runs in a terminal.</>}
+            continueWhen={<>Pocket Cinema opens locally and the factory still shows the starting phase.</>}
+          >{`.factory/venv/bin/python demo-app/app.py`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/pocket-cinema-before.webp"
             alt="Pocket Cinema application before the workshop change"
@@ -382,45 +434,56 @@ git push origin main --follow-tags
         </StepSection>
 
         <StepSection index={3} id="prd" title="Read the PRD" goal="Turn a broad request into a testable product outcome." complete={completed.includes("prd")} onToggle={() => toggleStep("prd")}>
-          <p>Read the supplied TableStory PRD. Confirm four things before planning:</p>
-          <ul>
-            <li>Who the product is for</li>
-            <li>What changes for the user</li>
-            <li>What must remain compatible</li>
-            <li>How success will be observed</li>
-          </ul>
-          <CodeBlock>{`sed -n '1,220p' recipe-app-prd.md`}</CodeBlock>
+          <WorkshopPaths
+            click={<>Select <strong>PRD</strong> in the left navigation. Edit the document if needed, then select <strong>Save PRD</strong>.</>}
+            inspect={<>Answer the four questions in the right panel: audience, user change, compatibility, and evidence of success.</>}
+            continueWhen={<>The PRD is saved and you can explain the outcome without describing implementation.</>}
+          >{`sed -n '1,220p' recipe-app-prd.md`}</WorkshopPaths>
+          <WorkshopMedia
+            src="/screenshots/control-center-prd.jpg"
+            alt="Control Center PRD editor with Save PRD and Start Product Review buttons"
+            label="PRD"
+            caption="Read the outcome in the editor and use the four-question checklist on the right."
+            width={1440}
+            height={900}
+          />
           <Checkpoint>You can explain the change in one sentence without describing implementation.</Checkpoint>
         </StepSection>
 
         <StepSection index={4} id="plan" title="Review product intent" goal="Approve the problem and desired behavior before technical design begins." complete={completed.includes("plan")} onToggle={() => toggleStep("plan")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory plan recipe-app-prd.md --mock
-export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory plan recipe-app-prd.md
-export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
-          )}
-          <p>Open the plan in the dashboard. Review the product brief. If it is vague, revise it; when it is testable, approve it.</p>
-          <CodeBlock>{`./factory/factory review product "$PLAN_ID"
+          <WorkshopPaths
+            click={<>In <strong>PRD</strong>, choose {track === "rehearsal" ? "Rehearsal" : "Live"}, select <strong>Start Product Review</strong>, then open <strong>Planning → Product Review</strong>.</>}
+            inspect={<>Check the user problem, desired behavior, requirement <code>R4</code>, evidence, and blocking questions. Revise vague output.</>}
+            continueWhen={<>The product artifact is specific, testable, and records a human approval.</>}
+          >{`./factory/factory plan recipe-app-prd.md${track === "rehearsal" ? " --mock" : ""}
+export PLAN_ID=<plan-id-from-output>
+./factory/factory review product "$PLAN_ID"
 ./factory/factory revise "$PLAN_ID" product \\
   --feedback "Clarify the user journey and measurable outcome."${track === "rehearsal" ? " --mock" : ""}
 ./factory/factory review product "$PLAN_ID"
-./factory/factory approve-product "$PLAN_ID"`}</CodeBlock>
+./factory/factory approve-product "$PLAN_ID"`}</WorkshopPaths>
+          <WorkshopMedia
+            src="/screenshots/control-center-planning.jpg"
+            alt="Control Center Planning screen showing the expert stages and human approval gates"
+            label="Planning"
+            caption="Click Product Review first. The yellow cards are decisions that require a person."
+            width={1440}
+            height={900}
+          />
           <Checkpoint>The product artifact shows objective <code>R4</code> and a human approval.</Checkpoint>
         </StepSection>
 
         <StepSection index={5} id="publish" title="Create tickets" goal="Agree on architecture, program design, and vertical slices before publishing work." complete={completed.includes("publish")} onToggle={() => toggleStep("publish")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory continue-plan "$PLAN_ID" --mock
+          <WorkshopPaths
+            click={<>In <strong>Planning</strong>, select <strong>Run remaining experts</strong>. Open each expert card, approve alignment, then select <strong>Create tickets</strong>.</>}
+            inspect={<>Check component contracts, data models, types, call paths, acceptance criteria, dependencies, and delivery waves.</>}
+            continueWhen={track === "live" ? <>GitHub Projects contains the approved slices as issues.</> : <>The rehearsal ticket board contains the approved slices.</>}
+          >{track === "rehearsal" ? `./factory/factory continue-plan "$PLAN_ID" --mock
 ./factory/factory review alignment "$PLAN_ID"
 ./factory/factory approve-rehearsal "$PLAN_ID" --scenario recipe-rebrand
-./factory/factory run --mock --scenario recipe-rebrand --dry-run`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory continue-plan "$PLAN_ID"
+./factory/factory run --mock --scenario recipe-rebrand --dry-run` : `./factory/factory continue-plan "$PLAN_ID"
 ./factory/factory review alignment "$PLAN_ID"
-./factory/factory approve "$PLAN_ID" --new-project-title "TableStory Workshop"`}</CodeBlock>
-          )}
+./factory/factory approve "$PLAN_ID" --new-project-title "TableStory Workshop"`}</WorkshopPaths>
           <p>Four specialists contribute one artifact each:</p>
           <div className="concept-grid compact-concept-grid">
             <article><span>P</span><h3>Product review</h3><p>Problem, users, behavior, and success.</p></article>
@@ -444,19 +507,17 @@ export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
         </StepSection>
 
         <StepSection index={6} id="qa" title="Approve tests" goal="Have a QA agent define acceptance evidence before implementation." complete={completed.includes("qa")} onToggle={() => toggleStep("qa")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory run --mock --scenario recipe-rebrand --review-qa-tests --once
-./factory/factory approve-tests ISSUE_NUMBER`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory run --review-qa-tests --once
-./factory/factory approve-tests ISSUE_NUMBER`}</CodeBlock>
-          )}
-          <p>Open the first ticket. Review the QA proposal, edit weak assertions, and approve only tests that prove user-visible behavior.</p>
+          <WorkshopPaths
+            click={<>Open <strong>Tickets</strong>, select <strong>Run one cycle</strong>, open ticket <strong>#1</strong>, then select <strong>Tests</strong>. Return to Summary to approve.</>}
+            inspect={<>Read the protected test path and verify that the proposed assertions prove the ticket’s acceptance criteria.</>}
+            continueWhen={<>The test proposal is credible and the ticket history records your approval.</>}
+          >{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""} --review-qa-tests --once
+./factory/factory approve-tests ISSUE_NUMBER`}</WorkshopPaths>
           <WorkshopMedia
-            src="/screenshots/factory-dashboard-qa-review.webp"
-            alt="GitHub Project with a ticket waiting for QA test review"
-            label="QA review state"
-            caption="Implementation waits until a human approves the proposed tests."
+            src="/screenshots/control-center-ticket-tests.jpg"
+            alt="Control Center ticket drawer open on the Tests tab"
+            label="Ticket tests"
+            caption="Open a QA Review ticket, then click Tests in the detail drawer."
             width={1440}
             height={900}
           />
@@ -464,36 +525,51 @@ export PLAN_ID=<plan-id-from-output>`}</CodeBlock>
         </StepSection>
 
         <StepSection index={7} id="factory" title="Run the factory" goal="Observe agents implement, verify, and review isolated tickets." complete={completed.includes("factory")} onToggle={() => toggleStep("factory")}>
-          {track === "rehearsal" ? (
-            <CodeBlock>{`./factory/factory run --mock --scenario recipe-rebrand`}</CodeBlock>
-          ) : (
-            <CodeBlock>{`./factory/factory run`}</CodeBlock>
-          )}
-          <p>Follow one ticket through the dashboard. Inspect:</p>
-          <ul>
-            <li>The exact prompt and agent log</li>
-            <li>The worktree and changed files</li>
-            <li>Test and quality-gate output</li>
-            <li>Review decisions and state history</li>
-          </ul>
-          <Callout type="tip" title="Retries are evidence">
-            <p>A failed gate should return the ticket to the agent with a clear reason. Do not hide the loop.</p>
-          </Callout>
+          <WorkshopPaths
+            click={<>Open <strong>Tickets</strong> and select <strong>Run factory</strong>. Open a moving ticket; use Prompt, Live log, Diff, Tests, and History.</>}
+            inspect={<>Follow its state, attempt count, dependencies, exact prompt, worktree changes, gate output, and review decisions.</>}
+            continueWhen={<>At least one ticket reaches Done and its detail drawer contains the evidence for that state.</>}
+          >{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""}`}</WorkshopPaths>
           <WorkshopMedia
-            src="/screenshots/factory-dashboard-complete.webp"
-            alt="GitHub Project with workshop tickets completed"
-            label="Completed delivery"
-            caption="The project board remains the shared view of work and state."
+            src="/screenshots/control-center-tickets.jpg"
+            alt="Control Center Tickets board with backlog and QA Review columns"
+            label="Ticket board"
+            caption="Click a card to inspect its prompt, live log, diff, tests, and history."
             width={1440}
             height={900}
           />
+          <WorkshopMedia
+            src="/screenshots/control-center-overview.jpg"
+            alt="Control Center Overview showing current phase, next checkpoint, progress, and human decisions"
+            label="Overview"
+            caption="Use Current phase to orient yourself and Next checkpoint to find the next human action."
+            width={1440}
+            height={900}
+          />
+          <Callout type="tip" title="Retries are evidence">
+            <p>A failed gate should return the ticket to the agent with a clear reason. Do not hide the loop.</p>
+          </Callout>
           <Checkpoint>At least one ticket reaches Done, and you can open its log, diff, tests, and review evidence.</Checkpoint>
         </StepSection>
 
         <StepSection index={8} id="finish" title="Verify the result" goal="Check the integrated product, not only individual tickets." complete={completed.includes("finish")} onToggle={() => toggleStep("finish")}>
-          <CodeBlock>{`.factory/venv/bin/python -m pytest -q demo-app/tests
+          <WorkshopPaths
+            click={<>Open <strong>Evidence</strong>. Inspect the checklist, complete the Factory Canvas, then select <strong>Create evidence packet</strong>.</>}
+            inspect={<>Confirm product intent, plan approval, test records, required gates, completed tickets, and the integrated user journeys.</>}
+            continueWhen={<>Every checklist item is complete and the generated packet explains why the delivery is done.</>}
+          >{`.factory/venv/bin/python -m pytest -q demo-app/tests
 node --test demo-app/static/tests/*.test.js
-.factory/venv/bin/python demo-app/app.py`}</CodeBlock>
+.factory/venv/bin/python demo-app/app.py
+./factory/factory canvas --output factory-canvas.md
+./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md`}</WorkshopPaths>
+          <WorkshopMedia
+            src="/screenshots/control-center-evidence.jpg"
+            alt="Control Center Evidence screen with completion checklist and evidence packet button"
+            label="Evidence"
+            caption="Inspect every checklist row before creating the evidence packet."
+            width={1440}
+            height={900}
+          />
           <p>Verify five journeys: browse recipes, search, open details, save a favorite, and use the TV layout. Check desktop and mobile widths.</p>
           <div className="workshop-figure-grid">
             <WorkshopMedia src="/screenshots/tablestory-mobile.webp" alt="TableStory on a mobile viewport" label="Mobile" caption="Touch layout" width={430} height={932} portrait />
@@ -509,8 +585,6 @@ node --test demo-app/static/tests/*.test.js
             height={900}
             illustration
           />
-          <CodeBlock>{`./factory/factory canvas --output factory-canvas.md
-./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md`}</CodeBlock>
           <Checkpoint>The app passes its tests, works at three viewport sizes, and the evidence report explains why the change is complete.</Checkpoint>
         </StepSection>
 
@@ -522,14 +596,9 @@ node --test demo-app/static/tests/*.test.js
 
         <section id="adapt" className="apply-section">
           <div className="section-heading">
-            <span className="section-kicker">Use it at work</span>
-            <h2>Choose the smallest useful factory</h2>
-            <p>Keep the workflow proportional to risk. Add controls only when they answer a real failure mode.</p>
-          </div>
-          <div className="control-spectrum">
-            <article><span>LOW RISK</span><h3>Lean</h3><p>One agent, local tests, and a human diff review.</p><ul><li>Small internal tools</li><li>Short-lived experiments</li></ul></article>
-            <article className="spectrum-featured"><span>DEFAULT</span><h3>Standard</h3><p>Planning, ticket isolation, QA tests, gates, and GitHub review.</p><ul><li>Product features</li><li>Shared repositories</li></ul></article>
-            <article><span>HIGH RISK</span><h3>Assured</h3><p>Stricter approval, traceability, security checks, and release evidence.</p><ul><li>Regulated systems</li><li>Critical services</li></ul></article>
+            <span className="section-kicker">After the workshop</span>
+            <h2>Use your own agents</h2>
+            <p>Map the factory roles to the command-line agents your team already uses.</p>
           </div>
           <h3 className="subsection-title">Pick your next experiment</h3>
           <ol>
@@ -564,9 +633,10 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <details><summary>No Git remotes found</summary><p>Run <code>git remote -v</code> inside the demo repository. Add or correct <code>origin</code>; do not point the factory repository at the demo project.</p></details>
             <details><summary>Claude asks for an OpenAI API key</summary><p>Your selected adapter is still the OpenAI preset. Run <code>./factory/factory configure --preset claude-workshop</code>, confirm Claude is authenticated, then rerun doctor.</p></details>
             <details><summary>A ticket is blocked</summary><p>Open its event history and agent log. Fix the recorded cause, then run <code>./factory/factory retry ISSUE_NUMBER</code>.</p></details>
-            <details><summary>The dashboard reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
+            <details><summary>The Control Center reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
             <details><summary>Live planning is slow or inconsistent</summary><p>Use the rehearsal path to learn the workflow. Return to live mode after credentials, model access, and the PRD are stable.</p></details>
             <details><summary>A port or worktree is already in use</summary><p>Stop the stale process or inspect active worktrees with <code>git worktree list</code>. Remove only a worktree you have confirmed is disposable.</p></details>
+            <details><summary>I want to repeat the workshop</summary><p>Open <strong>Reset or start again</strong> in the local Control Center. Reset ticket execution to keep the approved PRD plan, or type <code>START OVER</code> to return to the beginning. For Live mode, create a fresh repository.</p></details>
           </div>
         </section>
 
@@ -577,6 +647,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <p>The commands you are most likely to repeat.</p>
           </div>
           <div className="reference-table">
+            <div><code>factory control-center</code><span>Open the local operator interface.</span></div>
             <div><code>factory doctor --full</code><span>Check live prerequisites and configuration.</span></div>
             <div><code>factory plan PRD</code><span>Start the four-stage planning workflow.</span></div>
             <div><code>factory review product PLAN_ID</code><span>Read the product artifact before approval.</span></div>

@@ -7,7 +7,8 @@ independent QA agent to commit protected acceptance tests, runs the selected
 implementation agent, verifies ordered gates, retries with the failure in the
 prompt, then publishes a PR. A Rehearsal Run (`--mock`) follows the implementation path but
 skips real QA by default and merges locally.
-Every transition is mirrored to .factory/state.json for the dashboard.
+Every transition is mirrored to .factory/state.json for the Control Center and
+read-only dashboard.
 """
 
 from __future__ import annotations
@@ -1363,6 +1364,13 @@ def parser():
     p = argparse.ArgumentParser(prog="factory", description="Software (re)-Factory orchestrator")
     p.add_argument("--version", action="version", version=f"factory {WORKSHOP_VERSION}")
     sub = p.add_subparsers(dest="command", required=True)
+    control_center = sub.add_parser(
+        "control-center", help="open the local web control plane",
+    )
+    control_center.add_argument("--repo", default=".")
+    control_center.add_argument("--host", default="127.0.0.1")
+    control_center.add_argument("--port", type=positive_int, default=5050)
+    control_center.add_argument("--no-open", action="store_true")
     configure = sub.add_parser("configure", help="save attendee defaults for shorter commands")
     configure.add_argument("--preset", choices=sorted(PRESETS))
     configure.add_argument("--profile", choices=sorted(FACTORY_PROFILES))
@@ -1477,7 +1485,10 @@ def main():
     repo = Path(getattr(args, "repo", ".")).resolve()
     try:
         session = apply_session_defaults(args, repo)
-        if args.command == "configure":
+        if args.command == "control-center":
+            from control_center import serve
+            serve(repo, host=args.host, port=args.port, open_browser=not args.no_open)
+        elif args.command == "configure":
             path, configured = configure_session(
                 repo, args.preset, args.project_number,
                 agent=args.agent, qa_agent=args.qa_agent,

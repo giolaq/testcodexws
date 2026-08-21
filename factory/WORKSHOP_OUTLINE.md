@@ -22,7 +22,7 @@ Everyone needs:
 
 - macOS, Linux, or Windows with WSL2.
 - Python 3.11+, Node.js 20+, Git, and a modern browser.
-- Ports 5000 and 8000 available.
+- Ports 5000 and 5050 available.
 - GitHub CLI and a personal disposable workshop repository. Every attendee
   creates their own; the facilitator uses a separate repository on screen.
 
@@ -78,18 +78,31 @@ Repeat the same pattern for every step:
 
 **Goal:** Start with a healthy factory and a separate demo repository.
 
-**Do:** Reset Pocket Cinema to the exercise baseline. For a live run, configure
-the selected agent and run preflight. Start the dashboard in a second terminal.
+**Do:** Reset Pocket Cinema to the exercise baseline. Then open a second
+terminal tab at the repository root and start the local Control Center:
 
 ```bash
 ./setup_demo.sh --scenario recipe-rebrand
-./factory/factory configure --preset claude-workshop  # live
-./factory/factory doctor --full                       # live
-python3 -m http.server 8000
 ```
 
-**Check:** `http://localhost:8000/factory/dashboard.html` loads. For a live run,
-doctor reports no blocking errors.
+Keep this second command running for the rest of the workshop:
+
+```bash
+./factory/factory control-center
+```
+
+Wait for `Factory Control Center: http://127.0.0.1:5050`. The browser should
+open automatically; otherwise open that address yourself. In the browser,
+select **Connect**, choose the agent preset, save it, and run preflight. Press
+`Ctrl+C` only when you want to stop the Control Center. In Rehearsal,
+credentials and GitHub writes are not required.
+
+**Check:** <http://127.0.0.1:5050> loads, shows the correct repository, and
+preflight reports no blocking errors.
+
+Point out the Overview before continuing: **Current phase** explains what is
+happening, **Next checkpoint** opens the next human action, and the progress row
+separates completed, current, and pending phases.
 
 ### 2. Inspect the app
 
@@ -107,11 +120,9 @@ doctor reports no blocking errors.
 
 **Goal:** Express the change as a user outcome, not an implementation request.
 
-**Do:** Read the TableStory PRD and identify the user, desired behavior, compatibility constraints, and observable success.
-
-```bash
-sed -n '1,220p' recipe-app-prd.md
-```
+**Do:** Open **PRD** in the Control Center. Read the supplied TableStory PRD and
+identify the user, desired behavior, compatibility constraints, and observable
+success.
 
 **Check:** An attendee can explain the change in one sentence without describing code.
 
@@ -119,19 +130,9 @@ sed -n '1,220p' recipe-app-prd.md
 
 **Goal:** Approve the problem and desired behavior before technical design.
 
-**Do:** Start planning, open the product artifact, revise vague statements, and approve it.
-
-```bash
-./factory/factory plan recipe-app-prd.md
-export PLAN_ID=<plan-id-from-output>
-./factory/factory review product "$PLAN_ID"
-./factory/factory revise "$PLAN_ID" product \
-  --feedback "Clarify the user journey and measurable outcome."
-./factory/factory review product "$PLAN_ID"
-./factory/factory approve-product "$PLAN_ID"
-```
-
-Add `--mock` to both `plan` and `revise` for rehearsal.
+**Do:** Choose Rehearsal or Live agents and select **Start Product Review**.
+Open **Planning**, read the Product Review artifact, request a focused revision
+when a claim is vague, and approve it when the outcome is testable.
 
 **Check:** The product artifact records a human approval.
 
@@ -139,27 +140,16 @@ Add `--mock` to both `plan` and `revise` for rehearsal.
 
 **Goal:** Align architecture, program design, and vertical slices before parallel work begins.
 
-**Do:** Continue planning and review four artifacts:
+**Do:** In **Planning**, select **Run remaining experts** and review four artifacts:
 
 - Product review: problem, users, behavior, and success.
 - Architecture: components, contracts, data, and constraints.
 - Program design: types, signatures, layout, and call paths.
 - Vertical slices: ordered tickets with acceptance criteria.
 
-```bash
-./factory/factory continue-plan "$PLAN_ID"
-./factory/factory review alignment "$PLAN_ID"
-./factory/factory approve "$PLAN_ID" --new-project-title "TableStory Workshop"
-```
-
-For rehearsal, use the same artifacts without GitHub writes:
-
-```bash
-./factory/factory continue-plan "$PLAN_ID" --mock
-./factory/factory review alignment "$PLAN_ID"
-./factory/factory approve-rehearsal "$PLAN_ID" --scenario recipe-rebrand
-./factory/factory run --mock --scenario recipe-rebrand --dry-run
-```
+Select **Approve and create tickets** only after the requirements trace through
+all four artifacts. In Live mode, enter a new Project title or use the Project
+number saved on **Connect**.
 
 The planning agents create normal workshop tickets from the PRD. Do not seed five tickets; seeding exists only for fixtures and recovery demonstrations.
 
@@ -169,14 +159,9 @@ The planning agents create normal workshop tickets from the PRD. Do not seed fiv
 
 **Goal:** Define acceptance evidence before implementation.
 
-**Do:** Let the QA agent propose tests for the first ticket. Review and approve assertions that prove user-visible behavior.
-
-```bash
-./factory/factory run --review-qa-tests --once
-./factory/factory approve-tests ISSUE_NUMBER
-```
-
-Use `--mock --scenario recipe-rebrand` for rehearsal.
+**Do:** Open **Tickets** and select **Run one cycle**. The QA agent proposes
+tests for ready tickets before implementation begins. Open one ticket, inspect
+its Tests tab, and approve only assertions that prove user-visible behavior.
 
 **Check:** The ticket contains tests and its history records QA approval.
 
@@ -184,13 +169,9 @@ Use `--mock --scenario recipe-rebrand` for rehearsal.
 
 **Goal:** Observe isolated implementation, verification, and review.
 
-**Do:** Run the factory and follow one ticket. Show its exact prompt, agent log, worktree, diff, test output, quality gates, review, and state history.
-
-```bash
-./factory/factory run
-```
-
-Use `--mock --scenario recipe-rebrand` for rehearsal.
+**Do:** Select **Run factory** and follow one ticket. Open its detail drawer and
+show the exact prompt, live agent log, diff, protected tests, gate output, and
+state history. The operation panel always shows the equivalent CLI command.
 
 **Check:** At least one ticket reaches Done, and attendees can locate the evidence behind that state.
 
@@ -206,12 +187,8 @@ node --test demo-app/static/tests/*.test.js
 .factory/venv/bin/python demo-app/app.py
 ```
 
-Then summarize the factory evidence:
-
-```bash
-./factory/factory canvas --output factory-canvas.md
-./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md
-```
+Then open **Evidence**, complete the Factory Canvas, and select **Create evidence
+packet**.
 
 **Check:** The integrated app works and the evidence report explains why the change is complete.
 
@@ -236,6 +213,7 @@ Recommend the smallest useful workflow:
 Keep detailed setup and recovery material out of the spoken path:
 
 - [Facilitator runbook](FACILITATOR.md)
+- [Control Center](CONTROL_CENTER.md)
 - [Agent configuration](CONFIGURATION.md)
 - [Planning workflow](PLANNING.md)
 - [Factory command reference](README.md)

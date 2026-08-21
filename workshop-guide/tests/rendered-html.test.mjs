@@ -32,6 +32,18 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /facilitator uses a different repository/i);
   assert.match(html, /Rehearsal/);
   assert.match(html, /Live/);
+  assert.match(html, /factory control-center/);
+  assert.match(html, /Open the Control Center/);
+  assert.match(html, /Terminal 2 — keep this running/);
+  assert.match(html, /Factory Control Center: http:\/\/127\.0\.0\.1:5050/);
+  assert.match(html, /browser should open automatically/i);
+  assert.match(html, /Ctrl\+C/);
+  assert.match(html, /Control Center/);
+  assert.match(html, /Control Center path/);
+  assert.match(html, /CLI path/);
+  assert.match(html, /Click/);
+  assert.match(html, /Inspect/);
+  assert.match(html, /Continue when/);
 
   for (const heading of [
     "Set up",
@@ -56,12 +68,17 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /planning agents produce the tickets from the PRD/i);
   assert.match(html, /Configure your own agent/);
   assert.match(html, /my-agent =/);
-  assert.match(html, /Lean[\s\S]*Standard[\s\S]*Assured/);
+  assert.match(html, /Use your own agents/);
   assert.match(html, /Troubleshooting/);
 
   assert.match(html, /screenshots\/pocket-cinema-before\.webp/);
-  assert.match(html, /screenshots\/factory-dashboard-qa-review\.webp/);
-  assert.match(html, /screenshots\/factory-dashboard-complete\.webp/);
+  assert.match(html, /screenshots\/control-center-connect\.jpg/);
+  assert.match(html, /screenshots\/control-center-prd\.jpg/);
+  assert.match(html, /screenshots\/control-center-planning\.jpg/);
+  assert.match(html, /screenshots\/control-center-tickets\.jpg/);
+  assert.match(html, /screenshots\/control-center-ticket-tests\.jpg/);
+  assert.match(html, /screenshots\/control-center-overview\.jpg/);
+  assert.match(html, /screenshots\/control-center-evidence\.jpg/);
   assert.match(html, /screenshots\/tablestory-desktop\.webp/);
   assert.match(html, /screenshots\/tablestory-mobile\.webp/);
   assert.match(html, /screenshots\/tablestory-tv\.webp/);
@@ -71,6 +88,8 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /Ian Xiaohei illustration workflow/);
 
   assert.doesNotMatch(html, /lights[- ]off|control experiment|run_lights_off|two delivery systems/i);
+  assert.doesNotMatch(html, /Choose the smallest useful factory|Small internal tools|Regulated systems/i);
+  assert.doesNotMatch(html, /localhost:8000|python3 -m http\.server 8000/i);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 

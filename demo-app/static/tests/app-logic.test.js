@@ -1,15 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {matchesRecipe,cookbookState} from '../app-logic.js';
+import {matchesMovie, nextWatchlist} from '../app-logic.js';
 
-test('recipe matching ignores case and surrounding whitespace',()=>{
-  assert.equal(matchesRecipe('Tomato Pasta basil',' BASIL '),true);
-  assert.equal(matchesRecipe('Tomato Pasta','miso'),false);
+test('movie matching ignores case and surrounding whitespace', () => {
+  assert.equal(matchesMovie('Afterlight Station Sci-Fi', '  sci-FI '), true);
+  assert.equal(matchesMovie('Afterlight Station Sci-Fi', 'comedy'), false);
 });
 
-test('cookbook state toggles without mutating its input',()=>{
-  const saved=new Set(['one']);
-  assert.deepEqual([...cookbookState(saved,'two')],['one','two']);
-  assert.deepEqual([...saved],['one']);
-  assert.deepEqual([...cookbookState(saved,'one')],[]);
+test('watchlist toggles deterministically', () => {
+  assert.deepEqual(nextWatchlist(['b'], 'a'), ['a', 'b']);
+  assert.deepEqual(nextWatchlist(['a', 'b'], 'a'), ['b']);
 });
