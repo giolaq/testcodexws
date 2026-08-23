@@ -245,13 +245,13 @@ def approve_plan(
         "--json", "number,title,body,url",
     )
     marker = re.compile(rf"<!-- factory-plan:{re.escape(plan['plan_id'])}:([^ ]+) -->")
+    by_key = {ticket["key"]: ticket for ticket in plan["tickets"]}
     numbers = {}
     issue_urls = {int(issue["number"]): issue["url"] for issue in existing}
     for issue in existing:
         match = marker.search(issue.get("body") or "")
-        if match:
+        if match and match.group(1) in by_key:
             numbers[match.group(1)] = int(issue["number"])
-    by_key = {ticket["key"]: ticket for ticket in plan["tickets"]}
     created = set()
     for key in order:
         if key in numbers:

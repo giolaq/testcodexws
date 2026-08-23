@@ -122,11 +122,18 @@ class PlannerTests(unittest.TestCase):
                 if args[:2] == ("project", "create"):
                     return {"number": 12}
                 if args[:2] == ("issue", "list"):
-                    return [{
-                        "number": 41,
-                        "url": "https://github.test/giolaq/test1/issues/41",
-                        "body": "<!-- factory-plan:abc123:T1 -->",
-                    }]
+                    return [
+                        {
+                            "number": 40,
+                            "url": "https://github.test/giolaq/test1/issues/40",
+                            "body": "<!-- factory-plan:abc123:RETIRED -->",
+                        },
+                        {
+                            "number": 41,
+                            "url": "https://github.test/giolaq/test1/issues/41",
+                            "body": "<!-- factory-plan:abc123:T1 -->",
+                        },
+                    ]
                 if args[:2] == ("project", "view"):
                     return {"url": "https://github.test/users/giolaq/projects/12"}
                 raise AssertionError(f"unexpected GitHub JSON call: {args}")
@@ -161,12 +168,14 @@ class PlannerTests(unittest.TestCase):
                     Path(directory), path, None, True,
                     new_project_title="Fresh smoke board",
                 )
+            published = json.loads(path.read_text())
 
         backend = RecordingBackend.instance
         self.assertEqual(backend.added, [
             (41, "https://github.test/giolaq/test1/issues/41"),
         ])
         self.assertEqual(backend.status_updates, [(41, "Ready")])
+        self.assertEqual(published["publication"]["issues"], {"T1": 41})
 
 
 if __name__ == "__main__":
