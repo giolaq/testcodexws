@@ -55,6 +55,20 @@ class RepositoryContractTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_release_test_commands_use_an_environment_with_runtime_test_dependencies(self):
+        workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
+        install = "python3 -m pip install -r demo-app/requirements.txt"
+        unit = "python3 -m unittest discover -s factory/tests -v"
+        self.assertIn(install, workflow)
+        self.assertLess(workflow.index(install), workflow.index(unit))
+
+        for relative in ("factory/README.md", "factory/FACILITATOR.md"):
+            text = (REPO / relative).read_text()
+            self.assertIn(
+                ".factory/venv/bin/python -m unittest discover -s factory/tests",
+                text,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

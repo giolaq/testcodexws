@@ -325,7 +325,7 @@ release audit. The day before delivery:
 
 ```sh
 ./factory/factory --version
-python3 -m unittest discover -s factory/tests
+.factory/venv/bin/python -m unittest discover -s factory/tests
 npm --prefix workshop-guide test
 npm --prefix workshop-guide run lint
 ./factory/factory release-check
