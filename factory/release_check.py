@@ -388,7 +388,7 @@ def run_clean_standard_rehearsal(repo: Path) -> str:
 
 
 def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> None:
-    """Repair one mechanical slice-count violation, then fail closed."""
+    """Repair one mechanical Vertical Slices validation failure, then fail closed."""
     command = [*factory, "continue-plan", plan_id]
     try:
         _checked(command, repo, timeout=None)
@@ -404,10 +404,7 @@ def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> N
             record.get("status") == "blocked"
             and record.get("failure_kind") == "validation"
             and record.get("same_failure_count") == 1
-            and re.fullmatch(
-                r"vertical slices expert returned \d+ tickets; expected 1-1",
-                validation_error,
-            )
+            and bool(validation_error)
         )
         if not repairable:
             raise
@@ -417,6 +414,7 @@ def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> N
         "Return exactly one vertical slice. That one ticket must deliver the endpoint "
         "and carry the independent Acceptance Test evidence; the QA role authors the "
         "protected test during that ticket's workflow, not as a separate ticket. "
+        "Give that ticket non-empty file_ownership covering the implementation and test files. "
         "Preserve the approved requirement, contract, and program-element traceability."
     )
     _checked([

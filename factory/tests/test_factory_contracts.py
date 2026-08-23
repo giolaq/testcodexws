@@ -225,7 +225,7 @@ class FactoryContractTests(unittest.TestCase):
             ):
                 run_live_github_smoke(repo, True)
 
-    def test_live_smoke_repairs_one_ticket_count_validation_once(self):
+    def test_live_smoke_repairs_first_vertical_slice_validation_once(self):
         class StopAfterBoundedRepair(Exception):
             pass
 
@@ -251,13 +251,15 @@ class FactoryContractTests(unittest.TestCase):
                                     "status": "blocked",
                                     "failure_kind": "validation",
                                     "validation_error": (
-                                        "vertical slices expert returned 2 tickets; expected 1-1"
+                                        "SMOKE-DELIVER requires non-empty file_ownership"
                                     ),
                                     "same_failure_count": 1,
                                 },
                             },
                         }))
-                        raise RuntimeError("vertical slices expert returned 2 tickets; expected 1-1")
+                        raise RuntimeError(
+                            "SMOKE-DELIVER requires non-empty file_ownership"
+                        )
                 if "revise" in command:
                     self.assertEqual(command[command.index("revise") + 1:command.index("revise") + 3], [
                         "live-plan", "slices",
@@ -265,6 +267,7 @@ class FactoryContractTests(unittest.TestCase):
                     feedback = command[command.index("--feedback") + 1]
                     self.assertIn("exactly one vertical slice", feedback)
                     self.assertIn("Acceptance Test", feedback)
+                    self.assertIn("non-empty file_ownership", feedback)
                     raise StopAfterBoundedRepair
                 return ""
 
