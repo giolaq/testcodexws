@@ -388,39 +388,54 @@ def run_clean_standard_rehearsal(repo: Path) -> str:
 
 
 def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> None:
-    """Repair one mechanical Vertical Slices validation failure, then fail closed."""
+    """Repair one mechanical validation failure per technical stage, then fail closed."""
     command = [*factory, "continue-plan", plan_id]
-    try:
-        _checked(command, repo, timeout=None)
-        return
-    except RuntimeError:
-        manifest_path = repo / ".factory/plans" / plan_id / "manifest.json"
-        if not manifest_path.is_file():
-            raise
-        manifest = json.loads(manifest_path.read_text())
-        record = manifest.get("stages", {}).get("vertical_slices", {})
+    aliases = {
+        "system_architecture": "architecture",
+        "program_design": "program",
+        "vertical_slices": "slices",
+    }
+    repaired: set[str] = set()
+    while True:
+        try:
+            _checked(command, repo, timeout=None)
+            return
+        except RuntimeError:
+            manifest_path = repo / ".factory/plans" / plan_id / "manifest.json"
+            if not manifest_path.is_file():
+                raise
+            manifest = json.loads(manifest_path.read_text())
+            blocked = [
+                (stage, record)
+                for stage, record in manifest.get("stages", {}).items()
+                if stage in aliases
+                and record.get("status") == "blocked"
+                and record.get("failure_kind") == "validation"
+                and record.get("validation_error")
+            ]
+            if len(blocked) != 1:
+                raise
+            stage, record = blocked[0]
+            if record.get("same_failure_count") != 1 or stage in repaired:
+                raise
         validation_error = str(record.get("validation_error") or "")
-        repairable = (
-            record.get("status") == "blocked"
-            and record.get("failure_kind") == "validation"
-            and record.get("same_failure_count") == 1
-            and bool(validation_error)
+        feedback = (
+            f"The deterministic validator rejected the artifact: {validation_error}. "
+            "Return a complete corrected replacement that satisfies the exact validator "
+            "constraint. Use only stable identifiers declared by the approved upstream "
+            "artifacts, preserve approved scope, and do not invent new product decisions."
         )
-        if not repairable:
-            raise
-
-    feedback = (
-        f"The deterministic validator rejected the artifact: {validation_error}. "
-        "Return exactly one vertical slice. That one ticket must deliver the endpoint "
-        "and carry the independent Acceptance Test evidence; the QA role authors the "
-        "protected test during that ticket's workflow, not as a separate ticket. "
-        "Give that ticket non-empty file_ownership covering the implementation and test files. "
-        "Preserve the approved requirement, contract, and program-element traceability."
-    )
-    _checked([
-        *factory, "revise", plan_id, "slices", "--feedback", feedback,
-    ], repo, timeout=None)
-    _checked(command, repo, timeout=None)
+        if stage == "vertical_slices":
+            feedback += (
+                " Return exactly one vertical slice. That one ticket must deliver the endpoint "
+                "and carry the independent Acceptance Test evidence; the QA role authors the "
+                "protected test during that ticket's workflow, not as a separate ticket. Give "
+                "that ticket non-empty file_ownership covering the implementation and test files."
+            )
+        _checked([
+            *factory, "revise", plan_id, aliases[stage], "--feedback", feedback,
+        ], repo, timeout=None)
+        repaired.add(stage)
 
 
 def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
