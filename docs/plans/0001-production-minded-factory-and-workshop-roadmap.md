@@ -1,10 +1,12 @@
 # Production-minded Factory and Workshop Roadmap
 
-**Status:** Implementation in progress
+**Status:** Release candidate — local gates passed; Live smoke pending
 **Owner:** Workshop lead
 **Created:** 2026-08-23
 **Scope:** Factory engine, Control Center, GitHub integration, workshop website,
 facilitator material, and release validation
+
+Implementation evidence: [roadmap audit](0001-production-minded-factory-and-workshop-implementation-audit.md)
 
 ## Inputs
 
