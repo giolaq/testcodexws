@@ -324,7 +324,7 @@ Acceptance criteria:
 **Goal:** teach why each factory component exists before asking attendees to
 operate the complete system.
 
-Do not restore the removed lights-off control experiment. Use one coherent,
+Do not restore the retired unattended comparison exercise. Use one coherent,
 guided story:
 
 1. Start with the minimum responsible loop: clear issue, one agent, one real
@@ -498,7 +498,7 @@ changes; require a person to approve every policy change.
 - Automatically repairing findings discovered by Monitor.
 - Automatically editing the Factory Charter from run metrics.
 - Running all four planning experts for every bounded maintenance issue.
-- Reintroducing the removed lights-off control experiment.
+- Reintroducing the retired unattended comparison exercise.
 - Claiming that one successful workshop run proves higher quality or lower cost.
 
 ## Implementation order and release gates
