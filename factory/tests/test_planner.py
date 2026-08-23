@@ -1,8 +1,10 @@
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -99,6 +101,65 @@ class PlannerTests(unittest.TestCase):
     def test_approval_rejects_two_project_selection_modes(self):
         with self.assertRaisesRegex(ValueError, "either --project-number"):
             approve_plan(Path("."), Path("missing.json"), 2, True, "Fresh board")
+
+    def test_publication_adds_only_the_approved_tickets_to_the_project(self):
+        class RecordingBackend:
+            instance = None
+
+            def __init__(self, repo, project_number=None):
+                type(self).instance = self
+                self.owner = "giolaq"
+                self.name = "test1"
+                self.project_number = project_number
+                self.created = []
+                self.added = []
+
+            def preflight(self):
+                return None
+
+            def json(self, *args):
+                if args[:2] == ("project", "create"):
+                    return {"number": 12}
+                if args[:2] == ("issue", "list"):
+                    return []
+                if args[:2] == ("project", "view"):
+                    return {"url": "https://github.test/users/giolaq/projects/12"}
+                raise AssertionError(f"unexpected GitHub JSON call: {args}")
+
+            def gh(self, *args):
+                if args[:2] == ("issue", "create"):
+                    number = 40 + len(self.created) + 1
+                    url = f"https://github.test/giolaq/test1/issues/{number}"
+                    self.created.append((number, url))
+                    return subprocess.CompletedProcess(args, 0, url + "\n", "")
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            def add_issue_to_project(self, number, url):
+                self.added.append((number, url))
+
+            def load(self):
+                return [
+                    {"number": number, "labels": ["agent-ready"]}
+                    for number, _ in self.created
+                ]
+
+            def set_status(self, ticket, status, note):
+                ticket["status"] = status
+
+        plan = sample_plan()
+        plan["tickets"] = plan["tickets"][:1]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(plan))
+
+            with mock.patch("planner.GitHubBackend", RecordingBackend):
+                approve_plan(
+                    Path(directory), path, None, True,
+                    new_project_title="Fresh smoke board",
+                )
+
+        backend = RecordingBackend.instance
+        self.assertEqual(backend.added, backend.created)
 
 
 if __name__ == "__main__":

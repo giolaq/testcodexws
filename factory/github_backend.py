@@ -31,6 +31,7 @@ class GitHubBackend:
         self.repository = parse_github_repository(repository) if repository else None
         self.owner = self.name = self.default_branch = self.project_id = self.field_id = None
         self.options, self.items = {}, {}
+        self._project_items_loaded = False
 
     def gh(self, *args, input_data=None, check=True, cwd=None, env=None):
         result = subprocess.run(
@@ -291,20 +292,12 @@ class GitHubBackend:
             "issue", "list", "--repo", f"{self.owner}/{self.name}", "--state", "all", "--limit", 200,
             "--json", "number,title,body,state,url,labels,updatedAt",
         )
-        raw_items = self.json("project", "item-list", self.project_number, "--owner", self.owner, "--limit", 500, "--format", "json").get("items", [])
-        for item in raw_items:
-            content = item.get("content", {})
-            if content.get("type") == "Issue" and content.get("number"):
-                self.items[int(content["number"])] = item["id"]
+        raw_items = self._load_project_items()
         tickets = []
         for issue in issues:
             number = int(issue["number"])
             if number not in self.items:
-                item = self.json(
-                    "project", "item-add", self.project_number, "--owner", self.owner,
-                    "--url", issue["url"], "--format", "json",
-                )
-                self.items[number] = item["id"]
+                continue
             status = next((i.get("status") for i in raw_items if i.get("content", {}).get("number") == number), None) or "Backlog"
             labels = [label["name"] for label in issue.get("labels", [])]
             pr = self.existing_pr(number)
@@ -319,6 +312,34 @@ class GitHubBackend:
             })
         self._ensure_labels()
         return tickets
+
+    def _load_project_items(self):
+        raw_items = self.json(
+            "project", "item-list", self.project_number, "--owner", self.owner,
+            "--limit", 500, "--format", "json",
+        ).get("items", [])
+        self.items = {}
+        for item in raw_items:
+            content = item.get("content", {})
+            if content.get("type") == "Issue" and content.get("number"):
+                self.items[int(content["number"])] = item["id"]
+        self._project_items_loaded = True
+        return raw_items
+
+    def add_issue_to_project(self, number: int, url: str) -> None:
+        """Add one explicitly approved Ticket without importing repository backlog."""
+        if self.project_id is None:
+            self.ensure_project()
+        if not self._project_items_loaded:
+            self._load_project_items()
+        number = int(number)
+        if number in self.items:
+            return
+        item = self.json(
+            "project", "item-add", self.project_number, "--owner", self.owner,
+            "--url", url, "--format", "json",
+        )
+        self.items[number] = item["id"]
 
     def _ensure_labels(self):
         for status in STATES:

@@ -246,6 +246,7 @@ def approve_plan(
     )
     marker = re.compile(rf"<!-- factory-plan:{re.escape(plan['plan_id'])}:([^ ]+) -->")
     numbers = {}
+    issue_urls = {int(issue["number"]): issue["url"] for issue in existing}
     for issue in existing:
         match = marker.search(issue.get("body") or "")
         if match:
@@ -260,7 +261,9 @@ def approve_plan(
             "issue", "create", "--repo", repository, "--title", ticket["title"],
             "--body", issue_body(ticket, numbers, plan["plan_id"], governance), "--label", "agent-ready",
         )
-        numbers[key] = int(result.stdout.strip().splitlines()[-1].rsplit("/", 1)[-1])
+        issue_url = result.stdout.strip().splitlines()[-1]
+        numbers[key] = int(issue_url.rsplit("/", 1)[-1])
+        issue_urls[numbers[key]] = issue_url
         created.add(numbers[key])
         print(f"Created #{numbers[key]}: {ticket['title']}")
     for key in order:  # apply any human edits and final dependency numbers
@@ -269,6 +272,7 @@ def approve_plan(
             "issue", "edit", numbers[key], "--repo", repository, "--title", ticket["title"],
             "--body", issue_body(ticket, numbers, plan["plan_id"], governance), "--add-label", "agent-ready",
         )
+        backend.add_issue_to_project(numbers[key], issue_urls[numbers[key]])
     remote = {ticket["number"]: ticket for ticket in backend.load()}
     for key in order:
         number = numbers[key]

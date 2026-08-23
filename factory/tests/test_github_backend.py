@@ -16,6 +16,59 @@ def completed(returncode=0, stdout="", stderr=""):
 
 
 class GitHubReviewTests(unittest.TestCase):
+    def test_project_load_ignores_unrelated_repository_issues(self):
+        backend = GitHubBackend(Path.cwd(), project_number=5)
+        backend.owner, backend.name = "giolaq", "test1"
+        backend.preflight = mock.Mock()
+        backend.ensure_project = mock.Mock()
+        backend.existing_pr = mock.Mock(return_value=None)
+        backend.read_run_summary = mock.Mock(return_value=None)
+        backend._ensure_labels = mock.Mock()
+        issues = [
+            {
+                "number": 8,
+                "title": "Unrelated legacy ticket",
+                "body": "<!-- factory-plan:old:T8 -->",
+                "state": "OPEN",
+                "url": "https://github.test/issues/8",
+                "labels": [{"name": "agent-ready"}],
+                "updatedAt": "2026-08-23T10:00:00Z",
+            },
+            {
+                "number": 9,
+                "title": "Approved smoke ticket",
+                "body": "<!-- factory-plan:smoke:T1 -->",
+                "state": "OPEN",
+                "url": "https://github.test/issues/9",
+                "labels": [{"name": "agent-ready"}],
+                "updatedAt": "2026-08-23T11:00:00Z",
+            },
+        ]
+        project_items = [{
+            "id": "item-9",
+            "status": "Ready",
+            "content": {"type": "Issue", "number": 9},
+        }]
+
+        def github_json(*args):
+            if args[:2] == ("issue", "list"):
+                return issues
+            if args[:2] == ("project", "item-list"):
+                return {"items": project_items}
+            if args[:2] == ("project", "item-add"):
+                return {"id": "unexpected-import"}
+            self.fail(f"unexpected GitHub call: {args}")
+
+        backend.json = mock.Mock(side_effect=github_json)
+
+        tickets = backend.load()
+
+        self.assertEqual([ticket["number"] for ticket in tickets], [9])
+        self.assertFalse(any(
+            call.args[:2] == ("project", "item-add")
+            for call in backend.json.call_args_list
+        ))
+
     def test_remote_claim_is_atomic_resumable_and_explicitly_released(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
