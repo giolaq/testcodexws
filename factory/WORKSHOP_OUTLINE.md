@@ -1,18 +1,31 @@
 # Software (re)-Factory workshop
 
+Release: `workshop-v1.1.0`
+
 Use this outline to present the workshop. The attendee website contains the commands and checkpoints; keep the live explanation focused on why each decision matters.
 
 ## Outcome
 
-In 100 minutes, each attendee turns a PRD into approved tickets, runs coding agents in isolated Git worktrees, reviews QA evidence, and verifies an integrated application.
+In 100 minutes, each attendee turns a PRD into approved Tickets, runs coding
+agents in isolated Git worktrees, reviews causal QA evidence, makes an
+exact-revision merge decision, and previews post-delivery health.
 
 Attendees should leave able to:
 
 - Explain what an AI software factory adds around coding agents.
 - Plan product intent, architecture, program design, and vertical slices before implementation.
 - Use GitHub Projects as the shared view of work.
+- Explain how an Agent Supervisor coordinates a safe dispatch wave from worker Handoff Receipts.
+- Explain the separate authority of the Code Review Agent, Agent Supervisor,
+  and orchestrator in the review-and-merge loop.
 - Inspect prompts, logs, diffs, tests, and reviews for one ticket.
-- Adapt the workflow to their own agents and risk level.
+- Adapt the workflow to their own repository, PRD, agents, and risk level.
+
+The guided exercise uses Pocket Cinema so everyone sees the same evidence. It
+ends by showing the transfer path: `factory init --repo PATH` creates a
+reviewable Project Contract for an existing codebase, and Live planning accepts
+that project's real PRD. Do not imply that the deterministic Rehearsal agents
+can implement an arbitrary product.
 
 ## Prerequisites
 
@@ -23,15 +36,18 @@ Everyone needs:
 - macOS, Linux, or Windows with WSL2.
 - Python 3.11+, Node.js 20+, Git, and a modern browser.
 - Ports 5000 and 5050 available.
-- GitHub CLI and a personal disposable workshop repository. Every attendee
-  creates their own; the facilitator uses a separate repository on screen.
+- A personal local Git repository for Rehearsal. Every attendee works in their
+  own repository; the facilitator uses a different repository on screen.
 
 The live path also requires:
 
 - GitHub CLI authenticated with the `project` scope.
+- A personal GitHub repository URL saved in **Connect**; its `origin` must match.
 - Permission to create issues, branches, and Projects.
 - An authenticated Claude, Codex, Cursor, or custom agent CLI.
 - Network access to GitHub and the chosen model provider.
+- Optional: a second GitHub identity, supplied through
+  `FACTORY_REVIEW_GH_TOKEN`, when the demo must show formal PR approval.
 
 Check versions:
 
@@ -48,8 +64,8 @@ Use one path for the full session.
 
 | Path | Use it when | External dependencies |
 |---|---|---|
-| Rehearsal | Learning or running a reliable dry run | Personal repository only; no Project writes or model calls |
-| Live | Demonstrating real GitHub issues and agents | GitHub, network, and an authenticated agent CLI |
+| Rehearsal | Learning or running a reliable dry run | Local repository only; no GitHub or model credentials |
+| Live | Demonstrating real GitHub issues and agents | GitHub, network, and an authenticated agent CLI; optional second reviewer identity |
 
 Run the rehearsal path before facilitating the live path.
 
@@ -64,9 +80,26 @@ Run the rehearsal path before facilitating the live path.
 | 35–53 | Create tickets | Approved vertical slices in GitHub or dry-run output |
 | 53–63 | Approve tests | Human-approved QA evidence |
 | 63–85 | Run the factory | At least one completed ticket with traceable evidence |
-| 85–100 | Verify the result | Integrated app checked across key journeys and viewports |
+| 85–100 | Verify and monitor | Integrated app, Evidence Packet, and read-only Monitor report |
 
 ## The workshop story
+
+Start with the minimum responsible loop: a clear issue, one agent, one real
+test, one pull request, and a human merge. Introduce each extra control as the
+answer to a visible failure:
+
+| Failure | Added capability |
+| --- | --- |
+| Ambiguous intent | Product Review and human revision |
+| Conflicting design assumptions | Architecture, Program Design, and alignment |
+| Colliding workers | Dependency waves, remote claims, and worktrees |
+| Weak tests | QA-authored RED proof and identical-command GREEN proof |
+| Too much review work | Human-attention limits and `NEEDS YOU` back-pressure |
+| Lost decisions | Handoff Receipts and sanitized remote summaries |
+| Stale post-merge evidence | Read-only Monitor findings |
+
+More agents and more checks consume time and human attention. They are useful
+only when they make ownership, evidence, recovery, or a decision clearer.
 
 Repeat the same pattern for every step:
 
@@ -162,20 +195,40 @@ The planning agents create normal workshop tickets from the PRD. Do not seed fiv
 **Do:** Open **Tickets** and select **Run one cycle**. The QA agent proposes
 tests for ready tickets before implementation begins. Open one ticket, inspect
 its Tests tab, and approve only assertions that prove user-visible behavior.
+The focused command must fail for the missing behavior at the pre-implementation
+revision. Collection errors, timeouts, skipped tests, or unrelated failures are
+not valid evidence.
 
-**Check:** The ticket contains tests and its history records QA approval.
+**Check:** The ticket shows the protected test and focused command as
+**RED PROVED**. After implementation, the identical command must show
+**GREEN PROVED**.
 
 ### 7. Run the factory
 
-**Goal:** Observe isolated implementation, verification, and review.
+**Goal:** Observe supervised, isolated implementation, verification, review
+feedback, repair, approval, and merge.
 
-**Do:** Select **Run factory** and follow one ticket. Open its detail drawer and
-show the exact prompt, live agent log, diff, protected tests, gate output, and
-state history. The operation panel always shows the equivalent CLI command.
+**Do:** Select **Run factory**, then open **Supervisor**. Follow one coordination
+checkpoint from worker Handoff Receipts to the supervisor's dispatch instruction
+and the orchestrator's validated state change. Return to **Tickets** and follow
+the selected Ticket. Show its remote claim, supervisor instruction, exact
+prompt, live log, diff, protected tests, gate output, Code Review Agent decision,
+Handoff Receipts, and history. In the deterministic run, Ticket #1 receives
+`REQUEST_CHANGES`, returns to the same development branch, passes its gates
+again, and receives `APPROVE`. The Supervisor may then recommend the exact
+revision. Standard and Assured stop for a person to select **Merge exact
+revision**. In Live mode, compare the decision with the formal GitHub review or
+labelled Factory comment.
 
-**Check:** At least one ticket reaches Done, and attendees can locate the evidence behind that state.
+If the human decision queue reaches its Charter limit, point to **NEEDS YOU**.
+New dispatch pauses until the oldest decision is completed. If another runner
+owns the remote claim, this runner must not start a duplicate agent.
 
-### 8. Verify the result
+**Check:** At least one Ticket reaches Done, and attendees can trace claim →
+worker evidence → review comment → repair → approval → Supervisor recommendation
+→ human merge.
+
+### 8. Verify and monitor
 
 **Goal:** Check the integrated product, not only individual tickets.
 
@@ -187,10 +240,12 @@ node --test demo-app/static/tests/*.test.js
 .factory/venv/bin/python demo-app/app.py
 ```
 
-Then open **Evidence**, complete the Factory Canvas, and select **Create evidence
-packet**.
+Then open **Evidence**, complete the Factory Canvas, and create the packet. Open
+**Monitor** and preview its read-only findings. Monitor can propose follow-up
+work; it cannot repair code or merge in the same run.
 
-**Check:** The integrated app works and the evidence report explains why the change is complete.
+**Check:** The integrated app works, the Evidence Packet explains the governed
+revision and human decision, and every Monitor finding has an owner.
 
 ## Close
 
@@ -200,13 +255,16 @@ Ask each attendee:
 
 1. Which repeated engineering task is slow or inconsistent?
 2. What evidence would make an agent change safe to review?
-3. Where must a human make the final decision?
+3. Which decisions should remain human for your use case?
 
-Recommend the smallest useful workflow:
+Recommend a proportional workflow:
 
 - **Lean:** one agent, local tests, and diff review.
-- **Standard:** planning, worktree isolation, QA, gates, and GitHub review.
-- **Assured:** stricter approvals, security checks, traceability, and release evidence.
+- **Standard:** planning, supervised dispatch, worktree isolation, QA, gates,
+  review rework, a Supervisor recommendation, and human exact-revision merge.
+- **Assured:** stricter approvals, deeper gates, a critic, and release evidence.
+- **Autonomous Demo:** optional accountability contrast only; it requires an
+  explicit opt-in and is never the normal shipping path.
 
 ## Facilitator reference
 

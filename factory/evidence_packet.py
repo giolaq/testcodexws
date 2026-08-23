@@ -17,6 +17,13 @@ from sensitive_data import redact_credentials
 CANVAS_SECTIONS = (
     "Use case",
     "Factory Profile",
+    "Consequence tier",
+    "Merge authority",
+    "Review capacity",
+    "Load-bearing paths",
+    "Gate budget",
+    "Durable remote record",
+    "Monitoring owner",
     "Agent Roles",
     "Human Gates",
     "Execution environment",
@@ -97,6 +104,24 @@ def export_evidence(
 ) -> tuple[Path, Path]:
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
+    governance = manifest.get("governance")
+    if not isinstance(governance, dict):
+        raise ValueError(
+            "Planning Run predates governed evidence. Re-run planning with an approved "
+            "Factory Charter before exporting an Evidence Packet."
+        )
+    required_governance = {
+        "schema_version", "profile", "charter_sha256", "merge_authority",
+    }
+    missing_governance = sorted(required_governance - set(governance))
+    if missing_governance:
+        raise ValueError(
+            "Planning Run governance is incomplete: " + ", ".join(missing_governance)
+        )
+    if governance.get("profile") != manifest.get("profile", "standard"):
+        raise ValueError(
+            "Planning Run profile does not match its recorded Factory Charter governance."
+        )
     canvas_path = canvas_path if canvas_path.is_absolute() else repo / canvas_path
     canvas_text = validate_canvas(canvas_path)
     state = _load_state(repo)
@@ -107,6 +132,24 @@ def export_evidence(
     unknown = sorted(set(selected_numbers) - {ticket.get("number") for ticket in selected})
     if unknown:
         raise ValueError("Ticket evidence not found: " + ", ".join(f"#{number}" for number in unknown))
+    if selected:
+        execution_governance = state.get("governance")
+        if not isinstance(execution_governance, dict):
+            raise ValueError(
+                "Execution state predates governed evidence. Re-run the selected Tickets "
+                "under the approved planning Charter."
+            )
+        governed_fields = (
+            "schema_version", "profile", "charter_sha256", "merge_authority",
+        )
+        drift = [
+            field for field in governed_fields
+            if execution_governance.get(field) != governance.get(field)
+        ]
+        if drift:
+            raise ValueError(
+                "execution governance does not match planning: " + ", ".join(drift)
+            )
 
     output_dir = output or repo / ".factory/evidence" / manifest["plan_id"]
     output_dir = output_dir if output_dir.is_absolute() else repo / output_dir
@@ -119,7 +162,10 @@ def export_evidence(
         f"Workshop version: `{WORKSHOP_VERSION}`  ",
         f"Planning Run: `{manifest['plan_id']}`  ",
         f"Factory Profile: **{manifest.get('profile', 'standard').title()}**  ",
-        f"Policy version: `{manifest.get('policy', {}).get('version', 'not recorded')}`",
+        f"Policy version: `{manifest.get('policy', {}).get('version', 'not recorded')}`  ",
+        f"Factory Charter version: `{governance['schema_version']}`  ",
+        f"Factory Charter hash: `{governance['charter_sha256']}`  ",
+        f"Merge authority: **{str(governance['merge_authority']).title()}**",
         "",
         "## Planning artifacts",
         "",
@@ -193,6 +239,29 @@ def export_evidence(
         lines.append(f"- Status: {ticket.get('status', 'unknown')}")
         dependencies = ticket.get("dependencies", [])
         lines.append(f"- Dependencies: {', '.join(f'#{item}' for item in dependencies) or 'none'}")
+        triage = ticket.get("triage", {})
+        controls = triage.get("controls", {})
+        lines.append(
+            f"- Triage: **{triage.get('result', 'not recorded')}** · "
+            f"risk {controls.get('risk', 'not recorded')} · "
+            f"verification {ticket.get('verification_level') or controls.get('gate_level', 'not recorded')}"
+        )
+        if triage.get("reason") or controls.get("reason"):
+            lines.append(f"- Control reason: {triage.get('reason') or controls.get('reason')}")
+        lines.append(
+            f"- Verification duration: {ticket.get('verification_duration_seconds', 0)}s"
+        )
+        metrics = ticket.get("metrics", {})
+        lines.append(
+            "- Time by owner: "
+            f"agent {metrics.get('agent_seconds', 0)}s · "
+            f"gates {metrics.get('gate_seconds', 0)}s · "
+            f"human wait {metrics.get('human_wait_seconds', 0)}s"
+        )
+        lines.append(
+            f"- Recovery: {metrics.get('retry_count', 0)} retries · "
+            f"{metrics.get('verifier_rejections', 0)} verifier rejections"
+        )
         if ticket.get("issue_url"):
             lines.append(f"- GitHub Issue: {ticket['issue_url']}")
         else:
@@ -208,13 +277,42 @@ def export_evidence(
         else:
             missing.append(f"Ticket #{number} protected Acceptance Test metadata is missing")
             lines.append("- None recorded")
+        lines += ["", "Causal Acceptance Test evidence:", ""]
+        causal = ticket.get("qa_evidence", {})
+        red = causal.get("red", {})
+        green = causal.get("green", {})
+        command = redact_credentials(str(causal.get("focused_test_command", "")))
+        command_hash = causal.get("focused_test_command_sha256", "")
+        if command:
+            lines += [
+                f"- Focused command: `{command}`",
+                f"- Command hash: `{command_hash or 'not recorded'}`",
+                f"- Before implementation: **{red.get('result', 'RED NOT PROVED')}** "
+                f"· {red.get('classification', 'not classified')} · revision `{red.get('revision', 'not recorded')}`",
+                f"- After implementation: **{green.get('result', 'GREEN NOT PROVED')}** "
+                f"· {green.get('classification', 'not classified')} · revision `{green.get('revision', 'not recorded')}`",
+            ]
+        else:
+            lines.append("- RED NOT PROVED · no focused command recorded")
+        if manifest.get("profile") in {"standard", "assured", "autonomous-demo"}:
+            if red.get("result") != "RED PROVED":
+                missing.append(f"Ticket #{number} has no valid pre-implementation RED proof")
+            if green.get("result") != "GREEN PROVED":
+                missing.append(f"Ticket #{number} has no valid post-implementation GREEN proof")
+        if manifest.get("profile") == "assured":
+            negative = causal.get("negative", {})
+            lines.append(
+                f"- Assured negative proof: **{negative.get('result', 'NEGATIVE PROOF NOT PROVED')}**"
+            )
+            if negative.get("result") != "NEGATIVE PROOF PROVED":
+                missing.append(f"Ticket #{number} has no valid Assured negative proof")
         lines += ["", "Verification gates:", ""]
         gates = ticket.get("gate_results", [])
         if gates:
             for gate in gates:
-                result = "PASS" if gate.get("exit_code") == 0 else "FAIL"
+                result = gate.get("classification") or ("PASS" if gate.get("exit_code") == 0 else "FAIL")
                 lines.append(
-                    f"- {result} · {gate.get('name', 'unnamed')} · exit {gate.get('exit_code')} · "
+                    f"- {result} · {gate.get('name', 'unnamed')} · {gate.get('level', 'full')} · exit {gate.get('exit_code')} · "
                     f"{gate.get('duration_seconds', 0)}s"
                 )
         else:
@@ -278,6 +376,7 @@ def export_evidence(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "plan_id": manifest["plan_id"],
         "profile": manifest.get("profile", "standard"),
+        "governance": governance,
         "policy": manifest.get("policy", {}),
         "tickets": [ticket["number"] for ticket in selected],
         "artifacts": artifacts,

@@ -20,7 +20,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "description": { "type": "string" },
           "need": { "type": "string" }
         },
@@ -33,7 +33,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "statement": { "type": "string" },
           "source": { "type": "string" },
           "success_evidence": { "type": "string" }
@@ -47,7 +47,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "outcome": { "type": "string" },
           "steps": { "type": "array", "items": { "type": "string" } },

@@ -29,7 +29,7 @@ if [ ! -f factory/orchestrator.py ] || [ ! -f demo-app/app.py ]; then
   exit 1
 fi
 
-if [ ! -d .git ]; then
+if [ ! -e .git ]; then
   git init -b main >/dev/null
 fi
 
@@ -45,7 +45,7 @@ git config user.email >/dev/null 2>&1 || git config user.email "factory@example.
 
 git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while IFS= read -r worktree; do
   case "$worktree" in
-    "$repo_parent"/"$repo_name"-wt-[0-9]*) git worktree remove --force "$worktree" >/dev/null 2>&1 || true ;;
+    "$repo_parent"/"$repo_name"-wt-[0-9]*|"$repo_parent"/"$repo_name"-supervisor-wt) git worktree remove --force "$worktree" >/dev/null 2>&1 || true ;;
   esac
 done
 git worktree prune
@@ -95,6 +95,8 @@ mkdir -p .factory
 find .factory/logs -type f ! -name 'control-center-*' -delete 2>/dev/null || true
 find .factory/prompts .factory/qa-approvals -type f -delete 2>/dev/null || true
 rm -f .factory/state.json .factory/state.tmp .factory/ids.json
+rm -rf .factory/supervisor
+rm -rf .factory/reviews
 if [ -d .factory/receipts ]; then
   find .factory/receipts -type f \( -name 'build-*' -o -name 'verify-*' -o -name 'review-*' \) -delete
 fi
@@ -114,6 +116,10 @@ if [ ! -x .factory/venv/bin/python ]; then
   python3 -m venv .factory/venv
 fi
 .factory/venv/bin/python -m pip install -q -r demo-app/requirements.txt
+
+if [ ! -f .factory/workshop-install.json ] && [ -f factory/workshop_update.py ]; then
+  python3 factory/workshop_update.py --target "$repo" --record-current
+fi
 
 cat > .factory/state.json <<JSON
 {

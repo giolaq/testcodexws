@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Illustrated GitHub Project checkpoint</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { min-width: 1200px; margin: 0; background: #f6f8fa; color: #1f2328; font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { height: 64px; display: flex; align-items: center; gap: 18px; padding: 0 28px; color: white; background: #24292f; }
+    .mark { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid white; border-radius: 50%; font-weight: 800; }
+    header strong { font-size: 17px; }
+    header span { color: #c9d1d9; }
+    main { padding: 30px 40px 42px; }
+    .label { display: inline-flex; gap: 8px; align-items: center; padding: 5px 10px; color: #0550ae; background: #ddf4ff; border: 1px solid #54aeff; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    h1 { margin: 12px 0 4px; font-size: 28px; }
+    .lede { margin: 0 0 24px; color: #57606a; }
+    .tabs { display: flex; gap: 24px; border-bottom: 1px solid #d0d7de; }
+    .tabs b { padding: 10px 2px; border-bottom: 2px solid #fd8c73; }
+    .tabs span { padding: 10px 2px; color: #57606a; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 0 14px; }
+    .toolbar div { display: flex; gap: 8px; }
+    button { padding: 7px 13px; color: #24292f; background: #f6f8fa; border: 1px solid #afb8c1; border-radius: 6px; font-weight: 600; }
+    .green { color: white; background: #2da44e; border-color: #2da44e; }
+    .board { display: grid; grid-template-columns: repeat(6, minmax(175px, 1fr)); gap: 12px; overflow: hidden; }
+    .column { min-height: 440px; padding: 12px; background: #eef1f4; border: 1px solid #d0d7de; border-radius: 8px; }
+    .column header { height: auto; padding: 0 2px 12px; color: #24292f; background: transparent; justify-content: space-between; }
+    .column header b { font-size: 14px; }
+    .count { color: #57606a; background: #d8dee4; border-radius: 999px; padding: 1px 7px; font-size: 12px; }
+    .card { margin-bottom: 10px; padding: 12px; background: white; border: 1px solid #d0d7de; border-radius: 7px; box-shadow: 0 1px 0 rgba(31,35,40,.04); }
+    .card small { color: #57606a; }
+    .card p { margin: 7px 0 8px; font-weight: 600; }
+    .tag { display: inline-block; padding: 2px 7px; color: #0550ae; background: #ddf4ff; border-radius: 999px; font-size: 11px; }
+    .attention { border: 2px solid #bf8700; }
+    .approved { border: 2px solid #1a7f37; }
+    .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+    .note { display: flex; gap: 10px; padding: 12px; background: white; border: 1px solid #d0d7de; border-radius: 7px; }
+    .note i { display: grid; place-items: center; flex: 0 0 24px; height: 24px; color: white; background: #0969da; border-radius: 50%; font-style: normal; font-weight: 800; }
+    .note p { margin: 0; }
+    .foot { margin: 18px 0 0; color: #57606a; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header><span class="mark">GH</span><strong>Your repository</strong><span>/ Projects / TableStory Workshop</span></header>
+  <main>
+    <span class="label">Illustrated checkpoint · layout may vary</span>
+    <h1>TableStory Workshop</h1>
+    <p class="lede">GitHub Projects is the durable shared view of approved Tickets and their delivery state.</p>
+    <div class="tabs"><b>Board</b><span>Table</span><span>Roadmap</span></div>
+    <div class="toolbar"><div><button>Filter</button><button>Group</button></div><button class="green">+ Add item</button></div>
+    <section class="board" aria-label="Illustrated GitHub Project board">
+      <article class="column"><header><b>Backlog</b><span class="count">1</span></header><div class="card"><small>#14</small><p>Update recipe content</p><span class="tag">vertical slice</span></div></article>
+      <article class="column"><header><b>Ready</b><span class="count">1</span></header><div class="card"><small>#11</small><p>Add recipe model</p><span class="tag">claimed remotely</span></div></article>
+      <article class="column"><header><b>In progress</b><span class="count">1</span></header><div class="card"><small>#12</small><p>Build recipe detail</p><span class="tag">worktree active</span></div></article>
+      <article class="column"><header><b>QA review</b><span class="count">1</span></header><div class="card attention"><small>#13 · Needs you</small><p>Approve acceptance tests</p><span class="tag">RED PROVED</span></div></article>
+      <article class="column"><header><b>In review</b><span class="count">1</span></header><div class="card approved"><small>#10 · PR #18</small><p>Rebrand navigation</p><span class="tag">human merge</span></div></article>
+      <article class="column"><header><b>Done</b><span class="count">1</span></header><div class="card"><small>#9</small><p>Add search semantics</p><span class="tag">merged</span></div></article>
+    </section>
+    <section class="notes">
+      <div class="note"><i>1</i><p>Open your repository, select <b>Projects</b>, then open the workshop Project.</p></div>
+      <div class="note"><i>2</i><p>Use columns to see shared state. Open a card to inspect the GitHub Issue or PR.</p></div>
+      <div class="note"><i>3</i><p>Return to the Control Center for prompts, logs, claims, tests, gates, and receipts.</p></div>
+    </section>
+    <p class="foot">This is a workshop illustration, not a captured GitHub account. Column names are the factory lifecycle; GitHub controls may move over time.</p>
+  </main>
+</body>
+</html>

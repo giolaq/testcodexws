@@ -35,6 +35,11 @@ showing the detailed ticket states. Update the instructor-led and self-paced
 website paths, prerequisites, facilitator material, and release process to use
 the same vocabulary and observable completion rubric.
 
+Separate the bundled Pocket Cinema Rehearsal pack from generic repository
+behavior. A committed Project Contract defines the target checkout's source and
+test roots, tools, setup, gates, default branch, protected paths, and reset
+adapter. Live planning accepts any PRD and records that contract with the plan.
+
 ## User Stories
 
 1. As an attendee, I want a concise definition of a Software Factory, so that I understand that the workshop is about supervised engineering rather than autonomous code generation.
@@ -68,7 +73,7 @@ the same vocabulary and observable completion rubric.
 29. As an attendee, I want the Factory Dashboard to be the engine-room view, so that prompts, attempts, policy, receipts, gates, and logs do not overload the Project board.
 30. As an attendee, I want Plan, Build, Verify, and Review introduced before the detailed lifecycle states, so that I have a stable mental model for the board.
 31. As an attendee, I want a Lean Factory Profile, so that low-risk work can avoid controls whose cost is not justified.
-32. As an attendee, I want a Standard Factory Profile, so that the workshop can demonstrate planning, independent QA, protected evidence, verification, and human merge as one coherent path.
+32. As an attendee, I want a Standard Factory Profile, so that the workshop can demonstrate planning, independent QA, protected evidence, verification, review rework, a Supervisor recommendation, and human exact-revision merge as one coherent path.
 33. As an attendee, I want an Assured Factory Profile, so that I can see how cleanup, architecture conformance, hardening, and final verification extend the same model for higher-risk work.
 34. As an operator, I want every Agent Role to declare what it owns, must not change, verifies, and hands off, so that swapping Agent Adapters does not change responsibility boundaries.
 35. As an operator, I want engineering, workflow, and repository policy included in applicable role inputs, so that agents follow project constraints rather than generic preferences.
@@ -81,12 +86,24 @@ the same vocabulary and observable completion rubric.
 42. As a facilitator, I want all demonstrations to be genuinely live, so that the room sees real agent and GitHub behavior rather than a pre-completed Project.
 43. As a facilitator, I want a live evidence fallback using a consenting attendee repository, so that a slow facilitator agent does not have to be terminated.
 44. As a facilitator, I want the material to state that the schedule is a target when all live results are incomplete, so that I do not misrepresent nondeterministic execution as guaranteed.
-45. As a self-paced attendee, I want deterministic planning, QA, implementation, retry, and verification behavior, so that I can complete the same conceptual checkpoints without credentials.
+45. As a self-paced attendee, I want deterministic planning, QA, implementation, retry, verification, and code-review behavior, so that I can complete the same conceptual checkpoints without credentials.
 46. As a prospective adopter, I want explicit production boundaries, so that I do not confuse a workshop starter kit with a secured production orchestration platform.
 47. As a prospective adopter, I want custom Agent Adapter instructions separated from the golden path, so that I can extend the factory after learning the core model.
 48. As a workshop owner, I want the source, website, CLI, and release to show one version identity, so that attendee instructions can be reproduced against the intended revision.
 49. As a workshop owner, I want the repository audited before it becomes public and a template, so that no local credentials, generated state, or obsolete control material are published.
 50. As a workshop owner, I want the website and all documentation to use the project glossary, so that terms such as Agent Role, Agent Adapter, Live Run, Rehearsal Run, GitHub Project, and Factory Dashboard are not conflated.
+51. As an operator, I want an Agent Supervisor to coordinate dependency-ready Ticket agents from their Handoff Receipts, so that parallel work receives one coherent dispatch decision.
+52. As an operator, I want supervisor commands validated by the orchestrator, so that a coordinating agent cannot change scope, dependencies, gates, approvals, or lifecycle state.
+53. As an attendee, I want to inspect supervisor inputs, Ticket instructions, blocks, logs, and decision history, so that multi-agent synchronization is understandable rather than hidden.
+54. As an operator, I want a separate read-only Code Review Agent to inspect the exact candidate PR diff and return `APPROVE` or `REQUEST_CHANGES`, so that technical approval remains independent of implementation.
+55. As an operator, I want every code-review comment to return through the bounded implementation retry loop on the same branch and PR, so that the repaired revision reruns gates and review before it can merge.
+56. As an operator, I want the Agent Supervisor to recommend merge only for the exact approved PR head with passing gates and a published review decision, so that a human can make the final merge decision from validated evidence.
+57. As an attendee, I want the workshop to distinguish a formal GitHub review from the single-account Factory-comment fallback, so that I do not mistake audit evidence for a branch-protection approval.
+58. As a Live Run attendee, I want to paste the URL of a GitHub repository I control, so that the factory targets it explicitly instead of depending on an unrelated GitHub CLI default.
+59. As a Live Run attendee, I want reset to clear only local factory state without rewriting source or GitHub, so that I can recover the control panel without mistaking local cleanup for remote deletion.
+60. As an operator, I want to initialize a reviewable Project Contract for any Git repository, so that planning, QA, verification, and reset do not inherit Pocket Cinema assumptions.
+61. As an operator, I want setup detection separated from setup execution, so that no generated repository command runs before a human reviews and explicitly approves it.
+62. As an operator, I want a Live local-state reset to preserve source files, the selected mode, and all GitHub artifacts, so that recovery cannot invoke a project-specific destructive adapter accidentally.
 
 ## Implementation Decisions
 
@@ -104,7 +121,13 @@ the same vocabulary and observable completion rubric.
 - Every attendee creates a repository from the public GitHub template. The
   factory creates the GitHub Project during approved publication. The
   facilitator uses a different repository, and peers review one another's work.
-- The release is frozen on the default branch and tagged `workshop-v1.0.0`
+- Live configuration validates and saves the attendee-provided GitHub repository
+  URL, aligns `origin`, and uses that explicit identity for issues, branches,
+  Projects, pull requests, and preflight checks.
+- A reset started from Live mode is explicitly local-only, keeps the Control
+  Center in Live mode, preserves tracked source, and preserves all remote GitHub artifacts. A genuinely
+  fresh Live Run still uses a fresh repository.
+- The release is frozen on the default branch and tagged `workshop-v1.1.0`
   before repository creation opens. The CLI and website expose that identity.
   Only workshop-blocking fixes justify a replacement release.
 - Live agents have no presentation timeout. The facilitator first shows their
@@ -122,9 +145,10 @@ the same vocabulary and observable completion rubric.
 - Factory Profiles are executable configuration, not documentation aliases.
   Lean uses product intent, Vertical Slices, one implementation role, existing
   tests, and human PR review. Standard uses all four planning roles,
-  QA-authored protected Acceptance Tests, implementation, required gates, and
-  human merge. Assured adds cleanup, architecture conformance, hardening, and a
-  read-only final verifier after implementation.
+  QA-authored protected Acceptance Tests, implementation, required gates,
+  read-only code-review rework, a Supervisor recommendation, and human
+  exact-revision merge. Assured adds cleanup, architecture
+  conformance, hardening, and a read-only final verifier after implementation.
 - Assured modifying roles cannot edit protected Acceptance Tests. Architecture
   conformance and final verification are read-only and may block progression.
   A failed post-implementation review returns work to the relevant modifying
@@ -140,6 +164,29 @@ the same vocabulary and observable completion rubric.
   output revisions, claimed result, verification, unresolved risks, artifact
   references, policy hashes, and timestamp. The central orchestrator is the
   only lifecycle authority.
+- After required gates pass, the factory opens or updates the PR. The Code Review
+  Agent receives its exact candidate base and head revisions, Ticket contract,
+  changed paths, and gate summary. Its output has a versioned `APPROVE` or
+  `REQUEST_CHANGES` schema. Comments are bounded, restricted to changed paths,
+  and classified as blocking, warning, or note. The orchestrator rejects malformed
+  output and any worktree mutation. `REQUEST_CHANGES` returns every comment to
+  implementation within the existing retry budget; gates and review rerun on
+  the new commit. `APPROVE` requires an empty comments list.
+- The Supervisor has a separate post-review `MERGE` or `BLOCK` contract. The
+  orchestrator accepts `MERGE` only when the Code Review Agent approved the same
+  candidate head, required gates pass, and the decision was published. It
+  rechecks the live GitHub PR head and executes the merge; stale heads and branch
+  protection failures block the Ticket. With a single GitHub identity, formal
+  self-approval falls back to an explicit Factory comment that does not satisfy
+  branch-protection approval requirements.
+- Standard and Assured profiles run an Agent Supervisor at each ready-ticket
+  dispatch checkpoint; Lean retains direct scheduler dispatch. The Supervisor
+  reads current dependency state and recent worker Handoff Receipts, then
+  proposes Ticket-specific dispatch instructions or evidence-backed blocks.
+  The orchestrator validates readiness, uniqueness, concurrency, output schema,
+  and non-stalling behavior before applying any command. Supervisor execution
+  uses a disposable read-only-to-the-run worktree, and every prompt, log,
+  decision, and supervisor Handoff Receipt is retained for inspection.
 - The detailed Project lifecycle remains Backlog, Ready, In Progress, QA Review,
   Verifying, In Review, Done, and Blocked. The website and dashboard group the
   ordinary flow as Plan, Build, Verify, and Review; Blocked is an exception that
@@ -185,6 +232,9 @@ the same vocabulary and observable completion rubric.
   patterns to cover the narrative Ticket's deterministic first failure,
   bounded retry, protected Acceptance Tests, successful gates, merge, and
   dependency unlock.
+- Supervisor tests cover receipt input, bounded dispatch, explicit blocks,
+  invalid or conflicting commands, silent-stall rejection, durable decision
+  history, deterministic rehearsal behavior, and Control Center rendering.
 - Evidence Packet tests use synthetic planning and execution state containing
   secret-like values. They assert complete traceability, stable links, explicit
   missing-evidence warnings, Canvas inclusion, and exclusion of prompts, logs,

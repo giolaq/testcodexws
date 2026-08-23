@@ -56,6 +56,23 @@ class PlannerTests(unittest.TestCase):
         self.assertIn("agent: codex", body)
         self.assertIn("factory-plan:abc123:T2", body)
 
+    def test_issue_body_preserves_the_reviewed_delivery_contract(self):
+        ticket = sample_plan()["tickets"][0] | {
+            "vertical_outcome": "A user can complete the core journey.",
+            "requirement_ids": ["R1"],
+            "contract_ids": ["CT-API"],
+            "program_element_ids": ["FN-LOAD"],
+            "file_ownership": ["src/core.py"],
+            "qa_evidence": ["Core journey acceptance test"],
+        }
+
+        body = issue_body(ticket, {}, "abc123")
+
+        self.assertIn("## Vertical outcome", body)
+        self.assertIn("**Requirements:** R1", body)
+        self.assertIn("## File ownership\n- src/core.py", body)
+        self.assertIn("## QA evidence", body)
+
     def test_review_exposes_human_approval_step(self):
         plan = sample_plan()
         plan["_plan_path"] = "/tmp/plan.json"

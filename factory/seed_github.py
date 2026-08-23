@@ -43,7 +43,11 @@ def main():
     args = parser.parse_args()
     repo = Path(args.repo).resolve()
     scenario = repo / "factory/scenarios" / args.scenario / "tickets.json"
-    source = scenario if scenario.is_file() else repo / "factory/seed/tickets.json"
+    bundled = Path(__file__).with_name("scenarios") / args.scenario / "tickets.json"
+    legacy = repo / "factory/seed/tickets.json"
+    source = scenario if scenario.is_file() else bundled if bundled.is_file() else legacy
+    if not source.is_file():
+        raise SystemExit(f"No deterministic scenario found for {args.scenario}.")
     tickets = json.loads(source.read_text())
     if args.dry_run:
         for ticket in tickets:

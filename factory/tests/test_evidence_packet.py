@@ -61,6 +61,14 @@ class EvidencePacketTests(unittest.TestCase):
                 "plan_id": "demo-plan",
                 "project": "TableStory",
                 "profile": "standard",
+                "governance": {
+                    "schema_version": 1,
+                    "profile": "standard",
+                    "charter_path": "factory.charter.toml",
+                    "charter_sha256": "f" * 64,
+                    "merge_authority": "human",
+                    "explicit_autonomy": False,
+                },
                 "status": "published",
                 "policy": {"version": "workshop-policy-v1", "hashes": {"engineering": "abc"}},
                 "approvals": {
@@ -82,6 +90,8 @@ class EvidencePacketTests(unittest.TestCase):
             (run / "manifest.json").write_text(json.dumps(manifest))
             state_path = repo / ".factory/state.json"
             state_path.write_text(json.dumps({
+                "profile": "standard",
+                "governance": manifest["governance"],
                 "tickets": [{
                     "number": 12,
                     "plan_id": "demo-plan",
@@ -91,6 +101,19 @@ class EvidencePacketTests(unittest.TestCase):
                     "issue_url": "https://github.com/example/repo/issues/12",
                     "pr_url": "",
                     "qa_tests": {"demo-app/tests/test_ticket_12_mobile.py": "blob-sha"},
+                    "qa_evidence": {
+                        "focused_test_command": "python -m pytest -q demo-app/tests/test_ticket_12_mobile.py",
+                        "focused_test_command_sha256": "command-sha",
+                        "test_revision": "qa-sha",
+                        "red": {
+                            "result": "RED PROVED", "classification": "behavior_assertion",
+                            "exit_code": 1, "revision": "qa-sha", "output": "AssertionError",
+                        },
+                        "green": {
+                            "result": "GREEN PROVED", "classification": "pass",
+                            "exit_code": 0, "revision": "implementation-sha", "output": "1 passed",
+                        },
+                    },
                     "gate_results": [{
                         "name": "api-tests", "required": True, "exit_code": 0,
                         "output": fake_environment, "duration_seconds": 1.2,
@@ -115,6 +138,27 @@ Change a recipe journey safely.
 
 ## Factory Profile
 Standard, because user-visible behavior needs independent evidence.
+
+## Consequence tier
+Shared product behavior; a defect affects workshop attendees but is reversible.
+
+## Merge authority
+Sam owns the exact-revision human merge.
+
+## Review capacity
+At most three human decisions may wait; Sam handles the oldest first.
+
+## Load-bearing paths
+demo-app data and routing require full verification.
+
+## Gate budget
+Full gates may use up to five minutes per Ticket.
+
+## Durable remote record
+GitHub Issue and pull-request comments preserve claims, verdicts, and decisions.
+
+## Monitoring owner
+Sam reviews Monitor findings and creates follow-up Tickets when needed.
 
 ## Agent Roles
 Product, architecture, program, slices, QA, implementation, and review.
@@ -165,18 +209,47 @@ Reviewed by Sam; reduce Assured controls until the data becomes regulated.
             self.assertIn("Mobile recipe journey", packet)
             self.assertNotIn("Unrelated run", packet)
             self.assertIn("Protected Acceptance Tests created", packet)
+            self.assertIn("RED PROVED", packet)
+            self.assertIn("GREEN PROVED", packet)
+            self.assertIn("command-sha", packet)
             self.assertIn("Replace the walkthrough with objective keyboard evidence.", packet)
             self.assertIn("before-product", packet)
             self.assertIn("after-product", packet)
+            self.assertIn("Factory Charter version: `1`", packet)
+            self.assertIn(f"Factory Charter hash: `{'f' * 64}`", packet)
+            self.assertIn("Merge authority: **Human**", packet)
             self.assertIn("Missing evidence", packet)
             self.assertIn("Pull request link is missing", packet)
             self.assertEqual(exported["tickets"], [12])
+            self.assertEqual(exported["governance"], manifest["governance"])
             combined = packet + json.dumps(exported)
             for secret in (
                 fake_token, fake_environment, metadata_token,
                 "OPENAI_API_KEY", "raw-secret",
             ):
                 self.assertNotIn(secret, combined)
+
+            drifted = json.loads(state_path.read_text())
+            drifted["governance"]["charter_sha256"] = "e" * 64
+            state_path.write_text(json.dumps(drifted))
+            mismatch = subprocess.run(
+                [
+                    sys.executable,
+                    str(FACTORY),
+                    "evidence",
+                    "demo-plan",
+                    "--repo",
+                    str(repo),
+                    "--canvas",
+                    "factory-canvas.md",
+                    "--ticket",
+                    "12",
+                ],
+                text=True,
+                capture_output=True,
+            )
+            self.assertNotEqual(mismatch.returncode, 0)
+            self.assertIn("execution governance does not match planning", mismatch.stderr)
 
 
 if __name__ == "__main__":

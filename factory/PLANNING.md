@@ -44,6 +44,8 @@ make the separation explicit:
 
 Schemas are under `factory/planning_schemas/`. Every invocation also records the
 rendered prompt and CLI log under `.factory/prompts/` and `.factory/logs/`.
+The prompt includes a bounded repository inventory and the reviewed
+`factory.project.toml`; the PRD still remains the only source of product scope.
 Each prompt also includes its versioned Agent Role contract and applicable
 `workshop-policy-v1` rules. Every successful or failed stage writes a Handoff
 Receipt with revision hashes, verification, risks, artifacts, and policy hashes.
@@ -51,12 +53,14 @@ Receipt with revision hashes, verification, risks, artifacts, and policy hashes.
 ## Human workflow
 
 Claude is the worked example below. Use `codex-workshop` for an all-Codex run,
-or configure any registered implementation and QA adapters before planning.
+or configure any registered supervision, implementation, QA, and code-review adapters before planning.
 Planning itself currently uses Claude or Codex because it requires structured
 output against the stage schemas. See `CONFIGURATION.md`.
 
 ```sh
-./factory/factory configure --preset claude-workshop
+./factory/factory configure \
+  --github-repository https://github.com/YOUR-NAME/YOUR-REPOSITORY \
+  --preset claude-workshop
 ./factory/factory plan PRD.md
 ./factory/factory review product PLAN_ID
 ./factory/factory revise PLAN_ID product \
@@ -69,9 +73,20 @@ output against the stage schemas. See `CONFIGURATION.md`.
 ```
 
 `plan` stops after Product Review. `revise` records human feedback and revision
-history, reruns only Product Review, clears affected approvals, and marks
-downstream artifacts stale. `continue-plan` runs the remaining applicable experts
-sequentially, stopping if any expert has blocking questions. `approve` combines
+history, reruns only the named expert, clears affected approvals, and marks
+downstream artifacts stale. If a technical expert blocks, answer its questions
+in the Control Center; the panel submits those decisions, revises that artifact,
+and resumes the valid downstream stages. The equivalent CLI recovery is:
+
+```sh
+./factory/factory revise PLAN_ID architecture \
+  --feedback "Decision 1: keep the service in this repository. Decision 2: disable analytics for v1."
+./factory/factory continue-plan PLAN_ID
+```
+
+The other technical stage names are `program` and `slices`. `continue-plan`
+runs the remaining applicable experts sequentially, stopping if any expert has
+blocking questions. `approve` combines
 the final alignment authorization with publication, so no GitHub issue exists
 before a human accepts the whole package.
 
@@ -94,6 +109,12 @@ Type `APPROVE ALIGNMENT`. No GitHub issue or Project item is created.
 The local tickets retain the approved titles, specifications, acceptance
 criteria, dependencies, and plan markers. Deterministic scenario actions supply
 execution behavior only.
+
+Live planning accepts any readable Markdown PRD. For an existing project, run
+`factory init --repo /path/to/project`, review its Project Contract, and launch
+the Control Center against that path first. If the contract or repository
+inventory changes during planning, approval is cleared and the factory requires
+a fresh plan so technical tickets do not use stale paths or gates.
 
 ## Ticket provenance
 
@@ -126,3 +147,21 @@ Before publication, the factory verifies:
 version, expert, timestamps, logs, and approvals. If a person edits an approved
 upstream JSON artifact, downstream stages become stale and the relevant human
 approval is cleared. The next command explains which review must be repeated.
+
+When structured output fails deterministic validation, the factory stores the
+validator message and rejected JSON under the planning run's `rejected/`
+directory. A retry sends both back to the same expert together with the exact
+allowed upstream IDs. Valid upstream stages are reused. If that repair repeats
+the error, the Control Center accepts a concrete human correction and uses the
+rejected JSON as the revision source; the replacement must pass validation
+before planning resumes. The Control Center distinguishes this repairable
+validation failure from an agent authentication or provider failure. A Live Run
+may use another configured planning adapter; the adapter transition is recorded
+in `planning_agent_history`.
+
+If the PRD, Project Contract, or approved Factory Charter changes, retrying an
+expert is not valid: the old run is bound to different inputs. The Control
+Center labels this as a governance change and offers **Restart planning
+safely**. That action keeps the saved PRD and invalidated artifacts, then
+regenerates the planning run under the current approved governance. It does not
+change existing GitHub tickets.

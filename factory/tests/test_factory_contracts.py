@@ -9,10 +9,39 @@ from pathlib import Path
 FACTORY = Path(__file__).parents[1] / "orchestrator.py"
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from release_check import validate_standard_rehearsal
+from factory_contracts import handoff_receipt, validate_handoff_receipt
+from release_check import audit_release, validate_standard_rehearsal
 
 
 class FactoryContractTests(unittest.TestCase):
+    def test_handoff_receipt_carries_structured_causal_evidence(self):
+        receipt = handoff_receipt(
+            run_id="run-1",
+            role="qa",
+            phase="Build",
+            ticket=7,
+            attempt=1,
+            input_revisions={"base_commit": "abc"},
+            output_revisions={"qa_commit": "def"},
+            claimed_result="RED PROVED",
+            verification=["Focused Acceptance Test failed on a behavior assertion."],
+            unresolved_risks=[],
+            artifacts=["tests/test_ticket_7.py"],
+            policy_hashes={"engineering": "hash"},
+            evidence={
+                "focused_test_command": "python -m pytest -q tests/test_ticket_7.py",
+                "expected_failure_classification": "behavior_assertion",
+                "test_revision": "def",
+                "output": "AssertionError: expected recipe",
+            },
+        )
+
+        self.assertEqual(receipt["schema_version"], 2)
+        self.assertEqual(receipt["evidence"]["test_revision"], "def")
+        receipt["evidence"] = []
+        with self.assertRaisesRegex(ValueError, "evidence must be an object"):
+            validate_handoff_receipt(receipt)
+
     def test_cli_exposes_frozen_workshop_version(self):
         result = subprocess.run(
             [sys.executable, str(FACTORY), "--version"],
@@ -20,17 +49,17 @@ class FactoryContractTests(unittest.TestCase):
             capture_output=True,
             check=True,
         )
-        self.assertEqual(result.stdout.strip(), "factory workshop-v1.0.0")
+        self.assertEqual(result.stdout.strip(), "factory workshop-v1.1.0")
 
     def test_release_check_audits_clean_versioned_tree(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             (repo / "factory").mkdir()
             (repo / "workshop-guide/app").mkdir(parents=True)
-            (repo / "factory/factory_contracts.py").write_text('WORKSHOP_VERSION = "workshop-v1.0.0"\n')
-            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.0.0\n")
-            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.0.0\n")
-            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.0.0\n")
+            (repo / "factory/factory_contracts.py").write_text('WORKSHOP_VERSION = "workshop-v1.1.0"\n')
+            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.1.0\n")
+            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.1.0\n")
+            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.1.0\n")
             subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(
@@ -50,20 +79,53 @@ class FactoryContractTests(unittest.TestCase):
             self.assertIn("release-check --rehearsal", result.stdout)
             self.assertIn("release-check --live-smoke", result.stdout)
 
+    def test_release_audit_rejects_broken_participant_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / "factory").mkdir()
+            (repo / "workshop-guide/app").mkdir(parents=True)
+            (repo / "factory/factory_contracts.py").write_text('WORKSHOP_VERSION = "workshop-v1.1.0"\n')
+            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.1.0\n[Missing](NOPE.md)\n")
+            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.1.0\n")
+            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.1.0\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "fixture"],
+                cwd=repo,
+                check=True,
+            )
+
+            failures, _ = audit_release(repo)
+
+            self.assertIn(
+                "broken participant link: factory/WORKSHOP_OUTLINE.md -> NOPE.md",
+                failures,
+            )
+
     def test_release_rehearsal_contract_requires_gates_retry_and_role_receipts(self):
         manifest = {
             "approvals": {"product": {"approved_at": "now"}, "alignment": {"approved_at": "now"}},
             "revisions": [{"revision": 1}],
             "rehearsal": {"tickets_path": ".factory/rehearsal/demo/tickets.json"},
         }
-        receipt_roles = ["qa", "implementation", "verification", "human_review"]
+        receipt_roles = [
+            "supervisor", "qa", "implementation", "verification", "code_review", "human_review",
+        ]
         state = {"tickets": [
             {
                 "number": number,
                 "status": "Done",
-                "attempt": 2 if number == 3 else 1,
+                "attempt": 2 if number in {1, 3} else 1,
                 "_loaded_receipts": [{"role": role} for role in receipt_roles],
+                "code_review": {"result": {"decision": "APPROVE"}},
                 "gate_results": [{"name": "tests", "required": True, "exit_code": 0}],
+                "qa_evidence": {
+                    "focused_test_command": "python -m pytest -q tests/test_ticket.py",
+                    "focused_test_command_sha256": "same-command",
+                    "red": {"result": "RED PROVED", "classification": "behavior_assertion"},
+                    "green": {"result": "GREEN PROVED", "classification": "pass"},
+                },
             }
             for number in range(1, 6)
         ]}
@@ -90,16 +152,22 @@ class FactoryContractTests(unittest.TestCase):
             "ticket #2 has no required verification gate result",
             "; ".join(validate_standard_rehearsal(manifest, state)),
         )
+        state["tickets"][1]["gate_results"] = [{"name": "tests", "required": True, "exit_code": 0}]
+        state["tickets"][1]["qa_evidence"]["red"]["result"] = "RED NOT PROVED"
+        self.assertIn(
+            "ticket #2 has no RED PROVED evidence",
+            "; ".join(validate_standard_rehearsal(manifest, state)),
+        )
 
     def test_live_smoke_requires_explicit_disposable_repository_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             (repo / "factory").mkdir()
             (repo / "workshop-guide/app").mkdir(parents=True)
-            (repo / "factory/factory_contracts.py").write_text('WORKSHOP_VERSION = "workshop-v1.0.0"\n')
-            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.0.0\n")
-            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.0.0\n")
-            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.0.0\n")
+            (repo / "factory/factory_contracts.py").write_text('WORKSHOP_VERSION = "workshop-v1.1.0"\n')
+            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.1.0\n")
+            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.1.0\n")
+            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.1.0\n")
             subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(
@@ -138,18 +206,22 @@ class FactoryContractTests(unittest.TestCase):
         )
         self.assertEqual(
             profiles["standard"]["execution_roles"],
-            ["qa", "implementation", "verification", "human_review"],
+            ["supervisor", "qa", "implementation", "verification", "code_review", "human_review"],
         )
         self.assertEqual(
             profiles["assured"]["execution_roles"],
             [
+                "supervisor",
                 "qa",
                 "implementation",
                 "cleanup",
                 "architecture_conformance",
                 "hardening",
                 "verification",
+                "critic",
+                "negative_proof",
                 "final_verifier",
+                "code_review",
                 "human_review",
             ],
         )
@@ -157,18 +229,22 @@ class FactoryContractTests(unittest.TestCase):
         self.assertTrue(profiles["standard"]["protected_acceptance_tests"])
         self.assertTrue(profiles["assured"]["protected_acceptance_tests"])
 
-    def test_dashboard_teaches_macro_phases_and_exposes_engine_room_evidence(self):
-        dashboard = (Path(__file__).parents[1] / "dashboard.html").read_text()
-        for phase in ("Plan", "Build", "Verify", "Review"):
-            self.assertIn(f">{phase}<", dashboard)
-        self.assertIn("Factory Profile", dashboard)
-        self.assertIn("Policy version", dashboard)
-        self.assertIn("Handoff Receipts", dashboard)
-        self.assertIn("Rehearsal Run", dashboard)
-        self.assertIn("Live Run", dashboard)
-        self.assertNotIn("Mock rehearsal", dashboard)
-        self.assertNotIn("GitHub production", dashboard)
+    def test_normal_profiles_keep_human_merge_and_autonomous_demo_is_explicit(self):
+        result = subprocess.run(
+            [sys.executable, str(FACTORY), "profiles", "--json"],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        profiles = json.loads(result.stdout)
 
+        for name in ("lean", "standard", "assured"):
+            with self.subTest(profile=name):
+                self.assertEqual(profiles[name]["merge_authority"], "human")
+                self.assertNotIn("supervisor_merge", profiles[name]["execution_roles"])
+        self.assertEqual(profiles["autonomous-demo"]["merge_authority"], "supervisor")
+        self.assertIn("supervisor_merge", profiles["autonomous-demo"]["execution_roles"])
+        self.assertTrue(profiles["autonomous-demo"]["requires_explicit_opt_in"])
 
 if __name__ == "__main__":
     unittest.main()

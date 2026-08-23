@@ -9,7 +9,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "path": { "type": "string" },
           "responsibility": { "type": "string" },
           "components": { "type": "array", "items": { "type": "string" } }
@@ -23,7 +23,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "module": { "type": "string" },
           "definition": { "type": "string" },
@@ -38,7 +38,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "signature": { "type": "string" },
           "module": { "type": "string" },
           "calls": { "type": "array", "items": { "type": "string" } },
@@ -55,7 +55,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "steps": { "type": "array", "items": { "type": "string" } },
           "requirements": { "type": "array", "items": { "type": "string" } }
@@ -69,7 +69,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "boundary": { "type": "string" },
           "strategy": { "type": "string" },
           "requirements": { "type": "array", "items": { "type": "string" } }

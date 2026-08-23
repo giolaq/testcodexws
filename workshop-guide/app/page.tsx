@@ -12,7 +12,7 @@ const steps = [
   { id: "publish", label: "Create tickets", time: "18 min" },
   { id: "qa", label: "Approve tests", time: "10 min" },
   { id: "factory", label: "Run the factory", time: "22 min" },
-  { id: "finish", label: "Verify the result", time: "15 min" },
+  { id: "finish", label: "Verify and monitor", time: "15 min" },
 ] as const;
 
 function CodeBlock({ children, label = "Terminal" }: { children: string; label?: string }) {
@@ -70,11 +70,13 @@ function Checkpoint({ children }: { children: ReactNode }) {
 
 function WorkshopPaths({
   click,
+  whyStopped,
   inspect,
   continueWhen,
   children,
 }: {
   click: ReactNode;
+  whyStopped?: ReactNode;
   inspect: ReactNode;
   continueWhen: ReactNode;
   children: string;
@@ -85,9 +87,10 @@ function WorkshopPaths({
         <span className="path-label">Control Center</span>
         <h3>Use the web interface</h3>
         <dl className="instruction-list">
-          <div><dt>Click</dt><dd>{click}</dd></div>
-          <div><dt>Inspect</dt><dd>{inspect}</dd></div>
-          <div><dt>Continue when</dt><dd>{continueWhen}</dd></div>
+          <div><dt>What is happening</dt><dd>{click}</dd></div>
+          <div><dt>Why it stopped</dt><dd>{whyStopped ?? <>The factory reached a human decision or a failed control. <strong>Current phase</strong> names the owner and recovery.</>}</dd></div>
+          <div><dt>What evidence to inspect</dt><dd>{inspect}</dd></div>
+          <div><dt>What you decide</dt><dd>{continueWhen}</dd></div>
         </dl>
       </section>
       <section className="instruction-card cli-card" aria-label="CLI path">
@@ -243,6 +246,9 @@ export default function Home() {
         <nav aria-label="Workshop sections">
           <p className="nav-label">Start</p>
           <a href="#overview" onClick={() => setMenuOpen(false)}>Overview</a>
+          <a href="#capability-ladder" onClick={() => setMenuOpen(false)}>Why the controls exist</a>
+          <a href="#supervisor-role" onClick={() => setMenuOpen(false)}>Supervisor role</a>
+          <a href="#code-review-role" onClick={() => setMenuOpen(false)}>Code review role</a>
           <a href="#prerequisites" onClick={() => setMenuOpen(false)}>Prerequisites</a>
           <a href="#path" onClick={() => setMenuOpen(false)}>Choose a path</a>
           <p className="nav-label">Workshop</p>
@@ -276,7 +282,7 @@ export default function Home() {
           <div className="factory-map" aria-label="Workshop workflow">
             <div className="map-row"><span className="map-node">PRD</span><i>→</i><span className="map-node node-blue">Plan</span><i>→</i><span className="map-node node-human">Approve</span></div>
             <div className="map-down">↓</div>
-            <div className="map-row"><span className="map-node node-purple">Agents</span><i>→</i><span className="map-node node-blue">QA</span><i>→</i><span className="map-node node-human">Review</span></div>
+            <div className="map-row"><span className="map-node node-purple">Supervisor</span><i>→</i><span className="map-node node-blue">Agents</span><i>→</i><span className="map-node node-human">Review + merge</span></div>
             <div className="map-down">↓</div>
             <div className="map-row"><span className="map-node node-green">Verified change</span></div>
           </div>
@@ -299,10 +305,106 @@ export default function Home() {
           />
           <div className="concept-grid compact-concept-grid">
             <article><span>01</span><h3>Plan</h3><p>Turn product intent into contracts and small vertical slices.</p></article>
-            <article><span>02</span><h3>Build</h3><p>Give each ticket and agent an isolated Git worktree.</p></article>
+            <article><span>02</span><h3>Build</h3><p>Supervise each safe ticket wave in isolated Git worktrees.</p></article>
             <article><span>03</span><h3>Verify</h3><p>Let QA define tests before implementation begins.</p></article>
-            <article><span>04</span><h3>Review</h3><p>Merge only when tests, evidence, and human review agree.</p></article>
+            <article><span>04</span><h3>Review</h3><p>Have a separate agent inspect the candidate diff, then leave merge judgment to a person.</p></article>
           </div>
+        </section>
+
+        <section id="capability-ladder" className="supervisor-section">
+          <div className="section-heading">
+            <span className="section-kicker">Build capability in response to failure</span>
+            <h2>Start with one responsible delivery loop</h2>
+            <p>Begin with a clear issue, one coding agent, one real test, one pull request, and a human merge. Add factory controls only when the work exposes a specific failure mode. Human attention is the limiting resource, so the factory stops creating review work when that queue is full.</p>
+          </div>
+          <div className="supervisor-role-flow" aria-label="Capability ladder">
+            <article><span>Minimum loop</span><h3>Issue → code → test → PR</h3><p>A person owns intent and the exact revision that ships.</p></article>
+            <article><span>Failure modes</span><h3>Ambiguity, collisions, weak proof</h3><p>Parallel work also creates review queues, lost decisions, and stale evidence.</p></article>
+            <article><span>Add controls</span><h3>Plan, claim, verify, record</h3><p>Use only the planning depth, isolation, gates, review, and monitoring the risk requires.</p></article>
+          </div>
+          <Callout type="tip" title="More agents are a cost">
+            <p>Agent count and check count are not quality measures. The useful result is a bounded change whose ownership, evidence, and human decision are easy to inspect.</p>
+          </Callout>
+        </section>
+
+        <section id="supervisor-role" className="supervisor-section">
+          <div className="section-heading">
+            <span className="section-kicker">Multi-agent coordination</span>
+            <h2>The supervisor coordinates work. It does not own delivery.</h2>
+            <p>A ticket agent sees one assignment. The Agent Supervisor sees the delivery state between work waves and recommends what should happen next.</p>
+          </div>
+          <details className="optional-detail">
+            <summary>Inspect the Supervisor contract</summary>
+            <div className="supervisor-role-flow" aria-label="Supervisor coordination flow">
+              <article><span>1 · Report</span><h3>Workers report</h3><p>Agents return a Handoff Receipt with checks, artifacts, and risks.</p></article>
+              <article><span>2 · Coordinate</span><h3>Supervisor proposes</h3><p>It reads dependencies, capacity, and receipts, then proposes a safe wave or block.</p></article>
+              <article><span>3 · Enforce</span><h3>Orchestrator decides</h3><p>It validates commands, starts worktrees, and owns ticket state.</p></article>
+            </div>
+            <div className="supervisor-boundaries">
+              <article>
+                <span className="boundary-label">The supervisor can</span>
+                <ul>
+                  <li>Select dependency-ready work.</li>
+                  <li>Reduce concurrency and focus instructions.</li>
+                  <li>Block on recorded risk.</li>
+                  <li>Recommend an approved revision for merge.</li>
+                </ul>
+              </article>
+              <article>
+                <span className="boundary-label">The supervisor cannot</span>
+                <ul>
+                  <li>Edit code or protected tests.</li>
+                  <li>Change scope or dependencies.</li>
+                  <li>Waive gates, approve code, or merge.</li>
+                  <li>Move tickets outside the orchestrator.</li>
+                </ul>
+              </article>
+            </div>
+            <Callout title="Why use Handoff Receipts?">
+              <p>Receipts make worker results, Supervisor recommendations, and orchestrator decisions inspectable.</p>
+            </Callout>
+          </details>
+        </section>
+
+        <section id="code-review-role" className="supervisor-section">
+          <div className="section-heading">
+            <span className="section-kicker">Independent code review</span>
+            <h2>The Code Review Agent closes the feedback loop.</h2>
+            <p>After tests and required gates pass, the factory opens or updates a pull request. A separate read-only agent reviews that exact candidate revision.</p>
+          </div>
+          <details className="optional-detail">
+            <summary>Inspect the review and rework loop</summary>
+            <div className="supervisor-role-flow" aria-label="Code review flow">
+              <article><span>1 · Inspect</span><h3>Review the diff</h3><p>The reviewer checks the approved Ticket against the exact candidate.</p></article>
+              <article><span>2 · Decide</span><h3>Approve or comment</h3><p>Actionable comments name a file, severity, and explanation.</p></article>
+              <article><span>3 · Close</span><h3>Fix and recheck</h3><p>Comments return to implementation. Gates and review rerun before a person can merge.</p></article>
+            </div>
+            <Callout type="note" title="Three roles, separate authority">
+              <p>The Code Review Agent can approve or request changes. The Supervisor can recommend that exact commit. Only the human merge action ships it.</p>
+            </Callout>
+            <Callout type="warning" title="GitHub approval needs a separate identity">
+              <p>With one workshop login, review is published as a labelled PR comment. For formal approval, use a second account through <code>FACTORY_REVIEW_GH_TOKEN</code>. Never commit it.</p>
+            </Callout>
+          </details>
+        </section>
+
+        <section id="project-contract" className="supervisor-section">
+          <div className="section-heading">
+            <span className="section-kicker">Use it beyond the exercise</span>
+            <h2>Any PRD, one explicit repository contract.</h2>
+            <p>The PRD defines what should change. <code>factory.project.toml</code> defines how this repository is built and verified. The human-owned <code>factory.charter.toml</code> defines authority, protected paths, limits, and stop conditions. Agents receive all three.</p>
+          </div>
+          <details className="optional-detail">
+            <summary>See how a generic repository is connected</summary>
+            <div className="supervisor-role-flow" aria-label="Generic project setup flow">
+              <article><span>1 · Detect</span><h3>Initialize</h3><p><code>factory init</code> detects roots, tools, and gates.</p></article>
+              <article><span>2 · Review</span><h3>Approve governance</h3><p>A developer corrects the contract and approves the Charter hash.</p></article>
+              <article><span>3 · Run</span><h3>Use Live agents</h3><p>Paste any PRD and publish approved slices to GitHub Projects.</p></article>
+            </div>
+            <Callout type="note" title="Why Rehearsal is different">
+              <p>Deterministic agents implement only TableStory. Use Live mode for an arbitrary PRD.</p>
+            </Callout>
+          </details>
         </section>
 
         <section id="prerequisites" className="prerequisites-section">
@@ -320,7 +422,7 @@ export default function Home() {
                 <li>Python 3.11+ with virtual environments</li>
                 <li>Node.js 20+, Git, and a modern browser</li>
                 <li>Ports 5000 and 5050 available</li>
-                <li>GitHub CLI and one personal workshop repository</li>
+                <li>A local Git repository for the Rehearsal path</li>
               </ul>
             </article>
             <article>
@@ -328,18 +430,20 @@ export default function Home() {
               <h3>Accounts and access</h3>
               <ul>
                 <li>GitHub CLI with the <code>project</code> scope</li>
+                <li>One personal GitHub workshop repository</li>
                 <li>Permission to create issues, branches, and Projects</li>
                 <li>An authenticated Claude, Codex, Cursor, or custom agent CLI</li>
                 <li>Network access to GitHub and your model provider</li>
+                <li>Optional: a second reviewer identity for formal GitHub approval</li>
               </ul>
             </article>
           </div>
           <CodeBlock label="Check versions">{`python3 --version
 node --version
 git --version
-gh --version`}</CodeBlock>
+${track === "live" ? "gh --version" : ""}`}</CodeBlock>
           <Callout type="warning" title="Use your own repository">
-            <p>Every attendee creates a personal workshop repository. The facilitator uses a different repository on screen.</p>
+            <p>Every Live attendee creates a personal GitHub repository. The facilitator uses a different repository on screen. Rehearsal stays local and needs no GitHub or model credentials.</p>
           </Callout>
         </section>
 
@@ -367,21 +471,33 @@ gh --version`}</CodeBlock>
         </section>
 
         <StepSection index={1} id="setup" title="Set up" goal="Start from a clean, personal workshop repository." complete={completed.includes("setup")} onToggle={() => toggleStep("setup")}>
-          <p>Clone the workshop and create your own repository first.</p>
-          <CodeBlock label="Terminal 1 — repository setup">{track === "rehearsal" ? `gh auth login
-git clone https://github.com/giolaq/software-refactory-workshop.git software-refactory-demo
-cd software-refactory-demo
-git remote rename origin upstream
-gh repo create software-refactory-demo --private --source=. --remote=origin --push
+          <p>{track === "live" ? "Create a personal GitHub repository from the workshop template, then clone it." : "Clone the workshop into a disposable local repository. Deterministic agents do not write to GitHub or call a model provider."}</p>
+          <CodeBlock label="Terminal 1 — repository setup">{track === "rehearsal" ? `git clone https://github.com/giolaq/software-refactory-workshop.git software-refactory-rehearsal
+cd software-refactory-rehearsal
 ./setup_demo.sh --scenario recipe-rebrand
-git push origin main --follow-tags` : `gh auth login
+git remote remove origin
+git add .
+git commit -m "chore: start workshop rehearsal"` : `gh auth login
 gh auth refresh -s project
-git clone https://github.com/giolaq/software-refactory-workshop.git software-refactory-demo
-cd software-refactory-demo
-git remote rename origin upstream
-gh repo create software-refactory-demo --private --source=. --remote=origin --push
+gh repo create YOUR-REPOSITORY --private \
+  --template giolaq/software-refactory-workshop --clone
+cd YOUR-REPOSITORY
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main --follow-tags`}</CodeBlock>
+          <Callout type="tip" title="Already created the repository?">
+            <p>Clone it if it already contains the workshop template. Otherwise clone the workshop locally and paste your repository URL in Connect; saving Live configuration will set that repository as <code>origin</code>. Push <code>main</code> before preflight.</p>
+          </Callout>
+          {track === "live" ? <Callout type="note" title="Using an existing project instead?">
+            <p>Keep the factory checkout separate. Run the commands below from it, review the generated contract, then continue in the Control Center. The guided steps that mention Pocket Cinema apply only to the workshop repository.</p>
+            <CodeBlock label="Target another Git checkout">{`./factory/factory init --repo /path/to/your-project
+# Review factory.project.toml and factory.charter.toml
+./factory/factory approve-charter --repo /path/to/your-project --yes
+git -C /path/to/your-project add factory.project.toml factory.charter.toml .gitignore
+git -C /path/to/your-project commit -m "chore: configure software factory"
+git -C /path/to/your-project push origin HEAD
+./factory/factory prepare --repo /path/to/your-project
+./factory/factory control-center --repo /path/to/your-project`}</CodeBlock>
+          </Callout> : null}
 
           <div className="activity-card launch-card">
             <span className="activity-label">Do this before using the screenshots</span>
@@ -396,16 +512,18 @@ git push origin main --follow-tags`}</CodeBlock>
           </div>
 
           <WorkshopPaths
-            click={<>In the browser that just opened, select <strong>Connect</strong>, choose <strong>{track === "live" ? "Live" : "Rehearsal"}</strong> and your agent preset, then select <strong>Run preflight</strong>.</>}
-            inspect={<>Confirm the run mode, repository, branch, remote, agent roles, QA approval, and parallel-ticket limit.</>}
-            continueWhen={<>Preflight reports no blockers and the header shows the correct repository.</>}
-          >{`./factory/factory configure --preset claude-workshop
+            click={<>Select <strong>Connect</strong>. Create the Project Contract and Charter if needed. Review both. Approve the exact Charter, then choose <strong>{track === "live" ? "Live" : "Rehearsal"}</strong>{track === "live" ? <>, paste your repository URL, choose an agent preset, and save</> : null}. Select <strong>Run preflight</strong>.</>}
+            whyStopped={<>Planning stays locked until the repository contract exists and a person approves the exact Charter policy.</>}
+            inspect={<>Confirm source roots, test roots, gate levels, protected paths, consequence tier, human merge authority, and—on Live—the GitHub target and agents.</>}
+            continueWhen={<>The Charter says <strong>Approved</strong>, preflight reports no blockers, and the header names the correct repository.</>}
+          >{`${track === "live" ? `./factory/factory configure --preset claude-workshop \\\n  --github-repository https://github.com/YOUR-NAME/YOUR-REPOSITORY
+` : ""}./factory/factory approve-charter --yes
 ./factory/factory doctor${track === "live" ? " --full" : ""}`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-connect.jpg"
             alt="Control Center Connect screen with agent presets, repository details, and preflight button"
             label="Connect"
-            caption="Click Connect in the left navigation. Check the repository panel before running preflight."
+            caption="Click Connect. In Live mode, paste the repository URL, save it, and confirm that the GitHub target says connected before preflight."
             width={1440}
             height={900}
           />
@@ -475,8 +593,8 @@ export PLAN_ID=<plan-id-from-output>
 
         <StepSection index={5} id="publish" title="Create tickets" goal="Agree on architecture, program design, and vertical slices before publishing work." complete={completed.includes("publish")} onToggle={() => toggleStep("publish")}>
           <WorkshopPaths
-            click={<>In <strong>Planning</strong>, select <strong>Run remaining experts</strong>. Open each expert card, approve alignment, then select <strong>Create tickets</strong>.</>}
-            inspect={<>Check component contracts, data models, types, call paths, acceptance criteria, dependencies, and delivery waves.</>}
+            click={<>In <strong>Planning</strong>, select <strong>Run remaining experts</strong>. Open each expert card. If an expert blocks, answer every question in its card and select <strong>Submit decisions and continue</strong>. Approve alignment, then select <strong>Create tickets</strong>.</>}
+            inspect={<>Check component contracts, data models, types, call paths, acceptance criteria, dependencies, and delivery waves. A blocked expert must show the decisions it needs; you do not edit its JSON.</>}
             continueWhen={track === "live" ? <>GitHub Projects contains the approved slices as issues.</> : <>The rehearsal ticket board contains the approved slices.</>}
           >{track === "rehearsal" ? `./factory/factory continue-plan "$PLAN_ID" --mock
 ./factory/factory review alignment "$PLAN_ID"
@@ -509,36 +627,46 @@ export PLAN_ID=<plan-id-from-output>
         <StepSection index={6} id="qa" title="Approve tests" goal="Have a QA agent define acceptance evidence before implementation." complete={completed.includes("qa")} onToggle={() => toggleStep("qa")}>
           <WorkshopPaths
             click={<>Open <strong>Tickets</strong>, select <strong>Run one cycle</strong>, open ticket <strong>#1</strong>, then select <strong>Tests</strong>. Return to Summary to approve.</>}
-            inspect={<>Read the protected test path and verify that the proposed assertions prove the ticket’s acceptance criteria.</>}
-            continueWhen={<>The test proposal is credible and the ticket history records your approval.</>}
+            whyStopped={<>Implementation cannot start until the focused command has failed for the missing behavior and a person accepts the QA-owned tests.</>}
+            inspect={<>Read the protected test path, focused command, command hash, and <strong>RED PROVED</strong> result. Collection errors, timeouts, skipped tests, and unrelated failures are not valid red evidence.</>}
+            continueWhen={<>The test detects the missing behavior, the evidence says <strong>RED PROVED</strong>, and you approve the proposal.</>}
           >{`./factory/factory run${track === "rehearsal" ? " --mock --scenario recipe-rebrand" : ""} --review-qa-tests --once
 ./factory/factory approve-tests ISSUE_NUMBER`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-ticket-tests.jpg"
             alt="Control Center ticket drawer open on the Tests tab"
             label="Ticket tests"
-            caption="Open a QA Review ticket, then click Tests in the detail drawer."
+            caption="Open a QA Review ticket, click Tests, and require RED PROVED before approval. The same focused command must later show GREEN PROVED."
             width={1440}
             height={900}
           />
-          <Checkpoint>The ticket contains acceptance tests, and its history records QA approval.</Checkpoint>
+          <Checkpoint>The ticket records the protected test, identical focused command, RED PROVED result, and human QA approval.</Checkpoint>
         </StepSection>
 
-        <StepSection index={7} id="factory" title="Run the factory" goal="Observe agents implement, verify, and review isolated tickets." complete={completed.includes("factory")} onToggle={() => toggleStep("factory")}>
+        <StepSection index={7} id="factory" title="Run the factory" goal="Observe a supervisor coordinate agents that implement, verify, and review isolated tickets." complete={completed.includes("factory")} onToggle={() => toggleStep("factory")}>
           <WorkshopPaths
-            click={track === "live" ? <>Keep your <strong>GitHub Project</strong> open, then open <strong>Tickets</strong> in the Control Center and select <strong>Run factory</strong>.</> : <>Open <strong>Tickets</strong> and select <strong>Run factory</strong>.</>}
-            inspect={track === "live" ? <>Use GitHub Projects for shared ticket state. Open a moving ticket in the Control Center for its prompt, live log, diff, tests, and history.</> : <>Open a moving ticket and follow its state, attempt count, dependencies, prompt, worktree changes, gates, and review decisions.</>}
-            continueWhen={<>At least one ticket reaches Done and its detail drawer contains the evidence for that state.</>}
+            click={track === "live" ? <>Keep your <strong>GitHub Project</strong> open. In the Control Center, open <strong>Tickets</strong>, select <strong>Run factory</strong>, then open <strong>Supervisor</strong>.</> : <>Open <strong>Tickets</strong>, select <strong>Run factory</strong>, then open <strong>Supervisor</strong>.</>}
+            whyStopped={<>The scheduler stops for full human-review capacity, an owned remote claim, failed causal proof, a gate failure, review comments, or the final human merge decision. The top <strong>NEEDS YOU</strong> card names the reason.</>}
+            inspect={track === "live" ? <>Use GitHub Projects for shared state. In Supervisor, follow worker Handoff Receipts into a dispatch instruction. Open the Ticket for its prompt, log, diff, tests, and gates. When verification passes, open <strong>Code review</strong>, compare the decision with the GitHub review or labelled Factory comment, then inspect the human merge gate.</> : <>Follow worker Handoff Receipts into a dispatch instruction. Open the selected Ticket and compare its instruction with its prompt, logs, gates, Code Review Agent decision, Supervisor recommendation, and human merge gate.</>}
+            continueWhen={<>The reviewer approves the exact PR head. You inspect the evidence and select <strong>Merge exact revision</strong>; only then does the Ticket reach Done.</>}
           >{track === "live" ? `gh project view <project-number> --owner "@me" --web
 ./factory/factory run` : `./factory/factory run --mock --scenario recipe-rebrand`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-tickets.jpg"
             alt="Control Center Tickets board with backlog and QA Review columns"
             label="Ticket board"
-            caption="Click a card to inspect its prompt, live log, diff, tests, and history."
+            caption="Click a card, then use Code review to inspect comments, approval, publication mode, and the exact candidate commit."
             width={1440}
             height={900}
           />
+          {track === "live" && <WorkshopMedia
+            src="/screenshots/github-project-board.jpg"
+            alt="Illustrated GitHub Project board showing factory Tickets in lifecycle columns"
+            label="Illustrated GitHub Project checkpoint"
+            caption="Open Projects from your repository and select the workshop board. Use it for shared state; GitHub's exact layout may vary."
+            width={1440}
+            height={900}
+          />}
           <WorkshopMedia
             src="/screenshots/control-center-overview.jpg"
             alt="Control Center Overview showing current phase, next checkpoint, progress, and human decisions"
@@ -547,25 +675,56 @@ export PLAN_ID=<plan-id-from-output>
             width={1440}
             height={900}
           />
+          <div className="activity-card">
+            <span className="activity-label">Coordination checkpoint</span>
+            <h3>Trace one supervised handoff</h3>
+            <ol>
+              <li>Read the latest worker report under <strong>Supervisor</strong>.</li>
+              <li>Find the matching dispatch, block, or deferred Ticket.</li>
+              <li>Open that Ticket’s <strong>Supervisor</strong> tab and read its instruction.</li>
+              <li>After the worker finishes, find its new Handoff Receipt in the next supervisor decision.</li>
+            </ol>
+            <p>The Agent Supervisor recommends coordination. The orchestrator validates commands and remains the only lifecycle authority.</p>
+          </div>
+          <WorkshopMedia
+            src="/screenshots/control-center-human-merge.jpg"
+            alt="Control Center Ticket summary showing an exact-revision human merge action"
+            label="Human merge gate"
+            caption="Check that the approved head matches the pull request head, then click Merge exact revision. Standard and Assured never merge automatically."
+            width={1440}
+            height={900}
+          />
+          <div className="activity-card">
+            <span className="activity-label">Review checkpoint</span>
+            <h3>Trace one candidate diff</h3>
+            <ol>
+              <li>Open a verified Ticket and select <strong>Code review</strong>.</li>
+              <li>Confirm the report names the candidate commit and only changed paths.</li>
+              <li>If it says REQUEST_CHANGES, watch every comment return to implementation as retry context.</li>
+              <li>After APPROVE, confirm the Supervisor recommendation names the same commit, then make the human merge decision.</li>
+            </ol>
+          </div>
           <Callout type="tip" title="Retries are evidence">
             <p>A failed gate should return the ticket to the agent with a clear reason. Do not hide the loop.</p>
           </Callout>
           {track === "live" && <Callout type="tip" title="Two views, one run">
             <p>GitHub Projects is the shared work-management view. The local Control Center is the engine room for prompts, worktrees, tests, logs, and verification evidence.</p>
           </Callout>}
-          <Checkpoint>At least one ticket reaches Done, and you can open its log, diff, tests, and review evidence.</Checkpoint>
+          <Checkpoint>At least one Ticket reaches Done, and you can trace dispatch → worker evidence → review feedback → repair → approval → Supervisor recommendation → human merge.</Checkpoint>
         </StepSection>
 
-        <StepSection index={8} id="finish" title="Verify the result" goal="Check the integrated product, not only individual tickets." complete={completed.includes("finish")} onToggle={() => toggleStep("finish")}>
+        <StepSection index={8} id="finish" title="Verify and monitor" goal="Check the integrated product, preserve evidence, and inspect what needs attention next." complete={completed.includes("finish")} onToggle={() => toggleStep("finish")}>
           <WorkshopPaths
-            click={<>Open <strong>Evidence</strong>. Inspect the checklist, complete the Factory Canvas, then select <strong>Create evidence packet</strong>.</>}
-            inspect={<>Confirm product intent, plan approval, test records, required gates, completed tickets, and the integrated user journeys.</>}
-            continueWhen={<>Every checklist item is complete and the generated packet explains why the delivery is done.</>}
+            click={<>Open <strong>Evidence</strong>, complete the Factory Canvas, and create the packet. Then open <strong>Monitor</strong> and select <strong>Preview findings</strong>.</>}
+            whyStopped={<>Evidence waits for completed Tickets and a complete Canvas. Monitor reports health separately and never repairs code in the same run.</>}
+            inspect={<>Confirm product intent, approvals, RED/GREEN proof, gates, exact-revision human merge, stage time, verification overhead, human wait, and any Monitor findings or limitations.</>}
+            continueWhen={<>The packet explains why delivery is done and the read-only Monitor report has a named owner for every follow-up.</>}
           >{`.factory/venv/bin/python -m pytest -q demo-app/tests
 node --test demo-app/static/tests/*.test.js
 .factory/venv/bin/python demo-app/app.py
 ./factory/factory canvas --output factory-canvas.md
-./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md`}</WorkshopPaths>
+./factory/factory evidence "$PLAN_ID" --canvas factory-canvas.md
+./factory/factory monitor`}</WorkshopPaths>
           <WorkshopMedia
             src="/screenshots/control-center-evidence.jpg"
             alt="Control Center Evidence screen with completion checklist and evidence packet button"
@@ -589,13 +748,22 @@ node --test demo-app/static/tests/*.test.js
             height={900}
             illustration
           />
-          <Checkpoint>The app passes its tests, works at three viewport sizes, and the evidence report explains why the change is complete.</Checkpoint>
+          <Checkpoint>The app passes its tests, works at three viewport sizes, the evidence packet explains the merge, and Monitor proposes no hidden repair.</Checkpoint>
         </StepSection>
 
         <section className="completion-panel">
           <div className="completion-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><span>{progress}%</span></div>
           <div><span className="section-kicker">Workshop progress</span><h2>{progress === 100 ? "Factory complete" : "Keep going"}</h2><p>{completed.length} of {steps.length} steps marked complete.</p></div>
           {progress < 100 && <a className="primary-button" href={`#${steps.find((step) => !completed.includes(step.id))?.id ?? "setup"}`}>Next step</a>}
+        </section>
+
+        <section className="supervisor-section" id="autonomous-demo">
+          <div className="section-heading"><span className="section-kicker">Optional contrast · outside the 100-minute core</span><h2>Autonomous Demo delegates the final merge</h2><p>Use this only to demonstrate the accountability tradeoff. It preserves exact-head checks, but the operator explicitly delegates merge execution to the Supervisor recommendation and orchestrator.</p></div>
+          <Callout type="warning" title="Not the normal shipping path">
+            <p>Standard and Assured end at a human exact-revision merge. Autonomous Demo requires a visible opt-in every time the run starts; it is not a production default.</p>
+          </Callout>
+          <CodeBlock>{`./factory/factory configure --profile autonomous-demo
+./factory/factory run --allow-autonomous-merge`}</CodeBlock>
         </section>
 
         <section id="adapt" className="apply-section">
@@ -610,6 +778,9 @@ node --test demo-app/static/tests/*.test.js
             <li>What evidence would make an agent change safe to review?</li>
             <li>Where must a human make the final decision?</li>
           </ol>
+          <Callout title="Complete the Factory Canvas">
+            <p>Name the consequence tier, merge authority, human review capacity, load-bearing paths, gate budget, durable remote record, and monitoring owner. These choices determine which controls your use case actually needs.</p>
+          </Callout>
           <details className="optional-detail">
             <summary>Configure your own agent</summary>
             <p>Start with a built-in preset, or map each role to a different CLI.</p>
@@ -617,12 +788,28 @@ node --test demo-app/static/tests/*.test.js
 # Or: --preset codex-workshop
 
 ./factory/factory configure \\
-  --planning-agent claude --agent my-agent --qa-agent my-agent \\
+  --planning-agent claude --supervisor-agent my-agent \\
+  --agent my-agent --qa-agent my-agent --review-agent my-agent \\
   --review-qa-tests --max-parallel 1`}</CodeBlock>
             <p>Add a custom adapter in <code>factory/factory.toml</code>:</p>
             <CodeBlock label="factory/factory.toml">{`[agents]
-my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
-            <p>Keep test roots and quality gates in the same configuration, then run <code>./factory/factory doctor --full</code>.</p>
+my-agent = './tools/run-my-agent.sh {prompt}'
+
+[agent_capabilities.my-agent]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "provider-only"
+environment_allowlist = ["PATH", "HOME", "MY_AGENT_HOME"]
+credential_names = []
+read_only_template = './tools/run-my-agent.sh --read-only {prompt}'
+
+[supervisor]
+agent = "my-agent"
+
+[review]
+agent = "my-agent"`}</CodeBlock>
+            <p>Declare only the environment names the adapter needs. Unsupported read-only, network, container, or hosted-runner controls appear as limitations; Git worktrees are not security sandboxes. The Supervisor returns structured dispatch and revision-bound merge recommendations. The reviewer must leave the worktree unchanged. Then run <code>./factory/factory doctor --full</code>.</p>
           </details>
         </section>
 
@@ -634,13 +821,16 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
           </div>
           <div className="accordion-list">
             <details><summary><code>doctor</code> reports a failure</summary><p>Fix the first failed check, then rerun the same doctor command. Later errors are often consequences.</p></details>
-            <details><summary>No Git remotes found</summary><p>Run <code>git remote -v</code> inside the demo repository. Add or correct <code>origin</code>; do not point the factory repository at the demo project.</p></details>
+            <details><summary>Repository is not connected</summary><p>Open <strong>Connect</strong>, choose <strong>Live</strong>, paste the repository URL, and save. The factory verifies access and configures <code>origin</code>. Push <code>main</code>, then rerun preflight.</p></details>
             <details><summary>Claude asks for an OpenAI API key</summary><p>Your selected adapter is still the OpenAI preset. Run <code>./factory/factory configure --preset claude-workshop</code>, confirm Claude is authenticated, then rerun doctor.</p></details>
             <details><summary>A ticket is blocked</summary><p>Open its event history and agent log. Fix the recorded cause, then run <code>./factory/factory retry ISSUE_NUMBER</code>.</p></details>
+            <details><summary>Retry blocked expert repeats the same error</summary><p>Open the failed expert&apos;s recovery card. For validation, use the prefilled <strong>Apply correction and continue</strong> instruction. For a session or rate limit, select another planning adapter or wait; same-adapter retry is disabled. If the PRD, Project Contract, or Factory Charter changed, select <strong>Restart planning safely</strong>.</p></details>
+            <details><summary>NEEDS YOU says dispatch is paused</summary><p>The human queue reached its Charter limit. Open the oldest linked decision. Approve, reject, answer, or merge it; dispatch resumes when the queue falls below the limit.</p></details>
+            <details><summary>A remote claim belongs to an abandoned run</summary><p>Confirm the owner is no longer running. Open the blocked Ticket and select <strong>Release abandoned claim</strong>. Local reset never releases a remote claim.</p></details>
             <details><summary>The Control Center reports a deadlock</summary><p>One or more dependency chains form a cycle. Edit issue dependencies so at least one ticket can start, then rerun the factory.</p></details>
             <details><summary>Live planning is slow or inconsistent</summary><p>Use the rehearsal path to learn the workflow. Return to live mode after credentials, model access, and the PRD are stable.</p></details>
             <details><summary>A port or worktree is already in use</summary><p>Stop the stale process or inspect active worktrees with <code>git worktree list</code>. Remove only a worktree you have confirmed is disposable.</p></details>
-            <details><summary>I want to repeat the workshop</summary><p>Open <strong>Reset or start again</strong> in the local Control Center. Reset ticket execution to keep the approved PRD plan, or type <code>START OVER</code> to return to the beginning. For Live mode, create a fresh repository.</p></details>
+            <details><summary>I want to repeat the workshop</summary><p>Open <strong>Reset or start again</strong>. Reset ticket execution to keep the approved PRD plan, or type <code>START OVER</code> to clear local planning history. In Live mode, both actions keep the selected mode and preserve tracked source plus every GitHub artifact. Use a fresh repository when you need an empty Live board.</p></details>
           </div>
         </section>
 
@@ -658,9 +848,14 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
             <div><code>factory approve-product PLAN_ID</code><span>Record the human product decision.</span></div>
             <div><code>factory approve PLAN_ID</code><span>Publish approved slices as GitHub issues.</span></div>
             <div><code>factory run</code><span>Process available tickets with configured agents.</span></div>
+            <div><code>factory configure --supervisor-agent NAME</code><span>Select the adapter that coordinates Standard and Assured dispatch.</span></div>
+            <div><code>factory configure --review-agent NAME</code><span>Select the read-only adapter that reviews candidate pull-request diffs.</span></div>
             <div><code>factory approve-tests ISSUE</code><span>Allow implementation after reviewing QA tests.</span></div>
+            <div><code>factory merge ISSUE</code><span>Perform the human exact-revision merge for Standard and Assured.</span></div>
             <div><code>factory status</code><span>Summarize the current ticket states.</span></div>
             <div><code>factory retry ISSUE</code><span>Retry a ticket after fixing its blocker.</span></div>
+            <div><code>factory release-claim ISSUE</code><span>Release a confirmed abandoned remote claim explicitly.</span></div>
+            <div><code>factory monitor</code><span>Preview read-only post-delivery health findings.</span></div>
             <div><code>factory canvas --output FILE</code><span>Capture the factory design for evidence export.</span></div>
           </div>
           <div className="next-links">
@@ -678,7 +873,7 @@ my-agent = './tools/run-my-agent.sh {prompt}'`}</CodeBlock>
 
       <footer>
         <span className="footer-brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>Software (re)-Factory</span>
-        <span>Plan clearly. Isolate work. Require evidence.</span>
+        <span>Plan clearly. Isolate work. Require evidence. · workshop-v1.1.0</span>
       </footer>
     </>
   );

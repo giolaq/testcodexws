@@ -25,11 +25,17 @@
       "verification": ["Cover every applicable requirement and design element without cycles or unsafe parallel ownership."],
       "handoff_receipt": ["Hand off the slice artifact, dependency map, input revisions, and unresolved risks."]
     },
+    "supervisor": {
+      "ownership": ["Dispatch order, safe concurrency, cross-Ticket coordination instructions, and escalation from worker Handoff Receipts."],
+      "exclusions": ["Source changes, Ticket scope or dependency changes, lifecycle mutation, test or gate overrides, and human approval."],
+      "verification": ["Dispatch only dependency-ready Tickets, stay within the configured parallel limit, and justify every block command with recorded evidence."],
+      "handoff_receipt": ["Hand off the dispatch decision, Ticket-specific instructions, worker reports considered, and any blocked risk."]
+    },
     "qa": {
-      "ownership": ["Independent, deterministic Acceptance Tests derived from the Ticket criteria."],
+      "ownership": ["Independent, deterministic Acceptance Tests derived from the Ticket criteria, plus the exact focused command that executes only those accepted files."],
       "exclusions": ["Production implementation, existing-test modification, and scope changes."],
-      "verification": ["Cover automatable criteria, boundary behavior, and user-visible failure cases."],
-      "handoff_receipt": ["Hand off protected test paths and hashes, test intent, and unresolved evidence gaps."]
+      "verification": ["Cover automatable criteria, boundary behavior, and user-visible failure cases; prove the focused command fails with a behavior assertion at the QA revision before implementation."],
+      "handoff_receipt": ["Hand off protected test paths and hashes, the focused command and its hash, QA revision, expected and actual failure classification, bounded output, and unresolved evidence gaps."]
     },
     "implementation": {
       "ownership": ["Production code and implementation-owned tests within the assigned Ticket scope."],
@@ -58,14 +64,38 @@
     "verification": {
       "ownership": ["Execution of configured required and advisory verification gates."],
       "exclusions": ["Source changes, test weakening, and lifecycle decisions outside gate results."],
-      "verification": ["Record command, exit status, bounded output, duration, and required/advisory status."],
-      "handoff_receipt": ["Hand off gate results and any blocking or advisory failures."]
+      "verification": ["Run the exact accepted focused Acceptance Test command to prove green, then record every configured gate command, exit status, bounded output, duration, and required/advisory status."],
+      "handoff_receipt": ["Hand off RED and GREEN revisions, the identical focused-command hash, gate results, and any blocking or advisory failures."]
+    },
+    "critic": {
+      "ownership": ["Read-only adversarial review of propagated assumptions, untested behavior, scope drift, dead code, and maintainability risk for deep-verification changes."],
+      "exclusions": ["All file modifications, deterministic gate execution, lifecycle decisions, and acceptance of unresolved blocking risk."],
+      "verification": ["Inspect the exact candidate diff and approved Ticket context; separate concrete findings from speculative concerns."],
+      "handoff_receipt": ["Hand off the exact candidate revision, PASS or BLOCK verdict, evidence references, and unresolved risks."]
+    },
+    "negative_proof": {
+      "ownership": ["Disposable reversal of non-test candidate changes and execution of the accepted focused Acceptance Test command."],
+      "exclusions": ["Candidate-branch modification, test modification, implementation, and reuse of the disposable worktree."],
+      "verification": ["Confirm the accepted test returns to the expected behavior assertion failure when candidate production changes are removed."],
+      "handoff_receipt": ["Hand off the candidate and QA revisions, reversed paths, identical command hash, bounded output, and restoration result."]
     },
     "final_verifier": {
       "ownership": ["Read-only final assessment of requirements, policy, protected evidence, and gate results."],
       "exclusions": ["All file modifications and acceptance of unresolved blocking risk."],
       "verification": ["Block when the claimed result is not supported by objective evidence."],
       "handoff_receipt": ["Hand off the final read-only verdict, evidence references, and unresolved risks."]
+    },
+    "code_review": {
+      "ownership": ["Read-only review and approval decision for the exact candidate pull-request diff, covering correctness, regressions, security, maintainability, and test quality."],
+      "exclusions": ["All file modifications, Ticket scope changes, lifecycle mutation, and pull-request merge execution."],
+      "verification": ["Return APPROVE with no comments or REQUEST_CHANGES with precise comments limited to changed repository paths."],
+      "handoff_receipt": ["Hand off the pull request, candidate base and head revisions, structured decision, comments, and review artifact."]
+    },
+    "supervisor_merge": {
+      "ownership": ["Final MERGE or BLOCK command after Code Review Agent approval, based on matching candidate revision, required gates, Handoff Receipts, and unresolved risks."],
+      "exclusions": ["Source changes, review fabrication, gate overrides, stale-candidate merge, direct GitHub execution, and repository-policy changes."],
+      "verification": ["Authorize merge only when the approved review, required gates, pull request, and candidate head all refer to the same revision."],
+      "handoff_receipt": ["Hand off the validated merge command, evidence revisions, resulting merge reference, and any blocking risk."]
     },
     "human_review": {
       "ownership": ["Human decision to merge, request changes, or stop based on the complete evidence."],

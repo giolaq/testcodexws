@@ -9,7 +9,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "responsibility": { "type": "string" },
           "requirements": { "type": "array", "items": { "type": "string" } },
@@ -24,7 +24,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "provider": { "type": "string" },
           "consumers": { "type": "array", "items": { "type": "string" } },
@@ -42,7 +42,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "name": { "type": "string" },
           "fields": { "type": "array", "items": { "type": "string" } },
           "invariants": { "type": "array", "items": { "type": "string" } },
@@ -57,7 +57,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,31}$" },
           "decision": { "type": "string" },
           "rationale": { "type": "string" },
           "requirements": { "type": "array", "items": { "type": "string" } }

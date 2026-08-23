@@ -13,8 +13,9 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from factory_contracts import (
     handoff_receipt,
@@ -22,7 +23,11 @@ from factory_contracts import (
     role_input,
     write_handoff_receipt,
 )
+from factory_charter import FactoryCharter, FactoryCharterError
+from project_contract import ProjectContract
 from planner import dependency_waves, issue_body, render_review, validate_plan
+from sensitive_data import redact_credentials
+from adapter_capabilities import role_environment
 
 
 PROMPT_VERSION = "2.0"
@@ -33,6 +38,12 @@ STAGES = (
     ("vertical_slices", "04-vertical-slices", "Vertical Slices"),
 )
 STAGE_INDEX = {name: index for index, (name, _, _) in enumerate(STAGES)}
+REVISION_STAGES = {
+    "product": "product_review",
+    "architecture": "system_architecture",
+    "program": "program_design",
+    "slices": "vertical_slices",
+}
 ID_PATTERN = re.compile(r"[A-Z][A-Z0-9_-]{0,31}")
 
 
@@ -55,6 +66,126 @@ def read_json(path: Path) -> dict:
 def write_json(path: Path, value: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2) + "\n")
+
+
+def append_log(path: Path, message: str):
+    """Append one redacted, user-readable diagnostic to a planning log."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as stream:
+        stream.write(f"[{now()}] {redact_credentials(message)}\n")
+
+
+def claude_json_schema(path: Path) -> str:
+    """Return the planning schema in the dialect accepted by Claude Code."""
+    schema = read_json(path)
+    schema.pop("$schema", None)
+    return json.dumps(schema)
+
+
+def _run_claude_agent(
+    command: list[str], repo: Path, prompt: str, log: Path, stage: str,
+) -> tuple[subprocess.CompletedProcess, dict | None]:
+    """Run Claude with safe, realtime progress while retaining structured output."""
+    title = stage.replace("_", " ").title()
+    log.write_text("")
+    last_message = ""
+    last_heartbeat = time.monotonic()
+
+    def emit(message: str, *, repeat: bool = False):
+        nonlocal last_message
+        if not repeat and message == last_message:
+            return
+        last_message = message
+        rendered = f"[{now()}] {message}"
+        with log.open("a") as stream:
+            stream.write(rendered + "\n")
+            stream.flush()
+        print(message, flush=True)
+
+    emit(f"Claude {title} started.")
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=repo,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=role_environment("CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"),
+        )
+    except OSError as exc:
+        emit(f"Claude {title} could not start: {exc}")
+        raise
+
+    assert process.stdin is not None
+    assert process.stdout is not None
+    process.stdin.write(prompt)
+    process.stdin.close()
+    structured: dict | None = None
+    errors: list[str] = []
+    result_failed = False
+
+    for line in process.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            message = line[:2000]
+            errors.append(message)
+            emit(f"Claude reported: {message}")
+            continue
+
+        event_type = event.get("type")
+        if event_type == "system" and event.get("subtype") == "init":
+            emit("Claude session initialized.")
+        elif event_type == "stream_event":
+            stream_event = event.get("event", {})
+            stream_type = stream_event.get("type")
+            if stream_type == "content_block_start":
+                block = stream_event.get("content_block", {})
+                block_type = block.get("type")
+                if block_type == "thinking":
+                    emit("Claude is analyzing repository context.")
+                elif block_type == "tool_use":
+                    tool = block.get("name") or "a read-only tool"
+                    emit(f"Claude is using {tool}.")
+                elif block_type == "text":
+                    emit("Claude is drafting the structured artifact.")
+            elif stream_type == "content_block_delta" and time.monotonic() - last_heartbeat >= 10:
+                emit("Claude is still working.", repeat=True)
+                last_heartbeat = time.monotonic()
+        elif event_type == "user":
+            emit("Claude received repository context.")
+        elif event_type == "result":
+            structured_value = event.get("structured_output")
+            if event.get("subtype") == "success" and isinstance(structured_value, dict):
+                structured = structured_value
+                duration = event.get("duration_ms")
+                turns = event.get("num_turns")
+                detail = ""
+                if isinstance(duration, (int, float)):
+                    detail += f" in {duration / 1000:.1f}s"
+                if isinstance(turns, int):
+                    detail += f" across {turns} turn{'s' if turns != 1 else ''}"
+                emit(f"Claude {title} completed{detail}.")
+            else:
+                result_failed = True
+                message = event.get("result") or "Claude returned an unsuccessful result."
+                errors.append(str(message)[:2000])
+                emit(f"Claude {title} failed.")
+
+    process.stdout.close()
+    return_code = process.wait()
+    if return_code == 0 and (result_failed or structured is None):
+        return_code = 1
+        if structured is None:
+            errors.append("Claude returned no valid structured_output.")
+            emit(f"Claude {title} returned no valid structured output.")
+    result = subprocess.CompletedProcess(command, return_code, "", "\n".join(errors))
+    return result, structured
 
 
 def relative_path(path: Path, repo: Path) -> str:
@@ -268,6 +399,25 @@ def validate_lean_vertical_slices(slices: dict, product: dict) -> list[str]:
     return order
 
 
+def validate_project_paths(slices: dict, project: ProjectContract) -> None:
+    """Keep planned ownership inside the checkout and outside protected policy."""
+    protected = (*project.protected_paths, "factory.project.toml")
+    for ticket in slices["tickets"]:
+        for raw_path in ticket["file_ownership"]:
+            if not isinstance(raw_path, str) or not raw_path.strip() or "\\" in raw_path:
+                raise ValueError(f"{ticket['key']} has an invalid owned path: {raw_path!r}")
+            path = PurePosixPath(raw_path.strip())
+            normalized = path.as_posix().removeprefix("./")
+            if path.is_absolute() or ".." in path.parts or not normalized:
+                raise ValueError(f"{ticket['key']} owned path must stay inside the repository: {raw_path}")
+            for protected_path in protected:
+                protected_path = protected_path.rstrip("/")
+                if normalized == protected_path or normalized.startswith(protected_path + "/"):
+                    raise ValueError(
+                        f"{ticket['key']} cannot own protected Project Contract path: {normalized}"
+                    )
+
+
 def build_traceability(
     product: dict,
     architecture: dict | None,
@@ -315,19 +465,34 @@ def stage_prompt(
     minimum: int,
     maximum: int,
     profile_name: str = "standard",
+    repository_context: str = "",
 ) -> str:
-    shared = """Use the repository only as implementation context; product scope comes from the PRD and approved upstream artifacts. Preserve stable IDs exactly.
+    shared = """Use the repository only as implementation context; product scope comes from the PRD and approved upstream artifacts. Preserve stable IDs exactly. Every new object ID must start with an uppercase letter and contain only uppercase letters, digits, underscores, or hyphens (for example USER_HOME_COOK or COMPONENT_API). Ticket keys follow the same rule and must be at most 16 characters.
 Inspect the current codebase when technical or file-level detail is required. Do not invent scope. Put decisions that require a human in blocking_questions.
 Return only JSON matching the supplied schema. This artifact is an auditable contract for the next expert."""
     roles = {
         "product_review": """You are the Product Review expert. Clarify the problem, users, observable behavior, scope, journeys, success evidence, mockup needs, assumptions, and blocking questions. Give requirements stable IDs R1, R2, and so on. Cite the PRD section or phrase in each requirement's source. Do not design architecture or create implementation tickets.""",
         "system_architecture": """You are the System Architecture expert. Inspect the existing repository and, using the approved product review, define components, ownership boundaries, data models, explicit component contracts, architectural decisions, constraints, and risks. Map every item to product requirement IDs. Every requirement must have an owning component. Do not assign tickets or write low-level implementation code.""",
-        "program_design": """You are the Program Design expert. Inspect the existing code and turn the approved architecture into a concrete code design: modules and paths, types, function signatures, call relationships, error behavior, call flows, and test seams. Use stable IDs (MOD-, TYPE-, FN-, FLOW-, TEST-), reference contracts and requirements, and prefix calls outside this design with external:. Do not create tickets.""",
+        "program_design": """You are the Program Design expert. Inspect the existing code and turn the approved architecture into a concrete code design: modules and paths, types, function signatures, call relationships, error behavior, call flows, and test seams. Use stable IDs (MOD-, TYPE-, FN-, FLOW-, TEST-), reference contracts and requirements, and prefix calls outside this design with external:. modules[].components must contain only component IDs copied from System Architecture. Never put function IDs, type IDs, constants, or prose in modules[].components. Every type and function module reference must name a MOD- ID defined in this artifact. Do not create tickets.""",
         "vertical_slices": f"""You are the Vertical Slices expert. Divide the aligned product, architecture, and program design into {minimum}-{maximum} small end-to-end tickets. Each ticket must deliver an observable vertical outcome, own explicit files, name QA evidence, and map requirement, contract, and program-element IDs. Every program element and requirement must have an owner. Overlapping file ownership is allowed only when one ticket depends on the other. Keep the dependency graph acyclic and maximize safe parallel work. Default agent to {default_agent}.""",
     }
     planning_roles = set(factory_profile(profile_name)["planning_roles"])
     if stage == "vertical_slices" and "system_architecture" not in planning_roles:
         roles[stage] = f"""You are the Vertical Slices expert for the Lean Factory Profile. Divide the approved product intent into {minimum}-{maximum} small end-to-end tickets. Each ticket must deliver an observable outcome, own explicit files, name evidence from existing tests, and map product requirement IDs. Set contract_ids and program_element_ids to empty arrays because this profile intentionally omits architecture and program-design roles. Keep dependencies acyclic and default agent to {default_agent}."""
+    identifier_guidance = ""
+    if stage == "vertical_slices" and "system_architecture" in planning_roles:
+        architecture = inputs.get("system_architecture", {})
+        program = inputs.get("program_design", {})
+        contract_ids = sorted(item["id"] for item in architecture.get("contracts", []))
+        element_ids = sorted(program_element_ids(program))
+        identifier_guidance = (
+            "\n\n## Exact Vertical Slice traceability identifiers\n\n"
+            f"Allowed contract IDs: {', '.join(contract_ids)}\n\n"
+            f"Allowed program-element IDs: {', '.join(element_ids)}\n\n"
+            "Copy identifiers exactly from these lists. `contract_ids` must never contain "
+            "component IDs or architecture-decision IDs. `program_element_ids` must never "
+            "contain component, contract, or architecture-decision IDs."
+        )
     context = "\n\n".join(
         f"## Approved {name.replace('_', ' ').title()}\n```json\n{json.dumps(value, indent=2)}\n```"
         for name, value in inputs.items()
@@ -340,7 +505,13 @@ Return only JSON matching the supplied schema. This artifact is an auditable con
 
 {prd}
 
-{context}
+## Repository Project Contract and inventory
+
+```json
+{repository_context or '{}'}
+```
+
+{context}{identifier_guidance}
 """
 
 
@@ -451,11 +622,17 @@ def write_dashboard_state(repo: Path, run_dir: Path, manifest: dict):
             "sha256": record.get("sha256", ""),
             "questions": questions,
             "receipt": record.get("receipt", ""),
+            "failure_kind": record.get("failure_kind", ""),
+            "error": record.get("error", ""),
+            "validation_error": record.get("validation_error", ""),
+            "rejected_artifact": record.get("rejected_artifact", ""),
         })
     state = {
         "plan_id": manifest["plan_id"],
         "project": manifest.get("project", "Planning run"),
         "status": manifest["status"],
+        "planning_agent": manifest.get("planning_agent", "codex"),
+        "mode": "rehearsal" if manifest.get("planning_agent") == "mock" else "live",
         "updated_at": manifest["updated_at"],
         "run_directory": relative_path(run_dir, repo),
         "approvals": manifest["approvals"],
@@ -496,6 +673,7 @@ def _validate_stage(
     value: dict,
     inputs: dict[str, dict],
     profile_name: str = "standard",
+    project: ProjectContract | None = None,
 ):
     if stage == "product_review":
         validate_product(value)
@@ -507,11 +685,27 @@ def _validate_stage(
         validate_lean_vertical_slices(value, inputs["product_review"])
     else:
         validate_vertical_slices(value, inputs["product_review"], inputs["system_architecture"], inputs["program_design"])
+    if stage == "vertical_slices" and project is not None:
+        validate_project_paths(value, project)
 
 
 def _fixture_path(repo: Path, stage: str) -> Path:
     filename = next(filename for name, filename, _ in STAGES if name == stage)
-    return repo / "factory/scenarios/recipe-rebrand/planning" / f"{filename}.json"
+    supplied = repo / "factory/scenarios/recipe-rebrand/planning" / f"{filename}.json"
+    return supplied if supplied.is_file() else Path(__file__).with_name("scenarios") / "recipe-rebrand" / "planning" / f"{filename}.json"
+
+
+def _rejected_stage_path(repo: Path, stage_record: dict) -> Path | None:
+    """Resolve a validator-owned rejected artifact without trusting manifest paths."""
+    reference = stage_record.get("rejected_artifact", "")
+    if not isinstance(reference, str) or not reference:
+        return None
+    candidate = (repo / reference).resolve()
+    try:
+        candidate.relative_to(repo.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
 
 
 def _run_stage_agent_impl(
@@ -525,13 +719,46 @@ def _run_stage_agent_impl(
         stage, (run_dir / "source-prd.md").read_text(), inputs,
         manifest["default_ticket_agent"], manifest["ticket_limits"]["minimum"], manifest["ticket_limits"]["maximum"],
         manifest.get("profile", "standard"),
+        ProjectContract.load(repo).context(),
     )
+    charter = FactoryCharter.load(repo, require_approved=True)
+    prompt += (
+        "\n## Approved Factory Charter\n\n```json\n"
+        f"{charter.context()}\n```\n"
+    )
+    stage_record = manifest["stages"][stage]
+    previous_validation_error = stage_record.get("validation_error", "")
+    rejected_path = _rejected_stage_path(repo, stage_record)
+    if previous_validation_error:
+        rejected_content = ""
+        if rejected_path is not None and rejected_path.is_file():
+            rejected_content = rejected_path.read_text()[:120_000]
+        prompt += (
+            "\n## Previous validation failure\n\n"
+            "The previous structured artifact was rejected by the deterministic validator. "
+            "Return a complete corrected replacement; do not merely explain the error.\n\n"
+            f"Validator error: {previous_validation_error}\n"
+        )
+        if rejected_content:
+            prompt += f"\n### Rejected artifact\n\n```json\n{rejected_content}\n```\n"
+    stage_record.pop("failure_kind", None)
+    stage_record.pop("error", None)
     revision_number = len(manifest.get("revisions", [])) + 1 if feedback else None
     if feedback:
+        revision_source = json_path if json_path.is_file() else rejected_path
+        if revision_source is None:
+            raise ValueError(
+                f"{stage.replace('_', ' ').title()} has no artifact available to revise"
+            )
         prompt += (
+            "\n## Current artifact\n\n"
+            f"```json\n{json.dumps(read_json(revision_source), indent=2)}\n```\n"
             "\n## Human revision feedback\n\n"
             f"{feedback}\n\nRevise only the {stage.replace('_', ' ')} artifact. "
-            "Preserve stable IDs unless the feedback explicitly makes one invalid.\n"
+            "Treat the human decisions as authoritative, resolve the answered "
+            "blocking questions in the artifact, and preserve stable IDs unless "
+            "the feedback explicitly makes one invalid. Keep a question blocked "
+            "only when the feedback does not provide the decision needed to resolve it.\n"
         )
     contract = role_input(repo, stage)
     prompt += "\n" + contract["text"]
@@ -551,34 +778,37 @@ def _run_stage_agent_impl(
         log.write_text(f"Mock {stage} expert copied {fixture}\n")
     else:
         schema = repo / "factory/planning_schemas" / f"{stage}.json"
+        if not schema.is_file():
+            schema = Path(__file__).with_name("planning_schemas") / f"{stage}.json"
         if planning_agent == "codex":
             command = [
                 agent_bin, "exec", "--sandbox", "read-only", "--ephemeral",
                 "--ignore-user-config", "--ignore-rules", "--output-schema", str(schema),
                 "-o", str(raw), "-",
             ]
-            result = subprocess.run(command, cwd=repo, input=prompt, text=True, capture_output=True)
+            result = subprocess.run(
+                command, cwd=repo, input=prompt, text=True, capture_output=True,
+                env=role_environment("CODEX_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"),
+            )
         elif planning_agent == "claude":
             command = [
                 agent_bin, "-p", "--permission-mode", "plan",
                 "--tools", "Read,Glob,Grep", "--no-session-persistence",
-                "--output-format", "json", "--json-schema", schema.read_text(),
+                "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+                "--json-schema", claude_json_schema(schema),
             ]
-            result = subprocess.run(command, cwd=repo, input=prompt, text=True, capture_output=True)
-            if result.returncode == 0:
-                try:
-                    envelope = json.loads(result.stdout)
-                    structured = envelope["structured_output"]
-                    write_json(raw, structured)
-                except (json.JSONDecodeError, KeyError, TypeError) as exc:
-                    result = subprocess.CompletedProcess(
-                        result.args, 1, result.stdout,
-                        result.stderr + f"\nClaude returned no valid structured_output: {exc}\n",
-                    )
+            result, structured = _run_claude_agent(command, repo, prompt, log, stage)
+            if result.returncode == 0 and structured is not None:
+                write_json(raw, structured)
         else:
             raise ValueError(f"unsupported planning agent: {planning_agent}")
-        log.write_text(result.stdout + result.stderr)
+        if planning_agent == "codex":
+            log.write_text(result.stdout + result.stderr)
         if result.returncode:
+            detail = redact_credentials((result.stderr or "").strip())[:2000]
+            if detail:
+                append_log(log, f"Agent error: {detail}")
+                raise RuntimeError(f"{stage.replace('_', ' ')} expert failed: {detail}; see {log}")
             raise RuntimeError(f"{stage.replace('_', ' ')} expert failed; see {log}")
     try:
         value = read_json(raw)
@@ -597,7 +827,24 @@ def _run_stage_agent_impl(
             "created_at": now(),
             "planning_agent": planning_agent if not mock else "mock",
         })
-    _validate_stage(stage, value, inputs, manifest.get("profile", "standard"))
+    try:
+        _validate_stage(
+            stage, value, inputs, manifest.get("profile", "standard"),
+            ProjectContract.load(repo),
+        )
+    except ValueError as exc:
+        failure_number = int(stage_record.get("failure_count", 0)) + 1
+        rejected_path = run_dir / "rejected" / f"{stage}-attempt-{failure_number}.json"
+        write_json(rejected_path, value)
+        message = redact_credentials(str(exc))[:2000]
+        stage_record.update({
+            "failure_kind": "validation",
+            "error": message,
+            "validation_error": message,
+            "rejected_artifact": relative_path(rejected_path, repo),
+        })
+        append_log(log, f"Deterministic validation failed: {message}")
+        raise
     if stage == "vertical_slices":
         count = len(value["tickets"])
         minimum = manifest["ticket_limits"]["minimum"]
@@ -662,6 +909,15 @@ def _run_stage_agent(
         )
     except Exception as exc:
         contract = role_input(repo, stage)
+        record = manifest["stages"][stage]
+        record["failure_count"] = int(record.get("failure_count", 0)) + 1
+        if not record.get("failure_kind"):
+            record["failure_kind"] = (
+                "validation" if isinstance(exc, ValueError)
+                else "agent" if isinstance(exc, RuntimeError)
+                else "internal"
+            )
+        record["error"] = redact_credentials(str(exc))[:2000]
         attempt = len(manifest.get("revisions", [])) + 1 if feedback else 1
         suffix = f"-revision-{attempt}" if feedback else ""
         prompt_path = repo / ".factory/prompts" / f"planner-{manifest['plan_id']}-{stage}{suffix}.md"
@@ -676,10 +932,15 @@ def _run_stage_agent(
             output_revisions={},
             claimed_result="Planning stage failed",
             verification=[f"Planning stopped before a valid handoff ({type(exc).__name__})."],
-            unresolved_risks=["Planning handoff is blocked; inspect the referenced planning log."],
+            unresolved_risks=[record["error"]],
             artifacts=[
                 relative_path(path, repo)
-                for path in (prompt_path, log_path)
+                for path in (
+                    prompt_path,
+                    log_path,
+                    repo / record["rejected_artifact"] if record.get("rejected_artifact") else None,
+                )
+                if path is not None
                 if path.is_file()
             ],
             policy_hashes=contract["policy_hashes"],
@@ -687,7 +948,7 @@ def _run_stage_agent(
         receipt_path = write_handoff_receipt(repo, receipt)
         receipt_reference = relative_path(receipt_path, repo)
         manifest.setdefault("receipts", []).append(receipt_reference)
-        manifest["stages"][stage].update(status="blocked", receipt=receipt_reference)
+        record.update(status="blocked", receipt=receipt_reference)
         manifest["status"] = "blocked"
         save_manifest(repo, run_dir, manifest)
         raise
@@ -702,8 +963,10 @@ def revise_plan(
     mock: bool = False,
 ) -> Path:
     """Regenerate one planning stage from explicit human feedback."""
-    if stage != "product":
-        raise ValueError("revision currently supports only the product stage")
+    stage = REVISION_STAGES.get(stage, stage)
+    if stage not in STAGE_INDEX:
+        choices = ", ".join(REVISION_STAGES)
+        raise ValueError(f"revision stage must be one of: {choices}")
     feedback = feedback.strip()
     if not feedback:
         raise ValueError("revision feedback must not be empty")
@@ -715,62 +978,91 @@ def revise_plan(
     elif planning_agent == "mock":
         raise ValueError("this planning run uses deterministic fixtures; rerun with --mock")
 
-    product_path, _ = _stage_paths(run_dir, "product_review")
-    if not product_path.is_file():
-        raise ValueError("Product Review artifact is missing")
-    before_hash = sha_file(product_path)
+    _assert_governance_current(repo, run_dir, manifest)
+    _assert_project_contract_current(repo, run_dir, manifest)
+    if stage != "product_review":
+        _assert_product_approval_current(repo, run_dir, manifest)
+    _refresh_edited_stage(repo, run_dir, manifest, stage)
+
+    artifact_path, _ = _stage_paths(run_dir, stage)
+    title = next(title for name, _, title in STAGES if name == stage)
+    stage_record = manifest["stages"][stage]
+    revision_source = (
+        artifact_path if artifact_path.is_file()
+        else _rejected_stage_path(repo, stage_record)
+    )
+    if revision_source is None:
+        raise ValueError(f"{title} artifact is missing")
+    before_hash = sha_file(revision_source)
     revision_number = len(manifest.get("revisions", [])) + 1
     revision_dir = run_dir / "revisions"
     revision_dir.mkdir(parents=True, exist_ok=True)
-    previous_path = revision_dir / f"product-review-{revision_number:02d}-before.json"
-    shutil.copyfile(product_path, previous_path)
+    revision_slug = stage.replace("_", "-")
+    previous_path = revision_dir / f"{revision_slug}-{revision_number:02d}-before.json"
+    shutil.copyfile(revision_source, previous_path)
 
-    manifest["approvals"] = {"product": None, "alignment": None}
+    if stage == "product_review":
+        manifest["approvals"] = {"product": None, "alignment": None}
+        gate = "product"
+    else:
+        manifest["approvals"]["alignment"] = None
+        gate = "alignment"
     manifest.setdefault("approval_history", []).append({
-        "gate": "product",
+        "gate": gate,
         "decision": "revision_requested",
         "at": now(),
         "feedback": feedback,
         "artifact_sha256": before_hash,
+        "stage": stage,
     })
     manifest.pop("publication", None)
-    manifest["status"] = "revising_product_review"
-    for downstream, _, _ in STAGES[1:]:
+    manifest["status"] = f"revising_{stage}"
+    for downstream, _, _ in STAGES[STAGE_INDEX[stage] + 1:]:
         if manifest["stages"][downstream].get("status") not in {"pending", "not_applicable"}:
             manifest["stages"][downstream]["status"] = "stale"
     for filename in ("traceability.json", "alignment-review.md"):
         (run_dir / filename).unlink(missing_ok=True)
     save_manifest(repo, run_dir, manifest)
 
-    product = _run_stage_agent(
+    value = _run_stage_agent(
         repo,
         run_dir,
-        "product_review",
+        stage,
         manifest,
         planning_agent,
         agent_bin,
         mock,
         feedback=feedback,
     )
-    after_hash = sha_file(product_path)
+    after_hash = sha_file(artifact_path)
     revision = {
         "revision": revision_number,
-        "stage": "product_review",
+        "stage": stage,
         "feedback": feedback,
         "before_sha256": before_hash,
         "after_sha256": after_hash,
         "previous_artifact": relative_path(previous_path, repo),
-        "revised_artifact": relative_path(product_path, repo),
+        "revised_artifact": relative_path(artifact_path, repo),
         "agent": "mock" if mock else planning_agent,
         "created_at": now(),
     }
-    write_json(revision_dir / f"product-review-{revision_number:02d}.json", revision)
+    revision_path = revision_dir / f"{revision_slug}-{revision_number:02d}.json"
+    write_json(revision_path, revision)
     manifest.setdefault("revisions", []).append(revision)
-    manifest["status"] = "blocked" if product.get("blocking_questions") else "awaiting_product_approval"
+    questions = value.get("blocking_questions", value.get("open_questions", []))
+    if questions:
+        manifest["status"] = "blocked"
+    elif stage == "product_review":
+        manifest["status"] = "awaiting_product_approval"
+    else:
+        manifest["status"] = "product_approved"
     save_manifest(repo, run_dir, manifest)
-    print(f"Product Review revised for {manifest['plan_id']}.")
-    print(f"Feedback record: {revision_dir / f'product-review-{revision_number:02d}.json'}")
-    print(f"Next: ./factory/factory review product {manifest['plan_id']}")
+    print(f"{title} revised for {manifest['plan_id']}.")
+    print(f"Feedback record: {revision_path}")
+    if stage == "product_review":
+        print(f"Next: ./factory/factory review product {manifest['plan_id']}")
+    else:
+        print(f"Next: ./factory/factory continue-plan {manifest['plan_id']}")
     return run_dir
 
 
@@ -787,7 +1079,9 @@ def plan_prd(
     minimum: int, maximum: int, planning_agent: str, agent_bin: str,
     mock: bool = False,
     profile_name: str = "standard",
+    explicit_autonomy: bool = False,
 ) -> Path:
+    repo = repo.resolve()
     prd_path = prd_path.resolve()
     if not prd_path.is_file():
         raise FileNotFoundError(f"PRD not found: {prd_path}")
@@ -796,6 +1090,12 @@ def plan_prd(
     factory_profile(profile_name)
     prd = prd_path.read_text()
     run_policy = role_input(repo, "product_review")
+    project_contract = ProjectContract.load(repo)
+    charter = FactoryCharter.load(repo, require_approved=True)
+    governance = charter.governance(
+        profile_name,
+        explicit_autonomy=explicit_autonomy,
+    )
     plan_id = sha_text(prd)[:12]
     run_dir = Path(output).resolve() if output else repo / ".factory/plans" / plan_id
     if run_dir.exists() and not run_dir.is_dir():
@@ -818,6 +1118,11 @@ def plan_prd(
         "default_ticket_agent": default_agent,
         "planning_agent": "mock" if mock else planning_agent,
         "profile": profile_name,
+        "governance": governance,
+        "project_contract": {
+            "path": str(project_contract.path.relative_to(repo)) if project_contract.path else "detected",
+            "sha256": sha_text(project_contract.context()),
+        },
         "policy": {
             "version": run_policy["policy_version"],
             "hashes": run_policy["policy_hashes"],
@@ -856,7 +1161,10 @@ def _refresh_edited_stage(repo: Path, run_dir: Path, manifest: dict, stage: str)
         return False
     inputs = _stage_inputs(run_dir, stage)
     value = read_json(path)
-    _validate_stage(stage, value, inputs, manifest.get("profile", "standard"))
+    _validate_stage(
+        stage, value, inputs, manifest.get("profile", "standard"),
+        ProjectContract.load(repo),
+    )
     record["sha256"] = current_hash
     record["source_hashes"] = _input_hashes(run_dir, stage, manifest)
     record["status"] = "blocked" if value.get("blocking_questions", value.get("open_questions", [])) else "complete"
@@ -871,6 +1179,7 @@ def _refresh_edited_stage(repo: Path, run_dir: Path, manifest: dict, stage: str)
 def review(repo: Path, kind: str, identifier: str | Path) -> Path:
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
+    _assert_governance_current(repo, run_dir, manifest)
     if kind == "product":
         _refresh_edited_stage(repo, run_dir, manifest, "product_review")
         save_manifest(repo, run_dir, manifest)
@@ -902,6 +1211,8 @@ def review(repo: Path, kind: str, identifier: str | Path) -> Path:
 def approve_product(repo: Path, identifier: str | Path, assume_yes: bool = False):
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
+    _assert_governance_current(repo, run_dir, manifest)
+    _assert_project_contract_current(repo, run_dir, manifest)
     changed = _refresh_edited_stage(repo, run_dir, manifest, "product_review")
     product = read_json(run_dir / "01-product-review.json")
     validate_product(product)
@@ -949,7 +1260,58 @@ def _assert_product_approval_current(repo: Path, run_dir: Path, manifest: dict):
         raise ValueError("product review changed; review and approve it again")
 
 
-def continue_plan(repo: Path, identifier: str | Path, agent_bin: str, mock: bool = False) -> Path:
+def _assert_project_contract_current(repo: Path, run_dir: Path, manifest: dict):
+    expected = manifest.get("project_contract", {}).get("sha256")
+    current = sha_text(ProjectContract.load(repo).context())
+    if expected == current:
+        return
+    manifest["approvals"] = {"product": None, "alignment": None}
+    manifest["status"] = "stale_project_contract"
+    save_manifest(repo, run_dir, manifest)
+    raise ValueError(
+        "the Project Contract or repository inventory changed; run `factory plan` again"
+    )
+
+
+def _assert_governance_current(repo: Path, run_dir: Path, manifest: dict):
+    expected = manifest.get("governance")
+    if not isinstance(expected, dict):
+        manifest["status"] = "stale_factory_charter"
+        save_manifest(repo, run_dir, manifest)
+        raise ValueError(
+            "Planning Run predates Factory Charter governance; run `factory plan` again"
+        )
+    try:
+        charter = FactoryCharter.load(repo, require_approved=True)
+        current = charter.governance(
+            expected.get("profile", manifest.get("profile", "standard")),
+            explicit_autonomy=expected.get("explicit_autonomy") is True,
+        )
+    except (FactoryCharterError, ValueError) as exc:
+        manifest["approvals"] = {"product": None, "alignment": None}
+        manifest["status"] = "stale_factory_charter"
+        save_manifest(repo, run_dir, manifest)
+        raise ValueError(
+            f"Factory Charter is no longer valid for this Planning Run: {exc}. "
+            "Review it and run `factory plan` again"
+        ) from exc
+    if expected == current and manifest.get("profile", "standard") == current["profile"]:
+        return
+    manifest["approvals"] = {"product": None, "alignment": None}
+    manifest["status"] = "stale_factory_charter"
+    save_manifest(repo, run_dir, manifest)
+    raise ValueError(
+        "Factory Charter changed after planning began; review it and run factory plan again"
+    )
+
+
+def continue_plan(
+    repo: Path,
+    identifier: str | Path,
+    agent_bin: str,
+    mock: bool = False,
+    planning_agent_override: str | None = None,
+) -> Path:
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
     planning_agent = manifest.get("planning_agent", "codex")
@@ -957,6 +1319,21 @@ def continue_plan(repo: Path, identifier: str | Path, agent_bin: str, mock: bool
         planning_agent = "mock"
     elif planning_agent == "mock" and not mock:
         raise ValueError("this planning run uses deterministic fixtures; rerun with --mock")
+    elif planning_agent_override:
+        if planning_agent_override not in {"claude", "codex"}:
+            raise ValueError("planning retry agent must be claude or codex")
+        if planning_agent_override != planning_agent:
+            manifest.setdefault("planning_agent_history", []).append({
+                "from": planning_agent,
+                "to": planning_agent_override,
+                "at": now(),
+                "reason": "Operator changed the adapter for a blocked planning retry.",
+            })
+            manifest["planning_agent"] = planning_agent_override
+            planning_agent = planning_agent_override
+            save_manifest(repo, run_dir, manifest)
+    _assert_governance_current(repo, run_dir, manifest)
+    _assert_project_contract_current(repo, run_dir, manifest)
     _assert_product_approval_current(repo, run_dir, manifest)
     applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
     for stage, _, title in STAGES[1:]:
@@ -1028,6 +1405,7 @@ def write_alignment_review(repo: Path, run_dir: Path, manifest: dict) -> Path:
         validate_lean_vertical_slices(slices, product)
     else:
         validate_vertical_slices(slices, product, architecture, program)
+    validate_project_paths(slices, ProjectContract.load(repo))
     traceability = build_traceability(product, architecture, program, slices)
     validate_traceability(traceability)
     write_json(run_dir / "traceability.json", traceability)
@@ -1067,6 +1445,8 @@ def write_alignment_review(repo: Path, run_dir: Path, manifest: dict) -> Path:
 def prepare_publication(repo: Path, identifier: str | Path, assume_yes: bool) -> tuple[Path, Path]:
     run_dir = resolve_run(repo, identifier)
     manifest = load_manifest(run_dir)
+    _assert_governance_current(repo, run_dir, manifest)
+    _assert_project_contract_current(repo, run_dir, manifest)
     _assert_product_approval_current(repo, run_dir, manifest)
     applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
     upstream_changed = any(
@@ -1143,6 +1523,8 @@ def approve_rehearsal(
         ticket["key"]: index
         for index, ticket in enumerate(slices["tickets"], 1)
     }
+    manifest = load_manifest(run_dir)
+    governance = manifest.get("governance")
     materialized = []
     for index, ticket in enumerate(slices["tickets"], 1):
         executable = {**ticket, "agent": "mock"}
@@ -1150,7 +1532,9 @@ def approve_rehearsal(
             "number": index,
             "title": ticket["title"],
             "labels": ["agent-ready"],
-            "body": issue_body(executable, numbers, slices["plan_id"]),
+            "body": issue_body(
+                executable, numbers, slices["plan_id"], governance,
+            ),
             "dependencies": [numbers[key] for key in ticket["dependencies"]],
             "planned_agent": ticket["agent"],
             "mock_action": templates[index - 1].get("mock_action", ""),
@@ -1158,7 +1542,6 @@ def approve_rehearsal(
         })
     output = repo / ".factory/rehearsal" / slices["plan_id"] / "tickets.json"
     write_json(output, materialized)
-    manifest = load_manifest(run_dir)
     manifest["rehearsal"] = {
         "approved_at": now(),
         "scenario": scenario,

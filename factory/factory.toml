@@ -8,26 +8,78 @@ gate_timeout = 300
 claude = 'claude -p "$(cat {prompt})" --permission-mode acceptEdits'
 codex = '{codex} exec --sandbox workspace-write --ephemeral "$(cat {prompt})"'
 cursor = 'cursor-agent -p "$(cat {prompt})"'
-mock = '{python} factory/mock_agent.py {ticket} --scenario {scenario} --attempt {attempt}'
-mock-qa = '{python} factory/mock_qa_agent.py {ticket} --scenario {scenario}'
+mock = '{python} {factory_dir}/mock_agent.py {ticket} --scenario {scenario} --attempt {attempt}'
+mock-qa = '{python} {factory_dir}/mock_qa_agent.py {ticket} --scenario {scenario}'
+mock-supervisor = '{python} {factory_dir}/mock_supervisor.py {prompt}'
+mock-review = '{python} {factory_dir}/mock_review_agent.py {ticket} {prompt} --attempt {attempt}'
+
+[agent_capabilities.claude]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "provider-only"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG", "TERM", "CLAUDE_CONFIG_DIR"]
+credential_names = []
+read_only_template = 'claude -p "$(cat {prompt})" --permission-mode plan'
+
+[agent_capabilities.codex]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "provider-only"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG", "TERM", "CODEX_HOME"]
+credential_names = []
+read_only_template = '{codex} exec --sandbox read-only --ephemeral "$(cat {prompt})"'
+
+[agent_capabilities.cursor]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "provider-only"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG", "TERM"]
+credential_names = []
+
+[agent_capabilities.mock]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "none"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG"]
+credential_names = []
+read_only_template = '{python} {factory_dir}/mock_agent.py {ticket} --scenario {scenario} --attempt {attempt}'
+
+[agent_capabilities."mock-qa"]
+execution_environment = "local"
+filesystem_mode = "workspace-write"
+allowed_working_roots = ["worktree"]
+network_expectation = "none"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG"]
+credential_names = []
+
+[agent_capabilities."mock-supervisor"]
+execution_environment = "local"
+filesystem_mode = "read-only"
+allowed_working_roots = ["repository"]
+network_expectation = "none"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG"]
+credential_names = []
+
+[agent_capabilities."mock-review"]
+execution_environment = "local"
+filesystem_mode = "read-only"
+allowed_working_roots = ["worktree"]
+network_expectation = "none"
+environment_allowlist = ["PATH", "HOME", "TMPDIR", "LANG"]
+credential_names = []
+read_only_template = '{python} {factory_dir}/mock_review_agent.py {ticket} {prompt} --attempt {attempt}'
+
+[supervisor]
+agent = "codex"
+
+[review]
+agent = "codex"
 
 [qa]
 agent = "codex"
 max_retries = 1
 require_human_approval = false
-test_roots = ["demo-app/tests", "demo-app/static/tests"]
-
-[[gate]]
-name = "api-tests"
-cmd = '{python} -m pytest -q demo-app/tests'
-required = true
-
-[[gate]]
-name = "ui-logic-tests"
-cmd = 'node --test demo-app/static/tests/*.test.js'
-required = true
-
-[[gate]]
-name = "python-compile"
-cmd = '{python} -m compileall -q factory demo-app'
-required = false

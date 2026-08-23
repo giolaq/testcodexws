@@ -10,10 +10,28 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from orchestrator import DEFAULT_AGENTS, Factory, validate_qa_changes, validate_qa_config
+from factory_charter import FactoryCharter
 from mock_qa_agent import RECIPE_TESTS
+from project_contract import ProjectContract
 
 
 TEST_ROOTS = ["demo-app/tests", "demo-app/static/tests"]
+
+
+def install_approved_charter(repo: Path, *, existing_tests: str = "review") -> None:
+    project = (
+        ProjectContract.load(repo)
+        if (repo / "factory.project.toml").is_file()
+        else ProjectContract.detect(repo)
+    )
+    charter = FactoryCharter.draft(repo, project)
+    charter.write()
+    if existing_tests != "review":
+        path = repo / "factory.charter.toml"
+        path.write_text(path.read_text().replace(
+            'existing_tests = "review"', f'existing_tests = "{existing_tests}"',
+        ))
+    FactoryCharter.load(repo).approve()
 
 
 class QaPolicyTests(unittest.TestCase):
@@ -32,6 +50,7 @@ class QaPolicyTests(unittest.TestCase):
 
     def test_standard_profile_cannot_disable_independent_qa(self):
         with tempfile.TemporaryDirectory() as directory:
+            install_approved_charter(Path(directory))
             args = SimpleNamespace(
                 repo=directory, qa_agent=None, no_qa=True, mock=True,
                 project_number=None, review_qa_tests=False, scenario="tv",
@@ -66,6 +85,7 @@ class QaPolicyTests(unittest.TestCase):
                 },
             }
             (contract_dir / "policy.json").write_text(json.dumps(policy))
+            install_approved_charter(repo)
             args = SimpleNamespace(
                 repo=str(repo), qa_agent="codex", no_qa=False, mock=True,
                 project_number=None, review_qa_tests=False,
@@ -86,6 +106,9 @@ class QaPolicyTests(unittest.TestCase):
             self.assertIn("### Verification responsibility", prompt)
             self.assertIn("### Handoff Receipt", prompt)
             self.assertIn("Policy version: `policy-test-v1`", prompt)
+            charter = FactoryCharter.load(repo, require_approved=True)
+            self.assertIn("## Approved Factory Charter", prompt)
+            self.assertIn(charter.policy_sha256(), prompt)
             engineering_hash = hashlib.sha256("Prefer public behavior seams.\n".encode()).hexdigest()
             self.assertIn(engineering_hash, prompt)
             self.assertIn("Do not rewrite shared history.", prompt)
@@ -137,7 +160,8 @@ class QaPolicyTests(unittest.TestCase):
             subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
             (repo / "README.md").write_text("baseline\n")
             (repo / ".gitignore").write_text(".factory/\n")
-            subprocess.run(["git", "add", "README.md", ".gitignore"], cwd=repo, check=True)
+            install_approved_charter(repo)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
             base_sha = subprocess.run(
                 ["git", "rev-parse", "HEAD"], cwd=repo, text=True, capture_output=True, check=True,
@@ -156,31 +180,208 @@ class QaPolicyTests(unittest.TestCase):
             factory.tickets[42] = ticket
 
             def fake_qa_adapter(agent, active_ticket, worktree, prompt, log_name, phase):
-                test = worktree / "demo-app/tests/test_ticket_42_search.py"
+                test = worktree / "tests/test_ticket_42_search.py"
                 test.parent.mkdir(parents=True, exist_ok=True)
-                test.write_text("def test_recipe_search_acceptance():\n    assert True\n")
+                test.write_text(
+                    "def test_recipe_search_acceptance():\n"
+                    "    assert False, 'recipe search behavior is missing'\n"
+                )
                 return 0, "acceptance test created"
 
             factory.run_adapter = fake_qa_adapter
             self.assertEqual(factory.create_qa_tests(ticket, repo, base_sha), "")
             self.assertNotEqual(ticket["qa_commit"], base_sha)
-            self.assertEqual(list(ticket["qa_tests"]), ["demo-app/tests/test_ticket_42_search.py"])
+            self.assertEqual(list(ticket["qa_tests"]), ["tests/test_ticket_42_search.py"])
+            self.assertEqual(ticket["qa_evidence"]["red"]["result"], "RED PROVED")
+            self.assertEqual(
+                ticket["qa_evidence"]["red"]["classification"],
+                "behavior_assertion",
+            )
+            self.assertEqual(
+                ticket["qa_evidence"]["test_revision"], ticket["qa_commit"],
+            )
             self.assertEqual(len(ticket["receipts"]), 1)
             receipt = json.loads((repo / ticket["receipts"][0]).read_text())
             self.assertEqual(receipt["role"], "qa")
             self.assertEqual(receipt["phase"], "Build")
             self.assertEqual(receipt["ticket"], 42)
             self.assertEqual(receipt["output_revisions"]["qa_commit"], ticket["qa_commit"])
-            self.assertEqual(receipt["artifacts"], ["demo-app/tests/test_ticket_42_search.py"])
+            self.assertEqual(receipt["artifacts"], ["tests/test_ticket_42_search.py"])
+            self.assertEqual(receipt["claimed_result"], "RED PROVED")
+            self.assertEqual(
+                receipt["evidence"]["focused_test_command"],
+                ticket["qa_evidence"]["focused_test_command"],
+            )
             self.assertEqual(set(receipt["policy_hashes"]), {"engineering", "workflow", "repository"})
 
             prompt = factory.make_prompt(ticket, "").read_text()
             self.assertIn("Independent QA acceptance tests", prompt)
             self.assertIn("Git hashes", prompt)
+            self.assertIn(ticket["qa_evidence"]["focused_test_command"], prompt)
 
-            protected = repo / "demo-app/tests/test_ticket_42_search.py"
+            protected = repo / "tests/test_ticket_42_search.py"
             protected.write_text("def test_recipe_search_acceptance():\n    assert False\n")
             self.assertIn("was modified", factory.verify_qa_tests_unchanged(ticket, repo))
+
+    def test_qa_phase_rejects_an_acceptance_test_that_already_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "config", "user.name", "Factory Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
+            (repo / "README.md").write_text("baseline\n")
+            (repo / ".gitignore").write_text(".factory/\n")
+            install_approved_charter(repo)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
+            base_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip()
+            args = SimpleNamespace(
+                repo=str(repo), qa_agent="codex", no_qa=False, mock=True,
+                project_number=None, review_qa_tests=False, scenario="tv",
+                agent="codex",
+            )
+            factory = Factory(args)
+            factory.cfg["qa"]["max_retries"] = 0
+            ticket = {
+                "number": 42, "title": "Search recipes",
+                "body": "## Acceptance criteria\n- Search works",
+                "agent": "codex", "attempt": 1, "qa_agent": "codex",
+                "qa_attempt": 0, "qa_tests": {}, "history": [],
+            }
+            factory.tickets[42] = ticket
+
+            def passing_qa(agent, active_ticket, worktree, prompt, log_name, phase):
+                test = worktree / "tests/test_ticket_42_search.py"
+                test.parent.mkdir(parents=True, exist_ok=True)
+                test.write_text("def test_recipe_search_acceptance():\n    assert True\n")
+                return 0, "acceptance test created"
+
+            factory.run_adapter = passing_qa
+            failure = factory.create_qa_tests(ticket, repo, base_sha)
+
+            self.assertIn("already passes before implementation", failure)
+            self.assertEqual(ticket["qa_evidence"]["red"]["classification"], "pass")
+            self.assertEqual(ticket["qa_evidence"]["red"]["result"], "RED NOT PROVED")
+
+    def test_identical_focused_command_proves_green_after_implementation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "config", "user.name", "Factory Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
+            (repo / "README.md").write_text("baseline\n")
+            (repo / ".gitignore").write_text(".factory/\n")
+            install_approved_charter(repo)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
+            base_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip()
+            args = SimpleNamespace(
+                repo=str(repo), qa_agent="codex", no_qa=False, mock=True,
+                project_number=None, review_qa_tests=False, scenario="tv",
+                agent="codex", profile="assured",
+            )
+            factory = Factory(args)
+            ticket = {
+                "number": 42, "title": "Search recipes",
+                "body": "## Acceptance criteria\n- Search works",
+                "agent": "codex", "attempt": 1, "qa_agent": "codex",
+                "qa_attempt": 0, "qa_tests": {}, "history": [],
+            }
+            factory.tickets[42] = ticket
+
+            def causal_qa(agent, active_ticket, worktree, prompt, log_name, phase):
+                test = worktree / "tests/test_ticket_42_search.py"
+                test.parent.mkdir(parents=True, exist_ok=True)
+                test.write_text(
+                    "from pathlib import Path\n\n"
+                    "def test_recipe_search_acceptance():\n"
+                    "    feature = Path(__file__).parents[1] / 'feature.txt'\n"
+                    "    assert feature.is_file() and feature.read_text() == 'enabled\\n'\n"
+                )
+                return 0, "acceptance test created"
+
+            factory.run_adapter = causal_qa
+            self.assertEqual(factory.create_qa_tests(ticket, repo, base_sha), "")
+            accepted_command = ticket["qa_evidence"]["focused_test_command"]
+            accepted_hash = ticket["qa_evidence"]["focused_test_command_sha256"]
+            (repo / "feature.txt").write_text("enabled\n")
+            subprocess.run(["git", "add", "feature.txt"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "implementation"], cwd=repo, check=True)
+
+            self.assertEqual(factory.run_focused_acceptance(ticket, repo, expected="green"), "")
+            self.assertEqual(ticket["qa_evidence"]["green"]["result"], "GREEN PROVED")
+            self.assertEqual(ticket["qa_evidence"]["focused_test_command"], accepted_command)
+            self.assertEqual(ticket["qa_evidence"]["focused_test_command_sha256"], accepted_hash)
+
+            candidate_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip()
+            candidate_status = subprocess.run(
+                ["git", "status", "--porcelain"], cwd=repo, text=True,
+                capture_output=True, check=True,
+            ).stdout
+            self.assertEqual(factory.run_negative_proof(ticket, repo, candidate_head), "")
+            self.assertEqual(ticket["qa_evidence"]["negative"]["result"], "NEGATIVE PROOF PROVED")
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                    capture_output=True, check=True,
+                ).stdout.strip(),
+                candidate_head,
+            )
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "status", "--porcelain"], cwd=repo, text=True,
+                    capture_output=True, check=True,
+                ).stdout,
+                candidate_status,
+            )
+
+            ticket["qa_evidence"]["focused_test_command"] += " --changed"
+            self.assertIn(
+                "missing or changed",
+                factory.run_focused_acceptance(ticket, repo, expected="green"),
+            )
+
+    def test_existing_tests_are_snapshotted_and_enforced_by_charter_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "config", "user.name", "Factory Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
+            existing = repo / "tests/test_existing.py"
+            existing.parent.mkdir(parents=True)
+            existing.write_text("def test_existing():\n    assert True\n")
+            (repo / ".gitignore").write_text(".factory/\n")
+            ProjectContract.detect(repo).write()
+            install_approved_charter(repo, existing_tests="protect")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
+            base_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip()
+            args = SimpleNamespace(
+                repo=str(repo), qa_agent="codex", no_qa=False, mock=True,
+                project_number=None, review_qa_tests=False, scenario="tv",
+                agent="codex",
+            )
+            factory = Factory(args)
+            ticket = {"number": 42, "history": []}
+
+            factory.snapshot_existing_tests(ticket, repo, base_sha)
+            existing.write_text("def test_existing():\n    assert False\n")
+
+            self.assertIn("Existing tests are protected", factory.verify_existing_tests(ticket, repo))
+            self.assertEqual(ticket["existing_test_policy"], "protect")
+            self.assertIn("tests/test_existing.py", ticket["existing_tests"])
 
     def test_assured_profile_executes_extended_roles_with_read_only_reviews(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -190,6 +391,7 @@ class QaPolicyTests(unittest.TestCase):
             subprocess.run(["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True)
             (repo / "README.md").write_text("baseline\n")
             (repo / ".gitignore").write_text(".factory/\n")
+            install_approved_charter(repo)
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
             head = subprocess.run(

@@ -19,7 +19,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "key": { "type": "string" },
+          "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]{0,15}$" },
           "title": { "type": "string" },
           "spec": { "type": "string" },
           "acceptance_criteria": { "type": "array", "items": { "type": "string" } },

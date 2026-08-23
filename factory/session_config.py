@@ -13,6 +13,7 @@ import tomllib
 from pathlib import Path
 
 from factory_contracts import PROFILES
+from github_repository import parse_github_repository
 
 
 CONFIG_PATH = Path(".factory/local.toml")
@@ -24,6 +25,8 @@ PRESETS = {
         "profile": "standard",
         "agent": "claude",
         "qa_agent": "claude",
+        "supervisor_agent": "claude",
+        "review_agent": "claude",
         "planning_agent": "claude",
         "review_qa_tests": True,
         "max_parallel": 1,
@@ -32,6 +35,8 @@ PRESETS = {
         "profile": "standard",
         "agent": "codex",
         "qa_agent": "codex",
+        "supervisor_agent": "codex",
+        "review_agent": "codex",
         "planning_agent": "codex",
         "review_qa_tests": True,
         "max_parallel": 1,
@@ -51,7 +56,7 @@ def validate_session_config(value: dict) -> dict:
         raise ValueError(f"unknown factory preset: {preset}")
     if "profile" in value and value["profile"] not in FACTORY_PROFILES:
         raise ValueError("profile must be lean, standard, or assured")
-    for key in ("agent", "qa_agent"):
+    for key in ("agent", "qa_agent", "supervisor_agent", "review_agent"):
         if key in value and (
             not isinstance(value[key], str) or not AGENT_NAME.fullmatch(value[key])
         ):
@@ -60,6 +65,8 @@ def validate_session_config(value: dict) -> dict:
         raise ValueError("planning_agent must be claude or codex")
     if "review_qa_tests" in value and not isinstance(value["review_qa_tests"], bool):
         raise ValueError("review_qa_tests must be true or false")
+    if "github_repository" in value:
+        value["github_repository"] = parse_github_repository(value["github_repository"]).url
     for key in ("max_parallel", "project_number"):
         invalid = (
             key in value
@@ -89,8 +96,8 @@ def write_session_config(repo: Path, value: dict) -> Path:
     path = config_path(repo)
     path.parent.mkdir(parents=True, exist_ok=True)
     order = (
-        "preset", "profile", "agent", "qa_agent", "planning_agent",
-        "review_qa_tests", "max_parallel", "project_number",
+        "preset", "profile", "agent", "qa_agent", "supervisor_agent", "review_agent", "planning_agent",
+        "github_repository", "review_qa_tests", "max_parallel", "project_number",
     )
     lines = ["# Attendee-specific defaults. This file is ignored by Git."]
     for key in order:
@@ -111,8 +118,11 @@ def write_session_config(repo: Path, value: dict) -> Path:
 def configure_session(
     repo: Path, preset: str | None = None, project_number: int | None = None,
     *, agent: str | None = None, qa_agent: str | None = None,
-    planning_agent: str | None = None, review_qa_tests: bool | None = None,
+    supervisor_agent: str | None = None, review_agent: str | None = None,
+    planning_agent: str | None = None,
+    review_qa_tests: bool | None = None,
     max_parallel: int | None = None, profile: str | None = None,
+    github_repository: str | None = None,
 ) -> tuple[Path, dict]:
     if preset is not None and preset not in PRESETS:
         raise ValueError(f"unknown factory preset: {preset}")
@@ -129,11 +139,17 @@ def configure_session(
     overrides = {
         "agent": agent,
         "qa_agent": qa_agent,
+        "supervisor_agent": supervisor_agent,
+        "review_agent": review_agent,
         "planning_agent": planning_agent,
         "review_qa_tests": review_qa_tests,
         "max_parallel": max_parallel,
     }
     value.update({key: item for key, item in overrides.items() if item is not None})
+    if github_repository is not None:
+        value["github_repository"] = parse_github_repository(github_repository).url
+    elif existing.get("github_repository"):
+        value["github_repository"] = existing["github_repository"]
     if project_number is not None:
         value["project_number"] = project_number
     elif existing.get("project_number"):
@@ -150,10 +166,13 @@ def remember_project(repo: Path, project_number: int) -> Path:
 def render_session_config(value: dict) -> str:
     labels = (
         ("Profile", value.get("profile", "standard").title()),
+        ("Repository", value.get("github_repository", "not connected")),
         ("Project", f"#{value['project_number']}" if value.get("project_number") else "automatic"),
         ("Planning", value.get("planning_agent", "codex").title()),
         ("Implementation", value.get("agent", "codex").title()),
         ("QA", value.get("qa_agent", "codex").title()),
+        ("Supervisor", value.get("supervisor_agent", "codex").title()),
+        ("Code review", value.get("review_agent", "codex").title()),
         ("Test approval", "Required" if value.get("review_qa_tests") else "Not required"),
         ("Parallel jobs", str(value.get("max_parallel", 1))),
     )

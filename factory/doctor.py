@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import socket
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+
+from factory_contracts import profile as factory_profile
+from factory_charter import FactoryCharter, FactoryCharterError
+from github_repository import (
+    GitHubRepositoryError,
+    parse_github_repository,
+    repository_from_remote,
+)
+from project_contract import CONTRACT_PATH, ProjectContract, ProjectContractError
 
 
 @dataclass
@@ -18,9 +28,11 @@ class Check:
     detail: str
 
 
-def command(args: list[str], cwd: Path, timeout: int = 15):
+def command(args: list[str], cwd: Path, timeout: int = 15, env=None):
     try:
-        return subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+        return subprocess.run(
+            args, cwd=cwd, text=True, capture_output=True, timeout=timeout, env=env,
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return type("CommandFailure", (), {"returncode": 127, "stdout": "", "stderr": str(exc)})()
 
@@ -93,15 +105,63 @@ def baseline_check(repo: Path) -> Check:
     return Check("FAIL", "factory baseline", f"{revision[:7]} still carries {', '.join(stale)}; {remedy}")
 
 
+def required_agent_names(
+    cfg: dict, profile_name: str, implementation_agent: str,
+    qa_agent: str | None, supervisor_agent: str | None, planning_agent: str,
+    review_agent: str | None = None,
+) -> set[str | None]:
+    roles = factory_profile(profile_name)["execution_roles"]
+    required = {implementation_agent, planning_agent}
+    if "qa" in roles:
+        required.add(qa_agent or cfg.get("qa", {}).get("agent"))
+    if "supervisor" in roles:
+        required.add(supervisor_agent or cfg.get("supervisor", {}).get("agent"))
+    if "code_review" in roles:
+        required.add(review_agent or cfg.get("review", {}).get("agent"))
+    return required
+
+
 def run_doctor(
     repo: Path, cfg: dict, *, full=False, implementation_agent="codex",
-    qa_agent=None, planning_agent="codex",
+    qa_agent=None, supervisor_agent=None, review_agent=None,
+    planning_agent="codex", profile_name="standard", github_repository=None,
 ) -> int:
     checks: list[Check] = []
+    try:
+        project = ProjectContract.load(repo)
+        contract_error = ""
+    except ProjectContractError as exc:
+        project = ProjectContract.detect(repo)
+        contract_error = str(exc)
+    configured_repository = None
+    if github_repository:
+        try:
+            configured_repository = parse_github_repository(github_repository)
+        except GitHubRepositoryError:
+            pass
 
-    required = ["factory/orchestrator.py", "factory/factory.toml", "demo-app/app.py"]
-    missing = [path for path in required if not (repo / path).is_file()]
-    checks.append(Check("FAIL" if missing else "PASS", "workspace", ", ".join(missing) if missing else str(repo)))
+    missing_roots = [root for root in project.source_roots if root != "." and not (repo / root).exists()]
+    checks.append(Check("FAIL" if missing_roots else "PASS", "workspace", ", ".join(missing_roots) if missing_roots else str(repo)))
+    contract_path = repo / CONTRACT_PATH
+    contract_level = "PASS" if contract_path.is_file() and not contract_error else ("FAIL" if full else "WARN")
+    contract_detail = str(contract_path) if contract_level == "PASS" else contract_error or "run `factory init` and review the generated contract"
+    checks.append(Check(contract_level, "Project Contract", contract_detail))
+    try:
+        charter = FactoryCharter.load(repo, require_approved=True)
+        selected_profile = factory_profile(profile_name)
+        governance = charter.governance(
+            profile_name,
+            explicit_autonomy=bool(selected_profile.get("requires_explicit_opt_in")),
+        )
+        charter_level = "PASS"
+        charter_detail = (
+            f"approved {governance['charter_sha256'][:12]} · "
+            f"{governance['merge_authority']} merge · {governance['gate_level']} gates"
+        )
+    except (FactoryCharterError, ValueError) as exc:
+        charter_level = "FAIL"
+        charter_detail = str(exc)
+    checks.append(Check(charter_level, "Factory Charter", charter_detail))
 
     git = command(["git", "rev-parse", "--show-toplevel"], repo)
     checks.append(Check("PASS" if git.returncode == 0 else "FAIL", "Git repository", git.stdout.strip() or git.stderr.strip()))
@@ -110,36 +170,59 @@ def run_doctor(
         checks.append(Check("FAIL" if dirty else "PASS", "clean checkout", dirty or "no uncommitted files"))
         branch = command(["git", "branch", "--show-current"], repo).stdout.strip()
         checks.append(Check("PASS" if branch else "FAIL", "current branch", branch or "detached HEAD"))
-        origin = command(["git", "remote", "get-url", "origin"], repo)
-        checks.append(Check("PASS" if origin.returncode == 0 else "FAIL", "origin remote", origin.stdout.strip() or "not configured"))
-        checks.append(baseline_check(repo))
+        if full:
+            origin = command(["git", "remote", "get-url", "origin"], repo)
+            checks.append(Check("PASS" if origin.returncode == 0 else "FAIL", "origin remote", origin.stdout.strip() or "not configured"))
+            origin_repository = repository_from_remote(origin.stdout.strip())
+            repository_matches = bool(
+                configured_repository
+                and origin_repository
+                and configured_repository.slug.lower() == origin_repository.slug.lower()
+            )
+            detail = (
+                configured_repository.url
+                if repository_matches
+                else "save the attendee repository URL in Connect or with `factory configure --github-repository URL`"
+            )
+            checks.append(Check("PASS" if repository_matches else "FAIL", "GitHub repository target", detail))
+        if project.reset_command and any("setup_demo.sh" in item for item in project.reset_command):
+            checks.append(baseline_check(repo))
 
     python_ok = sys.version_info >= (3, 11)
     checks.append(Check("PASS" if python_ok else "FAIL", "Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"))
-    node = command(["node", "--version"], repo)
-    node_ok = node.returncode == 0 and version_tuple(node.stdout) >= (20,)
-    checks.append(Check("PASS" if node_ok else "FAIL", "Node", node.stdout.strip() or "Node 20+ not found"))
-
     venv_python = repo / ".factory/venv/bin/python"
-    if venv_python.is_file():
-        imports = command([str(venv_python), "-c", "import flask, pytest"], repo)
-        checks.append(Check("PASS" if imports.returncode == 0 else "FAIL", "Python environment", "Flask and pytest available" if imports.returncode == 0 else imports.stderr.strip()))
-    else:
-        checks.append(Check("FAIL", "Python environment", "run ./setup_demo.sh to create .factory/venv"))
+    checks.append(Check(
+        "PASS", "execution Python",
+        str(venv_python) if venv_python.is_file() else sys.executable,
+    ))
+    if full:
+        for tool in project.required_tools:
+            if tool in {"python", "python3"}:
+                found = sys.executable
+            else:
+                found = shutil.which(tool)
+            checks.append(Check("PASS" if found else "FAIL", f"tool: {tool}", found or "not found"))
 
-    gh = shutil.which("gh")
-    checks.append(Check("PASS" if gh else "FAIL", "GitHub CLI", gh or "install gh"))
-    if gh:
+    gh = shutil.which("gh") if full else None
+    if full:
+        checks.append(Check("PASS" if gh else "FAIL", "GitHub CLI", gh or "install gh"))
+    if full and gh:
         auth = command([gh, "auth", "status"], repo)
         auth_text = (auth.stdout + auth.stderr).strip()
         checks.append(Check("PASS" if auth.returncode == 0 else "FAIL", "GitHub authentication", "authenticated" if auth.returncode == 0 else auth_text))
         scope_ok = "project" in auth_text.lower()
         checks.append(Check("PASS" if scope_ok else "FAIL", "GitHub Projects scope", "project scope present" if scope_ok else "run gh auth refresh -s project"))
-        view = command([gh, "repo", "view", "--json", "nameWithOwner,defaultBranchRef"], repo)
+        target = [configured_repository.slug] if configured_repository else []
+        view = command([gh, "repo", "view", *target, "--json", "nameWithOwner,defaultBranchRef"], repo)
         if view.returncode == 0:
             repo_details = json.loads(view.stdout)
             default = (repo_details.get("defaultBranchRef") or {}).get("name") or "main"
             current = command(["git", "branch", "--show-current"], repo).stdout.strip()
+            checks.append(Check(
+                "PASS" if project.default_branch == default else "FAIL",
+                "Project Contract branch",
+                f"contract `{project.default_branch}`; GitHub `{default}`",
+            ))
             checks.append(Check("PASS" if current == default else "FAIL", "default branch", f"local `{current}`; GitHub `{default}`"))
             remote = command(["git", "ls-remote", "origin", f"refs/heads/{default}"], repo)
             remote_sha = remote.stdout.split()[0] if remote.returncode == 0 and remote.stdout.split() else ""
@@ -148,15 +231,36 @@ def run_doctor(
             owner = repo_details["nameWithOwner"].split("/", 1)[0]
             projects = command([gh, "project", "list", "--owner", owner, "--format", "json"], repo)
             checks.append(Check("PASS" if projects.returncode == 0 else "FAIL", "GitHub Project access", "accessible" if projects.returncode == 0 else projects.stderr.strip()))
+
+            reviewer_token = os.environ.get("FACTORY_REVIEW_GH_TOKEN", "").strip()
+            if reviewer_token and "code_review" in factory_profile(profile_name)["execution_roles"]:
+                author = command([gh, "api", "user", "--jq", ".login"], repo)
+                reviewer = command(
+                    [gh, "api", "user", "--jq", ".login"], repo,
+                    env={**os.environ, "GH_TOKEN": reviewer_token},
+                )
+                distinct = (
+                    author.returncode == 0 and reviewer.returncode == 0
+                    and author.stdout.strip() != reviewer.stdout.strip()
+                )
+                detail = (
+                    f"{reviewer.stdout.strip()} can submit formal reviews"
+                    if distinct else "token must belong to a different GitHub account"
+                )
+                checks.append(Check("PASS" if distinct else "WARN", "GitHub reviewer identity", detail))
+            elif "code_review" in factory_profile(profile_name)["execution_roles"]:
+                checks.append(Check(
+                    "WARN", "GitHub reviewer identity",
+                    "FACTORY_REVIEW_GH_TOKEN not set; self-reviews use a labelled Factory comment",
+                ))
         else:
             checks.append(Check("FAIL", "GitHub repository", view.stderr.strip() or "no connected repository"))
 
     if full:
-        required_agents = {
-            implementation_agent,
-            qa_agent or cfg.get("qa", {}).get("agent"),
-            planning_agent,
-        }
+        required_agents = required_agent_names(
+            cfg, profile_name, implementation_agent, qa_agent,
+            supervisor_agent, planning_agent, review_agent,
+        )
         for name in ("codex", "claude", "cursor"):
             if name == "codex":
                 available = False
@@ -196,10 +300,30 @@ def run_doctor(
             )
             checks.append(Check("PASS" if registered else "FAIL", f"{name} adapter", detail))
 
-    checks.extend(port_check(port) for port in (5000, 5050))
+        for name in sorted(item for item in required_agents if item):
+            capability = cfg.get("agent_capabilities", {}).get(name)
+            if not capability:
+                checks.append(Check(
+                    "FAIL", f"{name} execution boundary",
+                    "missing [agent_capabilities] declaration",
+                ))
+                continue
+            read_only = "native read-only" if capability.supports_read_only else "mutation detection only"
+            detail = (
+                f"{capability.execution_environment}; {capability.filesystem_mode}; "
+                f"roots {', '.join(capability.allowed_working_roots)}; "
+                f"network {capability.network_expectation}; {read_only}"
+            )
+            checks.append(Check(
+                "PASS" if capability.supports_read_only else "WARN",
+                f"{name} execution boundary", detail,
+            ))
+
+    checks.extend(port_check(port) for port in (*project.ports, 5050))
 
     qa = cfg.get("qa", {})
     roots = qa.get("test_roots")
+    patterns = qa.get("test_file_patterns", list(project.test_file_patterns))
     qa_valid = (
         qa.get("agent") in cfg.get("agents", {})
         and isinstance(qa.get("max_retries"), int)
@@ -211,6 +335,8 @@ def run_doctor(
             and ".." not in PurePosixPath(root).parts
             for root in roots
         )
+        and isinstance(patterns, list) and bool(patterns)
+        and all(isinstance(pattern, str) and "{ticket}" in pattern for pattern in patterns)
     )
     checks.append(Check("PASS" if qa_valid else "FAIL", "QA configuration", "valid" if qa_valid else "invalid agent, retries, or test roots"))
     gates = cfg.get("gate", [])
@@ -219,7 +345,7 @@ def run_doctor(
     if full and valid_gates:
         python = str(venv_python) if venv_python.is_file() else sys.executable
         for gate in gates:
-            rendered = gate["cmd"].format(python=python, repo=str(repo))
+            rendered = project.render_command(gate["cmd"], python=python)
             result = command(["/bin/sh", "-c", rendered], repo, timeout=300)
             checks.append(Check("PASS" if result.returncode == 0 else "FAIL", f"gate: {gate['name']}", "passed" if result.returncode == 0 else (result.stdout + result.stderr)[-500:].strip()))
 

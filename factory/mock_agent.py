@@ -273,6 +273,17 @@ def recipe_rebrand_ticket(number: int, attempt: int):
         destination = ROOT / source.relative_to(step)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+    if number == 1 and attempt > 1:
+        replace(
+            "demo-app/recipe_api.py",
+            'def load_recipes(root: Path) -> list[dict]:\n    return json.loads((root / "recipes.json").read_text())',
+            '''def load_recipes(root: Path) -> list[dict]:
+    recipes = json.loads((root / "recipes.json").read_text())
+    identifiers = [recipe["id"] for recipe in recipes]
+    if len(identifiers) != len(set(identifiers)):
+        raise ValueError("Recipe IDs must be unique")
+    return recipes''',
+        )
     delete_manifest = step / "delete.txt"
     if delete_manifest.is_file():
         for relative in delete_manifest.read_text().splitlines():

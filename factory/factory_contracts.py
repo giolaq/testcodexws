@@ -9,7 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 
-WORKSHOP_VERSION = "workshop-v1.0.0"
+WORKSHOP_VERSION = "workshop-v1.1.0"
 PROFILES = {
     "lean": {
         "name": "Lean",
@@ -17,22 +17,12 @@ PROFILES = {
         "planning_roles": ["product_review", "vertical_slices"],
         "execution_roles": ["implementation", "verification", "human_review"],
         "protected_acceptance_tests": False,
+        "merge_authority": "human",
+        "requires_explicit_opt_in": False,
     },
     "standard": {
         "name": "Standard",
-        "purpose": "The workshop path with aligned planning, independent Acceptance Tests, verification, and human merge.",
-        "planning_roles": [
-            "product_review",
-            "system_architecture",
-            "program_design",
-            "vertical_slices",
-        ],
-        "execution_roles": ["qa", "implementation", "verification", "human_review"],
-        "protected_acceptance_tests": True,
-    },
-    "assured": {
-        "name": "Assured",
-        "purpose": "Higher-risk work with cleanup, architecture conformance, hardening, and final independent verification.",
+        "purpose": "The workshop path with aligned planning, independent Acceptance Tests, verification, review rework, and human exact-revision merge.",
         "planning_roles": [
             "product_review",
             "system_architecture",
@@ -40,16 +30,54 @@ PROFILES = {
             "vertical_slices",
         ],
         "execution_roles": [
+            "supervisor", "qa", "implementation", "verification", "code_review", "human_review",
+        ],
+        "protected_acceptance_tests": True,
+        "merge_authority": "human",
+        "requires_explicit_opt_in": False,
+    },
+    "assured": {
+        "name": "Assured",
+        "purpose": "Higher-risk work with cleanup, architecture conformance, hardening, final verification, review rework, and human exact-revision merge.",
+        "planning_roles": [
+            "product_review",
+            "system_architecture",
+            "program_design",
+            "vertical_slices",
+        ],
+        "execution_roles": [
+            "supervisor",
             "qa",
             "implementation",
             "cleanup",
             "architecture_conformance",
             "hardening",
             "verification",
+            "critic",
+            "negative_proof",
             "final_verifier",
+            "code_review",
             "human_review",
         ],
         "protected_acceptance_tests": True,
+        "merge_authority": "human",
+        "requires_explicit_opt_in": False,
+    },
+    "autonomous-demo": {
+        "name": "Autonomous Demo",
+        "purpose": "An explicit workshop-only demonstration of Supervisor-authorized exact-revision merge.",
+        "planning_roles": [
+            "product_review",
+            "system_architecture",
+            "program_design",
+            "vertical_slices",
+        ],
+        "execution_roles": [
+            "supervisor", "qa", "implementation", "verification", "code_review", "supervisor_merge",
+        ],
+        "protected_acceptance_tests": True,
+        "merge_authority": "supervisor",
+        "requires_explicit_opt_in": True,
     },
 }
 
@@ -164,6 +192,7 @@ RECEIPT_FIELDS = {
     "unresolved_risks",
     "artifacts",
     "policy_hashes",
+    "evidence",
     "timestamp",
 }
 
@@ -182,10 +211,11 @@ def handoff_receipt(
     unresolved_risks: list[str],
     artifacts: list[str],
     policy_hashes: dict[str, str],
+    evidence: dict | None = None,
     timestamp: str | None = None,
 ) -> dict:
     receipt = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": run_id,
         "role": role,
         "phase": phase,
@@ -198,6 +228,7 @@ def handoff_receipt(
         "unresolved_risks": unresolved_risks,
         "artifacts": artifacts,
         "policy_hashes": policy_hashes,
+        "evidence": evidence or {},
         "timestamp": timestamp or datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     validate_handoff_receipt(receipt)
@@ -209,6 +240,8 @@ def validate_handoff_receipt(receipt: dict):
         missing = RECEIPT_FIELDS - set(receipt)
         extra = set(receipt) - RECEIPT_FIELDS
         raise ValueError(f"invalid Handoff Receipt fields; missing={sorted(missing)}, extra={sorted(extra)}")
+    if receipt["schema_version"] != 2:
+        raise ValueError("Handoff Receipt schema_version must be 2")
     for field in ("run_id", "role", "phase", "claimed_result", "timestamp"):
         if not isinstance(receipt[field], str) or not receipt[field]:
             raise ValueError(f"Handoff Receipt requires {field}")
@@ -226,6 +259,12 @@ def validate_handoff_receipt(receipt: dict):
         value = receipt[field]
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise ValueError(f"Handoff Receipt {field} must be a list of strings")
+    if not isinstance(receipt["evidence"], dict):
+        raise ValueError("Handoff Receipt evidence must be an object")
+    try:
+        json.dumps(receipt["evidence"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Handoff Receipt evidence must contain JSON values") from exc
 
 
 def write_handoff_receipt(repo: Path, receipt: dict) -> Path:

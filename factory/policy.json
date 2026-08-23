@@ -8,7 +8,8 @@
   ],
   "workflow": [
     "Work only in the assigned isolated worktree and within the approved Ticket scope.",
-    "Treat the orchestrator as the only lifecycle authority; roles do not assign work to one another.",
+    "Treat the orchestrator as the only lifecycle authority; the supervisor may propose dispatch and post-approval merge commands, but only the orchestrator validates and applies them.",
+    "Ticket roles report through Handoff Receipts and do not assign work or message one another directly.",
     "Report unresolved risk explicitly in the Handoff Receipt."
   ],
   "repository": [

@@ -1,8 +1,9 @@
 # Facilitator runbook
 
-Release: `workshop-v1.0.0`
+Release: `workshop-v1.1.0`
 
-Use [WORKSHOP_OUTLINE.md](WORKSHOP_OUTLINE.md) for the presentation path. This
+Use [WORKSHOP_OUTLINE.md](WORKSHOP_OUTLINE.md) for the presentation path and
+[COMPATIBILITY.md](COMPATIBILITY.md) for upgrades and migration behavior. This
 runbook is the detailed preparation, release, and recovery reference; do not
 read it as the attendee script.
 
@@ -25,13 +26,13 @@ Complete this checklist before attendees arrive:
 - [ ] Ports 5000 and 5050 are free.
 - [ ] The presentation browser can open localhost pages.
 - [ ] The workshop repository is clean and synchronized with its default branch.
-- [ ] A disposable checkout exists for a Rehearsal Run.
+- [ ] A disposable local Git checkout exists for a Rehearsal Run.
 - [ ] The deterministic recipe scenario completes successfully.
 - [ ] The attendee website is open at the prerequisites section.
 - [ ] The frozen source, CLI, website, and Git tag all identify
-      `workshop-v1.0.0`.
-- [ ] Every attendee will create and own a separate repository; the facilitator
-      uses a different repository on screen.
+      `workshop-v1.1.0`.
+- [ ] Every attendee will create and own a separate repository. Rehearsal may
+      stay local; Live uses GitHub. The facilitator uses a different repository.
 - [ ] Peer-review pairs are assigned without sharing repository state.
 
 A Live Run also requires:
@@ -39,10 +40,15 @@ A Live Run also requires:
 - [ ] `gh auth status` succeeds.
 - [ ] GitHub authentication includes the `project` scope.
 - [ ] The repository owner can create issues, Projects, branches, and pull requests.
+- [ ] The repository URL is saved in **Connect** and the repository card says **connected**.
 - [ ] A current Claude or Codex planning CLI is authenticated.
-- [ ] The selected implementation and QA adapters are registered and their
+- [ ] The selected supervision, implementation, QA, and code-review adapters are registered and their
       noninteractive commands have been smoke-tested. Claude is only the worked
       example; attendees may use their own agent.
+- [ ] The selected supervisor adapter is registered and can return the required
+      structured dispatch decision noninteractively.
+- [ ] If the demo requires formal GitHub approval, `FACTORY_REVIEW_GH_TOKEN`
+      belongs to a second account with repository review access.
 - [ ] Network access to GitHub and the selected agent provider is stable.
 
 ## Prepare the dry run
@@ -60,7 +66,10 @@ Run the deterministic preflight and scenario once:
 python3 --version
 node --version
 git --version
-./factory/factory run --mock --scenario recipe-rebrand --dry-run
+./factory/factory init
+# Review factory.project.toml and factory.charter.toml.
+./factory/factory approve-charter --yes
+./factory/factory doctor
 ```
 
 Prepare the live checkout only if you plan to demonstrate real agents:
@@ -70,12 +79,28 @@ Prepare the live checkout only if you plan to demonstrate real agents:
 cd ../software-refactory-live
 ./setup_demo.sh --scenario recipe-rebrand
 git push origin main
-./factory/factory configure --preset claude-workshop
+./factory/factory configure \
+  --github-repository "$(gh repo view --json url --jq .url)" \
+  --preset claude-workshop
 ./factory/factory doctor --full
 ```
 
 Continue only when the doctor reports zero failures. A warning is acceptable
-only for an optional adapter that won't be used.
+only for an optional adapter that won't be used or for the documented
+single-account review-comment fallback.
+
+If a colleague asks whether the factory only works for Pocket Cinema, show the
+Project Contract card in Connect. The extension path is:
+
+```sh
+./factory/factory init --repo /path/to/existing-project
+# Review factory.project.toml in that project.
+./factory/factory control-center --repo /path/to/existing-project
+```
+
+Explain the boundary plainly: a Live Run accepts any PRD and repository;
+Rehearsal is a deterministic TableStory teaching pack. Do not switch the core
+exercise to an unfamiliar repository during the 100-minute session.
 
 If the group uses another implementation or QA agent, register it under
 `[agents]` in `factory/factory.toml`, then save the attendee defaults with
@@ -117,9 +142,9 @@ versioned CLI. Do not tunnel or publicly expose port 5050.
 | 35–50 min | Trace R3 | Follow R3 across the four planning artifacts. |
 | 50–58 min | Align and publish | Show PRD-derived tickets and dependencies in GitHub Projects. |
 | 58–68 min | Review Acceptance Tests | Ask whether QA-owned assertions prove behavior before approving them. |
-| 68–85 min | Observe the Factory Run | Follow one ticket through Plan, Build, Verify, Review, and the deterministic retry. |
+| 68–85 min | Observe the Factory Run | Follow a Supervisor checkpoint, then one ticket through Plan, Build, Verify, automated code review, human Review, and the deterministic retry. |
 | 85–91 min | Verify the app | Verify TableStory and preview delivery evidence. |
-| 91–98 min | Peer review the Canvas | Attendees review another repository's nine-section Factory Canvas. |
+| 91–98 min | Peer review the Canvas | Attendees review another repository's authority, capacity, evidence, and monitoring choices. |
 | 98–100 min | Export and close | Export the Evidence Packet and name one bounded next experiment. |
 
 The schedule is a teaching target, not a guarantee that live model work will
@@ -145,7 +170,7 @@ Run and inspect technical planning:
 ```sh
 ./factory/factory continue-plan PLAN_ID --mock
 ./factory/factory review alignment PLAN_ID
-./factory/factory run --mock --scenario recipe-rebrand --dry-run
+./factory/factory approve-rehearsal PLAN_ID --scenario recipe-rebrand
 ```
 
 Pause after the first QA wave:
@@ -163,6 +188,8 @@ Finish the scenario:
 
 ```sh
 ./factory/factory run --mock --scenario recipe-rebrand --once
+./factory/factory merge ISSUE_NUMBER --yes
+./factory/factory monitor
 ```
 
 ## Live command path
@@ -213,14 +240,38 @@ Don't click through every field. Use one ticket to show this sequence:
 4. **Implementation prompt and log:** the current scope and activity.
 5. **Changed files:** the code-review surface.
 6. **Gate output:** the reason for pass, retry, or block.
-7. **Handoff Receipts:** the revisions, claim, verification, risks, and policy
+7. **Supervisor decision:** the worker reports it read, the Ticket instruction
+   it proposed, and the orchestrator's validated dispatch.
+8. **Code review evidence:** the candidate commit, `APPROVE` or
+   `REQUEST_CHANGES` decision, changed-path comments, and GitHub publication
+   mode. On Ticket #1, show the first comment and the repaired second revision.
+9. **Merge evidence:** the Supervisor's `MERGE` recommendation must name the
+   same PR and commit that the Code Review Agent approved. In the Standard
+   path, show the human exact-revision merge decision that follows it.
+10. **Handoff Receipts:** the revisions, claim, verification, risks, and policy
    hashes behind each role transition.
-8. **History:** merge synchronization and dependency unlock.
+11. **History:** merge synchronization and dependency unlock.
 
 Use GitHub Projects for shared backlog ownership and dependencies. Use the
 Control Center for local prompts, logs, worktree changes, protected tests,
 gate results, and receipts. Do not describe the Control Center as a hosted
 Project board.
+
+Use the Supervisor screen to make authority explicit. Ticket agents report
+results through Handoff Receipts. The Agent Supervisor recommends the next
+bounded wave. The orchestrator validates and applies allowed commands. Humans
+still approve Product Review, alignment, and Acceptance Tests when configured.
+The Code Review Agent approves an exact candidate or requests changes but cannot
+edit or merge. After approval, the Supervisor may recommend merge. The
+orchestrator rechecks the PR revision, then Lean, Standard, and Assured wait for
+a human decision. Only an explicitly opted-in Autonomous Demo executes the
+Supervisor recommendation automatically.
+
+GitHub does not allow the account that authored a PR to formally approve it.
+With one workshop identity, point out the labelled Factory comment and explain
+that it does not satisfy branch protection. A repository requiring formal
+approval needs a distinct reviewer identity supplied through the uncommitted
+`FACTORY_REVIEW_GH_TOKEN` environment variable.
 
 ## Recovery during the session
 
@@ -228,6 +279,7 @@ Project board.
 | --- | --- |
 | GitHub, Wi-Fi, or a model is slow | Switch to the deterministic recipe scenario. |
 | Product Review is blocked | Resolve the blocking question; don't continue to architecture. |
+| A planning retry repeats the same error | Read the failed expert's recovery card. For validation, use the prefilled **Apply correction and continue** instruction. For a session or rate limit, switch adapters or wait; the Control Center disables same-adapter retry. If governance changed, use **Restart planning safely**. |
 | QA Review takes too long | Review one test set, then finish without `--review-qa-tests`. |
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |
@@ -286,6 +338,6 @@ creates a fresh Project and merges one planned Ticket:
   --confirm-disposable-repo
 ```
 
-After all checks pass, tag `workshop-v1.0.0`, make the repository public, and
+After all checks pass, tag `workshop-v1.1.0`, make the repository public, and
 enable GitHub template mode. Those external owner actions are intentionally not
 automated by the factory.

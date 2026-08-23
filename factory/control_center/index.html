@@ -30,7 +30,9 @@
       <a href="#prd" data-view-link="prd"><span>≡</span>PRD</a>
       <a href="#planning" data-view-link="planning"><span>⌘</span>Planning</a>
       <a href="#tickets" data-view-link="tickets"><span>▦</span>Tickets</a>
+      <a href="#supervisor" data-view-link="supervisor"><span>◎</span>Supervisor</a>
       <a href="#evidence" data-view-link="evidence"><span>✓</span>Evidence</a>
+      <a href="#monitor" data-view-link="monitor"><span>◌</span>Monitor</a>
     </nav>
     <div class="sidebar-footer">
       <div class="profile-line"><span>Factory profile</span><strong id="sidebar-profile">Standard</strong></div>
@@ -54,7 +56,7 @@
           <li><b>Plan</b><span>PRD to approved slices</span></li>
           <li><b>Build</b><span>Agents work in isolation</span></li>
           <li><b>Verify</b><span>Tests and gates produce evidence</span></li>
-          <li><b>Review</b><span>People accept or send work back</span></li>
+          <li><b>Review</b><span>Reviewer approves or sends work back</span></li>
         </ol>
       </section>
 
@@ -108,20 +110,37 @@
             <label>Quick preset<select name="preset"><option value="claude-workshop">Claude workshop</option><option value="codex-workshop">Codex workshop</option><option value="">Custom roles</option></select></label>
             <div class="form-grid">
               <label>Run mode<select id="connect-mode"><option value="rehearsal">Rehearsal</option><option value="live">Live</option></select></label>
-              <label>Profile<select name="profile"><option value="standard">Standard</option><option value="lean">Lean</option><option value="assured">Assured</option></select></label>
+              <label>Profile<select name="profile"><option value="standard">Standard</option><option value="lean">Lean</option><option value="assured">Assured</option><option value="autonomous-demo">Autonomous Demo</option></select></label>
+              <label class="wide-field">GitHub repository URL<input name="github_repository" type="url" inputmode="url" placeholder="https://github.com/you/workshop-repo"><small>Required for Live. Saving verifies access and opens an isolated managed checkout. The factory never repoints another repository's <code>origin</code>.</small></label>
               <label>Parallel tickets<input name="max_parallel" type="number" min="1" max="12" value="1"></label>
               <label>Planning<select name="planning_agent" data-agent-select="planning"></select></label>
               <label>Implementation<select name="agent" data-agent-select="implementation"></select></label>
-              <label>Independent QA<select name="qa_agent" data-agent-select="qa"></select></label>
+              <label>Independent QA (Standard/Assured)<select name="qa_agent" data-agent-select="qa"></select></label>
+              <label>Supervisor (Standard/Assured)<select name="supervisor_agent" data-agent-select="supervisor"></select></label>
+              <label>Code review (Standard/Assured)<select name="review_agent" data-agent-select="review"></select></label>
               <label>GitHub Project number<input name="project_number" type="number" min="1" placeholder="Create during approval"></label>
             </div>
             <label class="check-row"><input name="review_qa_tests" type="checkbox" checked><span><b>Require human QA approval</b><small>Implementation waits until a person approves the acceptance tests.</small></span></label>
+            <label class="check-row safety-note" id="autonomous-merge-warning" hidden><input id="autonomous-merge-opt-in" type="checkbox"><span><b>Delegate final merge accountability for this demonstration</b><small>This delegates final merge accountability: the Supervisor recommends and the orchestrator executes an exact-revision merge. This is a workshop contrast, not the normal shipping path. The choice is not saved and must be made again after a reload.</small></span></label>
             <div class="form-actions"><button class="button button-primary" type="submit">Save configuration</button><button class="button" type="button" data-action="doctor">Run preflight</button></div>
           </form>
         </section>
         <aside class="surface readiness-surface">
           <div class="surface-heading"><div><span class="section-label">Repository</span><h2 id="connect-repo">—</h2></div></div>
-          <dl class="facts"><div><dt>Branch</dt><dd id="connect-branch">—</dd></div><div><dt>Origin</dt><dd id="connect-remote">—</dd></div><div><dt>Working tree</dt><dd id="connect-dirty">—</dd></div><div><dt>Project</dt><dd id="connect-project">Automatic</dd></div></dl>
+          <dl class="facts"><div><dt>Branch</dt><dd id="connect-branch">—</dd></div><div><dt>Origin</dt><dd id="connect-remote">—</dd></div><div><dt>GitHub target</dt><dd id="connect-github">Not connected</dd></div><div><dt>Working tree</dt><dd id="connect-dirty">—</dd></div><div><dt>Project</dt><dd id="connect-project">Automatic</dd></div></dl>
+          <div class="contract-summary">
+            <div class="surface-heading"><div><span class="section-label">Project Contract</span><h3 id="contract-status">Inspecting repository</h3></div></div>
+            <p id="contract-guidance">The factory detects this repository before planning.</p>
+            <dl class="facts compact-facts"><div><dt>Source</dt><dd id="contract-sources">—</dd></div><div><dt>Tests</dt><dd id="contract-tests">—</dd></div><div><dt>Gates</dt><dd id="contract-gates">—</dd></div></dl>
+            <div class="form-actions"><button class="button" id="initialize-project" type="button" data-action="init-project">Create contract and Charter</button><button class="button" id="prepare-project" type="button" data-action="prepare-project">Run setup</button></div>
+          </div>
+          <div class="contract-summary">
+            <div class="surface-heading"><div><span class="section-label">Factory Charter</span><h3 id="charter-status">Not created</h3></div></div>
+            <p id="charter-guidance">The Charter defines authority, gates, limits, protected paths, and stop conditions.</p>
+            <dl class="facts compact-facts"><div><dt>Tier</dt><dd id="charter-tier">—</dd></div><div><dt>Merge</dt><dd id="charter-merge">—</dd></div><div><dt>Gates</dt><dd id="charter-gates">—</dd></div></dl>
+            <details><summary>Review exact policy</summary><pre class="charter-policy" id="charter-policy">Create the Charter draft first.</pre></details>
+            <div class="form-actions"><button class="button button-primary" id="approve-charter" type="button" data-action="approve-charter">Approve exact Charter</button><button class="button" id="publish-setup" type="button" data-action="publish-setup">Commit and push setup</button></div>
+          </div>
           <div class="safety-note"><b>Local by design</b><p>The server listens on your machine. Agent credentials remain in their CLI stores.</p></div>
         </aside>
       </div>
@@ -150,6 +169,29 @@
       <div class="ticket-board" id="ticket-board"></div>
     </section>
 
+    <section class="view" data-view="supervisor" aria-labelledby="supervisor-title" hidden>
+      <div class="page-heading"><div><span class="eyebrow">Dispatch and merge coordination</span><h1 id="supervisor-title">Agent supervisor</h1><p>See how worker results become safe dispatch commands and how an approved revision becomes a merge recommendation for a person.</p></div><div class="heading-actions"><span class="operation-status idle" id="supervisor-status">Waiting</span><a class="button button-primary" href="#tickets" data-view-link="tickets">Open Tickets</a></div></div>
+      <section class="surface supervisor-flow" aria-label="Supervisor communication flow">
+        <div><b>Worker agents</b><span>QA, implementation, verification, review</span></div><i>Handoff Receipts →</i><div><b>Supervisor</b><span>Proposes dispatch; recommends merge</span></div><i>Validated decisions →</i><div><b>Orchestrator</b><span>Enforces dependencies, gates, exact revision, and state</span></div>
+      </section>
+      <div class="supervisor-grid">
+        <section class="surface supervisor-latest">
+          <div class="surface-heading"><div><span class="section-label">Latest decision</span><h2 id="supervisor-summary">No coordination decision yet</h2></div><span class="updated" id="supervisor-updated">—</span></div>
+          <p id="supervisor-explanation">Run the Standard or Assured Factory Profile to activate the supervisor.</p>
+          <div class="supervisor-commands" id="supervisor-commands"><p class="empty-state">No dispatch commands recorded.</p></div>
+          <div class="form-actions" id="supervisor-artifacts"></div>
+        </section>
+        <aside class="surface supervisor-reports">
+          <span class="section-label">Worker communication</span><h2>Reports considered</h2>
+          <div id="supervisor-reports"><p class="empty-state">No Handoff Receipts considered yet.</p></div>
+        </aside>
+      </div>
+      <section class="surface supervisor-history">
+        <div class="surface-heading"><div><span class="section-label">Audit trail</span><h2>Coordination history</h2></div><span class="updated" id="supervisor-agent">No adapter</span></div>
+        <div id="supervisor-history"><p class="empty-state">Decisions will appear here after the first ready wave.</p></div>
+      </section>
+    </section>
+
     <section class="view" data-view="evidence" aria-labelledby="evidence-title" hidden>
       <div class="page-heading"><div><span class="eyebrow">Step 8</span><h1 id="evidence-title">Verify the result</h1><p>Collect the artifacts that justify completion.</p></div><div class="heading-actions"><span class="save-state" id="canvas-save-state">Canvas not loaded</span><button class="button button-primary" id="create-evidence" type="button">Create evidence packet</button></div></div>
       <div class="evidence-grid">
@@ -162,12 +204,36 @@
         <div class="form-actions"><button class="button" id="save-canvas" type="button">Save canvas</button></div>
       </details>
     </section>
+
+    <section class="view" data-view="monitor" aria-labelledby="monitor-title" hidden>
+      <div class="page-heading">
+        <div><span class="eyebrow">After delivery</span><h1 id="monitor-title">Monitor repository health</h1><p>Inspect read-only findings after the factory delivers. Monitoring never repairs product code or merges a pull request.</p></div>
+        <div class="heading-actions"><button class="button" type="button" data-action="monitor">Preview findings</button><button class="button button-primary" id="publish-monitor" type="button" data-action="publish-monitor">Publish findings</button></div>
+      </div>
+      <div class="monitor-grid">
+        <section class="surface monitor-summary">
+          <span class="section-label">Latest report</span>
+          <h2 id="monitor-summary">No monitoring report yet</h2>
+          <p id="monitor-meta">Run a preview to check the repository without changing it.</p>
+          <div class="monitor-counts" id="monitor-counts"></div>
+          <div class="safety-note"><b>Read-only by contract</b><p>Preview gathers evidence. Publishing can create or update one finding record, but it cannot edit product code or merge.</p></div>
+        </section>
+        <section class="surface monitor-findings">
+          <div class="surface-heading"><div><span class="section-label">Actionable findings</span><h2>What needs attention</h2></div></div>
+          <div id="monitor-findings"><p class="empty-state">No report loaded.</p></div>
+        </section>
+      </div>
+      <section class="surface monitor-details">
+        <div><span class="section-label">Changed hotspots</span><h2>Where change is accumulating</h2><div id="monitor-hotspots"><p class="empty-state">No hotspot data yet.</p></div></div>
+        <div><span class="section-label">Known limitations</span><h2>What was not checked</h2><div id="monitor-limitations"><p class="empty-state">No limitations reported.</p></div></div>
+      </section>
+    </section>
   </main>
 
   <div class="drawer-scrim" id="drawer-scrim" hidden></div>
   <aside class="drawer" id="ticket-drawer" aria-labelledby="ticket-drawer-title" hidden>
     <header><div><span class="issue-label" id="drawer-issue">Ticket</span><h2 id="ticket-drawer-title">Ticket details</h2></div><button class="icon-button" id="close-drawer" type="button" aria-label="Close details">×</button></header>
-    <nav class="drawer-tabs" aria-label="Ticket details"><button class="active" type="button" data-drawer-tab="summary">Summary</button><button type="button" data-drawer-tab="prompt">Prompt</button><button type="button" data-drawer-tab="log">Live log</button><button type="button" data-drawer-tab="diff">Diff</button><button type="button" data-drawer-tab="tests">Tests</button><button type="button" data-drawer-tab="history">History</button></nav>
+    <nav class="drawer-tabs" aria-label="Ticket details"><button class="active" type="button" data-drawer-tab="summary">Summary</button><button type="button" data-drawer-tab="supervisor">Supervisor</button><button type="button" data-drawer-tab="review">Code review</button><button type="button" data-drawer-tab="prompt">Prompt</button><button type="button" data-drawer-tab="log">Live log</button><button type="button" data-drawer-tab="diff">Diff</button><button type="button" data-drawer-tab="tests">Tests</button><button type="button" data-drawer-tab="history">History</button></nav>
     <div class="drawer-content" id="drawer-content"></div>
   </aside>
 
@@ -189,7 +255,7 @@
         <button class="button button-danger" id="reset-all" type="button" disabled>Start workshop over</button>
       </section>
     </div>
-    <div class="reset-note" id="reset-note"><b>Rehearsal only.</b> A live GitHub run may contain issues, branches, and pull requests other people can see. Start live work again in a fresh workshop repository.</div>
+    <div class="reset-note" id="reset-note"><b>Local reset.</b> Reset changes this checkout only. Live GitHub artifacts are never deleted.</div>
   </dialog>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>

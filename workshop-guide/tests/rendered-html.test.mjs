@@ -23,17 +23,37 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /<title>Software \(re\)-Factory Workshop<\/title>/i);
   assert.match(html, /Turn a PRD into verified code/);
   assert.match(html, /A factory is the workflow around the agents/);
+  assert.match(html, /Start with one responsible delivery loop/);
+  assert.match(html, /Human attention is the limiting resource/);
+  assert.match(html, /Ambiguity, collisions, weak proof/);
+  assert.match(html, /More agents are a cost/);
   assert.match(html, /Plan[\s\S]*Build[\s\S]*Verify[\s\S]*Review/);
+  assert.match(html, /Agent Supervisor recommends coordination/);
+  assert.match(html, /Code Review Agent closes the feedback loop/);
+  assert.match(html, /Code Review Agent can approve or request changes/);
+  assert.match(html, /review feedback.*repair.*approval.*Supervisor recommendation.*human merge/);
+  assert.match(html, /GitHub approval needs a separate identity/);
+  assert.match(html, /worker Handoff Receipts/i);
+  assert.match(html, /only lifecycle authority/i);
+  assert.match(html, /The supervisor coordinates work\. It does not own delivery\./);
+  assert.match(html, /The supervisor can/);
+  assert.match(html, /The supervisor cannot/);
+  assert.match(html, /Why use Handoff Receipts\?/);
+  assert.match(html, /Any PRD, one explicit repository contract/);
+  assert.match(html, /factory\.project\.toml/);
+  assert.match(html, /Use Live mode for an arbitrary PRD/i);
 
   assert.match(html, /Prerequisites/);
   assert.match(html, /Python 3\.11/);
   assert.match(html, /Node\.js 20/);
-  assert.match(html, /GitHub CLI and one personal workshop repository/);
+  assert.match(html, /A local Git repository for the Rehearsal path/);
+  assert.match(html, /One personal GitHub workshop repository/);
   assert.match(html, /facilitator uses a different repository/i);
   assert.match(html, /Rehearsal/);
   assert.match(html, /Live/);
   assert.match(html, /factory control-center/);
   assert.match(html, /Open the Control Center/);
+  assert.match(html, /Project Contract/);
   assert.match(html, /Terminal 2 — keep this running/);
   assert.match(html, /Factory Control Center: http:\/\/127\.0\.0\.1:5050/);
   assert.match(html, /browser should open automatically/i);
@@ -41,9 +61,10 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /Control Center/);
   assert.match(html, /Control Center path/);
   assert.match(html, /CLI path/);
-  assert.match(html, /Click/);
-  assert.match(html, /Inspect/);
-  assert.match(html, /Continue when/);
+  assert.match(html, /What is happening/);
+  assert.match(html, /Why it stopped/);
+  assert.match(html, /What evidence to inspect/);
+  assert.match(html, /What you decide/);
 
   for (const heading of [
     "Set up",
@@ -53,7 +74,7 @@ test("server-renders the concise self-guided workshop", async () => {
     "Create tickets",
     "Approve tests",
     "Run the factory",
-    "Verify the result",
+    "Verify and monitor",
   ]) {
     assert.match(html, new RegExp(heading));
   }
@@ -65,10 +86,20 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /factory run --mock --scenario recipe-rebrand --review-qa-tests --once/);
   assert.match(html, /factory approve-tests ISSUE_NUMBER/);
   assert.match(html, /factory evidence/);
+  assert.match(html, /RED PROVED/);
+  assert.match(html, /GREEN PROVED/);
+  assert.match(html, /NEEDS YOU/);
+  assert.match(html, /remote claim/);
+  assert.match(html, /Merge exact revision/);
+  assert.match(html, /Autonomous Demo delegates the final merge/);
+  assert.match(html, /Not the normal shipping path/);
+  assert.match(html, /factory monitor/);
+  assert.match(html, /Monitor reports health separately and never repairs code/);
   assert.match(html, /planning agents produce the tickets from the PRD/i);
   assert.match(html, /Configure your own agent/);
   assert.match(html, /my-agent =/);
   assert.match(html, /Use your own agents/);
+  assert.match(html, /--supervisor-agent my-agent/);
   assert.match(html, /Troubleshooting/);
 
   assert.match(html, /screenshots\/pocket-cinema-before\.webp/);
@@ -78,6 +109,7 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /screenshots\/control-center-tickets\.jpg/);
   assert.match(html, /screenshots\/control-center-ticket-tests\.jpg/);
   assert.match(html, /screenshots\/control-center-overview\.jpg/);
+  assert.match(html, /screenshots\/control-center-human-merge\.jpg/);
   assert.match(html, /screenshots\/control-center-evidence\.jpg/);
   assert.match(html, /screenshots\/tablestory-desktop\.webp/);
   assert.match(html, /screenshots\/tablestory-mobile\.webp/);
@@ -95,8 +127,21 @@ test("server-renders the concise self-guided workshop", async () => {
 
 test("attendee page stays within its copy budget", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const words = source.trim().split(/\s+/).length;
-  assert.ok(words < 4500, `page.tsx contains ${words} words; expected fewer than 4500`);
+  const response = await render();
+  const html = await response.text();
+  const initiallyVisibleHtml = html.replace(
+    /<details\b(?![^>]*\bopen\b)[^>]*>([\s\S]*?)<\/details>/gi,
+    (_, content) => content.match(/<summary\b[^>]*>[\s\S]*?<\/summary>/i)?.[0] ?? "",
+  );
+  const visible = initiallyVisibleHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(?:[a-z]+|#\d+);/gi, " ");
+  const words = visible.trim().split(/\s+/).filter(Boolean).length;
+  assert.ok(words < 3200, `attendee page renders ${words} visible words; expected fewer than 3200`);
   assert.match(source, /doctor\$\{track === "live" \? " --full" : ""\}/);
   assert.match(source, /gh project view <project-number>/);
+  assert.match(source, /screenshots\/github-project-board\.jpg/);
+  assert.match(source, /agent_capabilities\.my-agent/);
 });

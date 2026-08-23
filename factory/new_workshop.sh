@@ -21,5 +21,8 @@ git clone "$remote" "$destination"
 if [ "$scenario" != live ]; then
   "$destination/setup_demo.sh" --scenario "$scenario"
 fi
+python3 "$destination/factory/workshop_update.py" \
+  --target "$destination" \
+  --record-current
 
 echo "Disposable workshop checkout ready: $destination ($scenario)"

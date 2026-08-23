@@ -67,7 +67,9 @@ single exercise proves better code, faster delivery, or lower cost.
 
 - Attendees use the prepared Pocket Cinema application and TableStory PRD for
   the core. They apply the model to their own use case in the final Canvas
-  exercise rather than running the factory on an arbitrary repository.
+  exercise rather than running the factory on an arbitrary repository during
+  the timed core. The reference implementation nevertheless supports that next
+  step through a committed Project Contract and Live agents.
 - The four planning artifacts are taught through one question each. Requirement
   `R3`, the mobile recipe journey, is traced through all four artifacts.
 - Product Review and Vertical Slices receive hands-on decisions. System
@@ -80,6 +82,11 @@ single exercise proves better code, faster delivery, or lower cost.
   background factory.
 - QA owns Acceptance Tests before implementation. Implementation adapters cannot
   modify protected Acceptance Tests.
+- Standard and Assured runs add a separate read-only Code Review Agent after
+  required gates. It can request changes with changed-path comments or approve
+  the exact candidate. Comments return to implementation; after a clean recheck,
+  the Supervisor may recommend that revision and a human decides whether to
+  merge it.
 - The narrative ticket fails one acceptance test on its first deterministic
   attempt, then succeeds after a visible, logged retry. Live runs are not
   artificially failed.
@@ -93,12 +100,15 @@ The factory offers three real profiles:
 - **Lean**: product intent, small slices, one implementation role, existing
   tests, and human pull-request review.
 - **Standard**: four planning roles, independent QA-owned acceptance tests,
-  protected tests, implementation roles, verification gates, and human merge.
+  protected tests, supervised Ticket dispatch, implementation roles,
+  verification gates, independent code-review rework, and revision-bound
+  Supervisor recommendation followed by human merge.
 - **Assured**: Standard plus cleanup, architecture conformance, hardening, and
-  final independent verification roles.
+  final independent verification roles before code review.
 
 The core workshop runs Standard. Lean and Assured are used in the Factory Canvas
-and optional modules.
+and optional modules. Autonomous Demo is a separate, explicit exercise for
+delegated merge accountability.
 
 Every role contract states what the role owns, what it does not own, its
 verification responsibility, and its handoff output. Versioned engineering,
@@ -108,7 +118,11 @@ the factory records the policy version with the run.
 Every phase emits a structured handoff receipt containing the role, ticket,
 input and output revisions, claimed result, verification performed, unresolved
 risks, and artifact paths. The central orchestrator owns lifecycle state and
-handoffs; agents do not coordinate through peer-to-peer queues.
+handoffs; agents do not coordinate through peer-to-peer queues. In Standard and
+Assured profiles, an Agent Supervisor reads those receipts at the scheduler
+seam and proposes the next bounded dispatch wave. The orchestrator validates
+and applies allowed commands; the Supervisor cannot change scope, dependencies,
+gates, approvals, or lifecycle state.
 
 ## Attendee preparation
 
@@ -156,11 +170,12 @@ only add ceremony?" The application is evidence, not the conclusion.
 - Named Lean, Standard, and Assured configurations select their role and gate
   topology without requiring long command lines.
 - The dashboard presents macro phases first and links detailed state to role
-  contracts, policy versions, and handoff receipts.
+  contracts, policy versions, handoff receipts, and the Supervisor's decision
+  history.
 
 ## Release and live-delivery defaults
 
-- The public workshop is frozen on `main` and tagged `workshop-v1.0.0` before
+- The public workshop is frozen on `main` and tagged `workshop-v1.1.0` before
   attendees create repositories. The website and CLI show the release identity.
   A replacement release is published only for a workshop-blocking defect.
 - The facilitator demonstrates the factory live and does not terminate slow
