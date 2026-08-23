@@ -23,6 +23,30 @@ def git(repo: Path, *args: str) -> str:
 
 
 class CodeReviewTests(unittest.TestCase):
+    def test_live_smoke_review_fixture_requests_one_changed_path_rework(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prompt = Path(directory) / "review.md"
+            prompt.write_text(
+                "## Ticket\nfactory-release-smoke:review-rework\n\n"
+                "## Changed paths\n\n- `demo-app/app.py`\n- `demo-app/tests/test_ticket_9.py`\n\n"
+                "## Recorded gates\n\n- tests: PASS\n"
+            )
+            script = Path(__file__).parents[1] / "mock_review_agent.py"
+            first = subprocess.run(
+                [sys.executable, str(script), "9", str(prompt), "--attempt", "1"],
+                text=True, capture_output=True, check=True,
+            )
+            second = subprocess.run(
+                [sys.executable, str(script), "9", str(prompt), "--attempt", "2"],
+                text=True, capture_output=True, check=True,
+            )
+
+            requested = json.loads(first.stdout)
+            approved = json.loads(second.stdout)
+            self.assertEqual(requested["decision"], "REQUEST_CHANGES")
+            self.assertEqual(requested["findings"][0]["path"], "demo-app/app.py")
+            self.assertEqual(approved["decision"], "APPROVE")
+
     def test_extracts_and_validates_last_json_result(self):
         raw = extract_review('progress\n{"ignored":true}\n{"schema_version":2,"decision":"APPROVE","summary":"Ready.","findings":[]}')
         review = validate_review(raw, {"demo-app/app.py"})

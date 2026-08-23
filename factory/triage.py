@@ -52,11 +52,19 @@ def classify_controls(charter, paths: list[str]) -> dict:
         if human_approval else
         f"The Charter consequence tier is {charter.consequence_tier}."
     )
+    planning_approvals = list(charter.planning_approvals)
+    if load_bearing:
+        for stage in ("system_architecture", "program_design"):
+            if stage not in planning_approvals:
+                planning_approvals.insert(-1, stage)
+    elif human_approval and "system_architecture" not in planning_approvals:
+        planning_approvals.insert(-1, "system_architecture")
     return {
         "risk": risk,
         "gate_level": selected,
         "load_bearing": load_bearing,
         "requires_human_approval": human_approval,
+        "planning_approvals": planning_approvals,
         "paths": sorted(dict.fromkeys(paths)),
         "reason": reason,
     }

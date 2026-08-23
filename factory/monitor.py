@@ -153,8 +153,12 @@ class FactoryMonitor:
             except Exception as exc:
                 limitations.append(f"Remote claims and Tickets could not be reconciled: {str(exc)[:500]}")
             try:
+                default_branch = getattr(self.backend, "default_branch", "main")
+                if not isinstance(default_branch, str) or not default_branch:
+                    default_branch = "main"
                 ci = self.backend.json(
                     "run", "list", "--repo", f"{self.backend.owner}/{self.backend.name}",
+                    "--branch", default_branch,
                     "--limit", "10", "--json", "databaseId,status,conclusion,workflowName,url,headSha",
                 )
                 failed = [run for run in ci if run.get("conclusion") == "failure"]

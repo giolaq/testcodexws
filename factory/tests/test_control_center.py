@@ -254,6 +254,45 @@ class ControlCenterTests(unittest.TestCase):
             self.assertIn("--yes", publish[0])
             self.assertIn("approve-rehearsal", publish[0])
 
+    def test_charter_selected_expert_gate_has_a_validated_control_center_action(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            self.write_plan_manifest(center, "a1b2c3d4", "mock")
+
+            title, commands = center.build_commands("approve-stage", {
+                "plan_id": "a1b2c3d4",
+                "stage": "system_architecture",
+            })
+
+            self.assertEqual(title, "Approve System Architecture")
+            self.assertEqual(
+                commands[0][-4:],
+                ["approve-stage", "architecture", "a1b2c3d4", "--yes"],
+            )
+            with self.assertRaisesRegex(InputError, "[Aa]rchitecture or program"):
+                center.build_commands("approve-stage", {
+                    "plan_id": "a1b2c3d4",
+                    "stage": "vertical_slices",
+                })
+
+    def test_journey_names_a_charter_selected_intermediate_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            planning = {
+                "plan_id": "a" * 12,
+                "status": "awaiting_system_architecture_approval",
+                "approvals": {"product": {"artifact_sha256": "a" * 64}},
+                "stages": [],
+            }
+
+            journey = center.journey(
+                planning, {"tickets": []}, {}, {"saved": True}, [],
+            )
+
+            self.assertEqual(journey["headline"], "System Architecture needs your approval")
+            self.assertEqual(journey["next"]["label"], "Review System Architecture")
+            self.assertEqual(journey["next"]["view"], "planning")
+
     def test_blocked_planning_can_retry_with_another_live_adapter(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))

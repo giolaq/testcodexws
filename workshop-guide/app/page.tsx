@@ -782,6 +782,13 @@ node --test demo-app/static/tests/*.test.js
             <p>Name the consequence tier, merge authority, human review capacity, load-bearing paths, gate budget, durable remote record, and monitoring owner. These choices determine which controls your use case actually needs.</p>
           </Callout>
           <details className="optional-detail">
+            <summary>Add architecture and design approval gates</summary>
+            <p>Product Review and final alignment always require a person. For higher-consequence work, add <code>system_architecture</code> or <code>program_design</code> to <code>policy.planning_approvals</code> in the Factory Charter. Declared load-bearing paths can also select these gates automatically. The Control Center pauses and binds each approval to the exact artifact hash.</p>
+            <CodeBlock>{`./factory/factory review architecture PLAN_ID
+./factory/factory approve-stage architecture PLAN_ID
+./factory/factory continue-plan PLAN_ID`}</CodeBlock>
+          </details>
+          <details className="optional-detail">
             <summary>Configure your own agent</summary>
             <p>Start with a built-in preset, or map each role to a different CLI.</p>
             <CodeBlock>{`./factory/factory configure --preset claude-workshop

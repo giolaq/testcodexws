@@ -275,7 +275,13 @@ function renderDecisions(data) {
   const blockedExpert = planning.stages?.find((stage) => stage.id === planning.blocked_stage);
   if (blockedExpert && !planning.requires_replan) decisions.push({ title: `Answer ${blockedExpert.title}`, text: `${blockedExpert.questions?.length || 0} decision(s) are blocking technical planning.`, view: "planning", planning: blockedExpert.id });
   const product = planning.stages?.find((stage) => stage.id === "product_review");
-  if (product?.status === "complete" && !planning.approvals?.product && !planning.requires_replan) decisions.push({ title: "Approve Product Review", text: "Confirm the user outcome before technical planning.", view: "planning", planning: "product_gate" });
+  if (product?.status === "complete" && !planning.approvals?.product && !planning.requires_replan) decisions.push({ title: "Approve Product Review", text: "Confirm the user outcome before technical planning.", view: "planning", planning: "product_review_gate" });
+  for (const stage of ["system_architecture", "program_design"]) {
+    if (planning.status === `awaiting_${stage}_approval` && !planning.approvals?.[stage]) {
+      const title = stage === "system_architecture" ? "System Architecture" : "Program Design";
+      decisions.push({ title: `Approve ${title}`, text: "Confirm the exact expert artifact before downstream planning continues.", view: "planning", planning: `${stage}_gate` });
+    }
+  }
   if (planning.status === "awaiting_alignment_approval" && !planning.approvals?.alignment) decisions.push({ title: "Approve alignment", text: "Accept architecture, program design, and vertical slices.", view: "planning", planning: "alignment_gate" });
   tickets.filter((ticket) => ticket.status === "QA Review").forEach((ticket) => decisions.push({ title: `Approve tests for #${ticket.number}`, text: ticket.title, ticket }));
   tickets.filter((ticket) => ticket.status === "In Review" && ticket.merge_authority === "human").forEach((ticket) => decisions.push({ title: `Decide whether to merge #${ticket.number}`, text: `Exact approved head ${(ticket.approved_head || "").slice(0, 12) || "not recorded"} · ${ticket.title}`, ticket }));
@@ -295,9 +301,29 @@ function renderDecisions(data) {
 function planningSequence(planning) {
   const stages = planning.stages || [];
   if (!stages.length) return [];
-  const productGate = { id: "product_gate", title: "Approve product", status: planning.approvals?.product ? "approved" : stages[0]?.status === "complete" ? "waiting" : "pending", gate: true };
-  const alignmentGate = { id: "alignment_gate", title: "Approve alignment", status: planning.approvals?.alignment ? "approved" : planning.status === "awaiting_alignment_approval" ? "waiting" : "pending", gate: true };
-  return [stages[0], productGate, ...stages.slice(1), alignmentGate];
+  const required = new Set([
+    ...(planning.governance?.planning_approvals || ["product_review", "alignment"]),
+    ...(planning.planning_controls?.planning_approvals || []),
+  ]);
+  const approvalKey = { product_review: "product", system_architecture: "system_architecture", program_design: "program_design" };
+  const sequence = [];
+  for (const stage of stages) {
+    sequence.push(stage);
+    if (!required.has(stage.id) || stage.id === "vertical_slices") continue;
+    const key = approvalKey[stage.id];
+    const title = stage.id === "product_review" ? "Approve product" : stage.id === "system_architecture" ? "Approve architecture" : "Approve program design";
+    sequence.push({
+      id: `${stage.id}_gate`,
+      stage: stage.id,
+      title,
+      status: planning.approvals?.[key] ? "approved" : planning.status === `awaiting_${stage.id}_approval` || (stage.id === "product_review" && stage.status === "complete") ? "waiting" : "pending",
+      gate: true,
+    });
+  }
+  if (required.has("alignment")) {
+    sequence.push({ id: "alignment_gate", title: "Approve alignment", status: planning.approvals?.alignment ? "approved" : planning.status === "awaiting_alignment_approval" ? "waiting" : "pending", gate: true });
+  }
+  return sequence;
 }
 
 function renderPlanning(planning) {
@@ -411,20 +437,24 @@ function selectPlanning(id) {
 function renderPlanningGate(item, planning) {
   $("#artifact-label").textContent = "Human decision";
   $("#artifact-title").textContent = item.title;
-  $("#artifact-content").textContent = item.id === "product_gate" ? "Approve only when the problem, users, behavior, scope, and evidence are clear." : "Approve only when requirements trace to architecture, program design, tickets, and QA evidence.";
+  $("#artifact-content").textContent = item.id === "product_review_gate" ? "Approve only when the problem, users, behavior, scope, and evidence are clear." : item.id === "alignment_gate" ? "Approve only when requirements trace to architecture, program design, tickets, and QA evidence." : "Approve only when this exact expert artifact respects its upstream contract and the approved Factory Charter.";
   $("#open-artifact").hidden = true;
   const approved = item.status === "approved";
   if (approved) {
     $("#approval-panel").innerHTML = `<span class="section-label">Human gate</span><h2>${esc(item.title)}</h2><div class="safety-note"><b>Approved</b><p>This decision and its artifact hashes are recorded in the plan manifest.</p></div>`;
     return;
   }
-  if (item.id === "product_gate") {
+  if (item.id === "product_review_gate") {
     $("#approval-panel").innerHTML = `<span class="section-label">Human gate</span><h2>Product Review</h2><p>Approve the outcome or send focused feedback to the product expert.</p><div class="approval-card"><label>Revision feedback<textarea id="product-feedback" placeholder="Describe what must become clearer or testable."></textarea></label><div class="approval-actions"><button class="button" type="button" id="revise-product">Request revision</button><button class="button button-primary" type="button" id="approve-product">Approve product</button></div></div>`;
     $("#revise-product").addEventListener("click", () => action("revise-product", { feedback: $("#product-feedback").value }));
     $("#approve-product").addEventListener("click", () => action("approve-product"));
-  } else {
+  } else if (item.id === "alignment_gate") {
     $("#approval-panel").innerHTML = `<span class="section-label">Human gate</span><h2>Alignment</h2><p>Publishing creates the approved vertical slices as ${mode() === "live" ? "GitHub issues" : "local rehearsal tickets"}.</p><div class="approval-card"><label>New GitHub Project title<input id="project-title" value="TableStory Workshop" ${mode() === "live" ? "" : "disabled"}></label><div class="approval-actions"><button class="button button-primary" type="button" id="approve-alignment">Approve and create tickets</button></div></div>`;
     $("#approve-alignment").addEventListener("click", () => action("publish-plan", { project_title: $("#project-title").value }));
+  } else {
+    const title = item.stage === "system_architecture" ? "System Architecture" : "Program Design";
+    $("#approval-panel").innerHTML = `<span class="section-label">Charter-required human gate</span><h2>${esc(title)}</h2><p>Review the adjacent expert artifact. Approval records its exact hash and allows the next expert to run.</p><div class="approval-actions"><button class="button button-primary" type="button" id="approve-planning-stage">Approve ${esc(title)}</button></div>`;
+    $("#approve-planning-stage").addEventListener("click", () => action("approve-stage", { stage: item.stage }));
   }
 }
 
@@ -583,7 +613,7 @@ async function action(name, extra = {}) {
     if (name === "publish-setup" && !window.confirm("Commit and push only .gitignore, factory.project.toml, and the approved factory.charter.toml to the default branch?")) return;
     if (name === "merge" && !window.confirm("Merge only the exact approved revision shown for this Ticket? This records your human shipping decision.")) return;
     if (name === "prepare-project" && !window.confirm("Run the setup commands recorded in factory.project.toml? Review that file first.")) return;
-    const destructive = ["publish-plan", "approve-product", "approve-tests", "retry", "release-claim"].includes(name);
+    const destructive = ["publish-plan", "approve-product", "approve-stage", "approve-tests", "retry", "release-claim"].includes(name);
     if (destructive && !window.confirm("Record this decision and continue?")) return;
     const operation = await request(`/api/actions/${name}`, { method: "POST", body: JSON.stringify(basePayload(extra)) });
     renderOperation(operation);

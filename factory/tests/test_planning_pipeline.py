@@ -6,12 +6,14 @@ import tempfile
 import threading
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from planning_pipeline import (
+    approve_planning_stage,
     approve_rehearsal,
     approve_product,
     continue_plan,
@@ -398,6 +400,133 @@ class PlanningPipelineTests(unittest.TestCase):
         self.assertEqual({row["requirement_id"] for row in traceability["rows"]}, {"R1", "R2", "R3", "R4", "R5"})
         self.assertTrue(all(row["slices"] and row["qa_evidence"] for row in traceability["rows"]))
         self.assertTrue((run / "alignment-review.md").is_file())
+
+    def test_charter_selected_intermediate_planning_approvals_pause_the_pipeline(self):
+        charter = replace(
+            FactoryCharter.load(self.repo),
+            planning_approvals=(
+                "product_review",
+                "system_architecture",
+                "program_design",
+                "alignment",
+            ),
+            approved=False,
+            approved_policy_sha256="",
+        )
+        charter.write(force=True)
+        charter.approve()
+
+        run = self.start()
+        approve_product(self.repo, run.name, assume_yes=True)
+        continue_plan(self.repo, run.name, "mock", mock=True)
+
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["status"], "awaiting_system_architecture_approval")
+        self.assertEqual(manifest["stages"]["system_architecture"]["status"], "complete")
+        self.assertEqual(manifest["stages"]["program_design"]["status"], "pending")
+        self.assertIsNone(manifest["approvals"]["system_architecture"])
+
+        approve_planning_stage(
+            self.repo, run.name, "system_architecture", assume_yes=True,
+        )
+        continue_plan(self.repo, run.name, "mock", mock=True)
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["status"], "awaiting_program_design_approval")
+        self.assertIsNotNone(manifest["approvals"]["system_architecture"])
+        self.assertIsNone(manifest["approvals"]["program_design"])
+        self.assertEqual(manifest["stages"]["vertical_slices"]["status"], "pending")
+
+        approve_planning_stage(
+            self.repo, run.name, "program_design", assume_yes=True,
+        )
+        continue_plan(self.repo, run.name, "mock", mock=True)
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["status"], "awaiting_alignment_approval")
+        self.assertIsNotNone(manifest["approvals"]["program_design"])
+        self.assertEqual(manifest["stages"]["vertical_slices"]["status"], "complete")
+
+    def test_load_bearing_slice_selects_intermediate_planning_approvals(self):
+        charter = FactoryCharter.load(self.repo)
+        charter = replace(
+            charter,
+            load_bearing_paths=("demo-app",),
+            planning_approvals=("product_review", "alignment"),
+            approved=False,
+            approved_policy_sha256="",
+        )
+        charter.write(force=True)
+        charter.approve()
+        run = self.start()
+        approve_product(self.repo, run.name, assume_yes=True)
+
+        continue_plan(self.repo, run.name, "codex", mock=True)
+        manifest = load_manifest(run)
+
+        self.assertEqual(manifest["status"], "awaiting_system_architecture_approval")
+        self.assertEqual(manifest["planning_controls"]["risk"], "load-bearing")
+        self.assertEqual(
+            manifest["planning_controls"]["planning_approvals"],
+            ["product_review", "system_architecture", "program_design", "alignment"],
+        )
+        approve_planning_stage(
+            self.repo, run.name, "architecture", assume_yes=True,
+        )
+        continue_plan(self.repo, run.name, "codex", mock=True)
+        self.assertEqual(
+            load_manifest(run)["status"], "awaiting_program_design_approval",
+        )
+
+    def test_lean_plan_fails_closed_when_slice_paths_require_missing_experts(self):
+        charter = replace(
+            FactoryCharter.load(self.repo),
+            load_bearing_paths=("demo-app",),
+            approved=False,
+            approved_policy_sha256="",
+        )
+        charter.write(force=True)
+        charter.approve()
+        run = plan_prd(
+            self.repo, self.prd, None, "codex", 3, 12,
+            "mock", "mock", mock=True, profile_name="lean",
+        )
+        approve_product(self.repo, run.name, assume_yes=True)
+
+        with self.assertRaisesRegex(ValueError, "choose Standard or Assured"):
+            continue_plan(self.repo, run.name, "mock", mock=True)
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["status"], "stale_factory_profile")
+        self.assertIn("choose Standard or Assured", manifest["planning_control_error"])
+
+    def test_editing_an_approved_intermediate_artifact_clears_its_downstream_gates(self):
+        charter = replace(
+            FactoryCharter.load(self.repo),
+            planning_approvals=(
+                "product_review", "system_architecture", "program_design", "alignment",
+            ),
+            approved=False,
+            approved_policy_sha256="",
+        )
+        charter.write(force=True)
+        charter.approve()
+        run = self.start()
+        approve_product(self.repo, run.name, assume_yes=True)
+        continue_plan(self.repo, run.name, "mock", mock=True)
+        approve_planning_stage(
+            self.repo, run.name, "system_architecture", assume_yes=True,
+        )
+        architecture_path = run / "02-system-architecture.json"
+        architecture = json.loads(architecture_path.read_text())
+        architecture["risks"].append("Human-edited deployment boundary")
+        architecture_path.write_text(json.dumps(architecture, indent=2) + "\n")
+
+        continue_plan(self.repo, run.name, "mock", mock=True)
+
+        manifest = load_manifest(run)
+        self.assertEqual(manifest["status"], "awaiting_system_architecture_approval")
+        self.assertIsNone(manifest["approvals"]["system_architecture"])
+        self.assertIsNone(manifest["approvals"]["program_design"])
+        self.assertIsNone(manifest["approvals"]["alignment"])
+        self.assertEqual(manifest["stages"]["program_design"]["status"], "pending")
 
     def test_product_edit_invalidates_approval_and_downstream(self):
         run = self.start()

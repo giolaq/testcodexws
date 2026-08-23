@@ -34,6 +34,10 @@ class TriageTests(unittest.TestCase):
             self.assertTrue(controls["load_bearing"])
             self.assertEqual(controls["gate_level"], "deep")
             self.assertEqual(controls["risk"], "load-bearing")
+            self.assertEqual(
+                controls["planning_approvals"],
+                ["product_review", "system_architecture", "program_design", "alignment"],
+            )
 
 
 if __name__ == "__main__":

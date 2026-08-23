@@ -16,6 +16,8 @@ turn a local coding CLI into a security sandbox.
 - Remote summaries are versioned, bounded, and exclude raw prompts, logs,
   environment values, and hidden model reasoning.
 - Standard and Assured stop at a human exact-revision merge decision.
+- A `requires_human_approval` path stops at that human decision even in an
+  explicitly opted-in Autonomous Demo run.
 
 ## Trusted boundary
 

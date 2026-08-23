@@ -249,6 +249,12 @@ def export_evidence(
         if triage.get("reason") or controls.get("reason"):
             lines.append(f"- Control reason: {triage.get('reason') or controls.get('reason')}")
         lines.append(
+            "- Merge authority for this Ticket: "
+            + str(ticket.get("merge_authority") or "not recorded")
+            + (" · Charter path policy required a human decision"
+               if ticket.get("policy_required_human_merge") else "")
+        )
+        lines.append(
             f"- Verification duration: {ticket.get('verification_duration_seconds', 0)}s"
         )
         metrics = ticket.get("metrics", {})

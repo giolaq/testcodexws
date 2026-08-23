@@ -185,6 +185,11 @@ class FactoryCharter:
                 "policy.planning_approvals contains unknown gates: "
                 + ", ".join(sorted(unknown_approvals))
             )
+        required_anchors = {"product_review", "alignment"} - set(approvals)
+        if required_anchors:
+            raise FactoryCharterError(
+                "policy.planning_approvals must include product_review and alignment"
+            )
         stop_conditions = _strings(policy.get("stop_conditions"), "policy.stop_conditions")
         if paths.get("editable") is None:
             raise FactoryCharterError(
@@ -363,6 +368,16 @@ class FactoryCharter:
         from factory_contracts import profile as factory_profile
 
         selected = factory_profile(profile_name)
+        unsupported_approvals = (
+            set(self.planning_approvals)
+            - set(selected["planning_roles"])
+            - {"alignment"}
+        )
+        if unsupported_approvals:
+            raise FactoryCharterError(
+                f"Factory Profile {selected['name']} does not run the planning stages "
+                "required by the Charter: " + ", ".join(sorted(unsupported_approvals))
+            )
         expected_authority = selected["merge_authority"]
         if self.merge_authority != expected_authority:
             raise FactoryCharterError(

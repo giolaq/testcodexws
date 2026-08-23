@@ -92,6 +92,9 @@ test("server-renders the concise self-guided workshop", async () => {
   assert.match(html, /remote claim/);
   assert.match(html, /Merge exact revision/);
   assert.match(html, /Autonomous Demo delegates the final merge/);
+  assert.match(html, /Add architecture and design approval gates/);
+  assert.match(html, /Declared load-bearing paths can also select these gates automatically/);
+  assert.match(html, /factory approve-stage architecture PLAN_ID/);
   assert.match(html, /Not the normal shipping path/);
   assert.match(html, /factory monitor/);
   assert.match(html, /Monitor reports health separately and never repairs code/);
@@ -144,4 +147,19 @@ test("attendee page stays within its copy budget", async () => {
   assert.match(source, /gh project view <project-number>/);
   assert.match(source, /screenshots\/github-project-board\.jpg/);
   assert.match(source, /agent_capabilities\.my-agent/);
+});
+
+test("server-rendered workshop has accessible document and image structure", async () => {
+  const response = await render();
+  const html = await response.text();
+  assert.match(html, /<html[^>]+lang="en"/i);
+  assert.match(html, /<main\b/i);
+  assert.match(html, /<nav\b[^>]*aria-label=/i);
+  const headings = html.match(/<h1\b/g) ?? [];
+  assert.equal(headings.length, 1, "the attendee page should expose one primary heading");
+  const images = html.match(/<img\b[^>]*>/gi) ?? [];
+  assert.ok(images.length > 0, "the attendee page should render its instructional images");
+  for (const tag of images) {
+    assert.match(tag, /\balt="[^"]+"/i, `instructional image is missing useful alt text: ${tag}`);
+  }
 });

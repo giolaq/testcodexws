@@ -19,7 +19,7 @@ workshop. Press `Ctrl+C` to close the server.
 | --- | --- | --- |
 | Connect | Inspect or create the Project Contract and Factory Charter; select role adapters; run setup and preflight | Saves repository behavior, records human-owned policy approval, and checks the target |
 | PRD | Review or edit the requirement; start Product Review | Saves a local PRD and runs the first planning expert |
-| Planning | Read four expert artifacts; approve the two human gates | Creates PRD-derived rehearsal tickets or GitHub issues |
+| Planning | Read four expert artifacts; approve Product Review, final alignment, and any Charter-selected intermediate gates | Creates PRD-derived rehearsal tickets or GitHub issues |
 | Tickets | Run the scheduler; inspect prompts, logs, diffs, tests, gates, code review, and history | Operates isolated worktrees and shows live state |
 | Supervisor | Inspect worker reports, dispatch instructions, blocks, merge recommendations, and prior decisions | Explains how the next safe Ticket wave and approved revision were coordinated |
 | Evidence | Complete the Factory Canvas; export the packet | Produces a sanitized review bundle |
@@ -54,6 +54,13 @@ become available. Authentication and missing-tool failures point to preflight.
 Only an unclassified, potentially transient process failure offers **Retry same
 adapter**. Adapter changes are recorded in the manifest, valid upstream
 artifacts remain unchanged, and only the failed and downstream stages rerun.
+
+When `factory.charter.toml` selects `system_architecture` or `program_design` in
+`policy.planning_approvals`, the pipeline shows another human gate immediately
+after that expert. Review the artifact and choose **Approve System Architecture**
+or **Approve Program Design**. The next expert cannot start until the exact
+artifact hash is approved; an edit clears that approval and every downstream
+approval.
 
 Use the three recovery actions deliberately:
 

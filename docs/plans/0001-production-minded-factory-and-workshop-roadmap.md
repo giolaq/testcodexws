@@ -1,6 +1,6 @@
 # Production-minded Factory and Workshop Roadmap
 
-**Status:** Proposed
+**Status:** Implementation in progress
 **Owner:** Workshop lead
 **Created:** 2026-08-23
 **Scope:** Factory engine, Control Center, GitHub integration, workshop website,

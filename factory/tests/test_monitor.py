@@ -78,6 +78,8 @@ class MonitorTests(unittest.TestCase):
 
             self.assertIn("stale-claim", {item["kind"] for item in report["findings"]})
             backend.release_claim.assert_not_called()
+            self.assertIn("--branch", backend.json.call_args_list[0].args)
+            self.assertIn("main", backend.json.call_args_list[0].args)
 
     def test_monitor_reports_stale_blocked_ticket_and_review_wait(self):
         with tempfile.TemporaryDirectory() as directory:

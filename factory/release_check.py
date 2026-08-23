@@ -89,6 +89,7 @@ def audit_release(repo: Path) -> tuple[list[str], list[str]]:
     """Return local failures and the remaining publication checklist."""
     failures: list[str] = []
     manual = [
+        "Run the full Python suite plus website build, tests, structural accessibility checks, and lint.",
         "Run `factory release-check --rehearsal` from the frozen checkout.",
         "Run `factory release-check --live-smoke --confirm-disposable-repo` in a disposable GitHub repository with Claude configured.",
         "Check participant-facing links from the frozen checkout.",
@@ -387,7 +388,7 @@ def run_clean_standard_rehearsal(repo: Path) -> str:
 
 
 def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
-    """Exercise the Claude golden path in an explicitly disposable GitHub repo."""
+    """Exercise live Claude delivery and deterministic review rework in a disposable repo."""
     if not confirmed:
         raise ValueError("live smoke requires --confirm-disposable-repo")
     if not shutil.which("gh"):
@@ -413,7 +414,7 @@ def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
         "--supervisor-agent",
         "claude",
         "--review-agent",
-        "claude",
+        "mock-review",
     ], repo, timeout=None)
     prd = repo / ".factory" / f"live-smoke-{run_id}.md"
     prd.parent.mkdir(parents=True, exist_ok=True)
@@ -468,6 +469,17 @@ The implementation passes every configured gate and is merged through a pull req
     if not publication.get("project_number") or len(publication.get("issues", {})) != 1:
         raise RuntimeError("live smoke did not create a Project and publish one planned Ticket")
     number = next(iter(publication["issues"].values()))
+    issue = backend.json(
+        "issue", "view", str(number), "--repo", repository, "--json", "body",
+    )
+    smoke_marker = "factory-release-smoke:review-rework"
+    body = str(issue.get("body") or "").rstrip() + f"\n\n{smoke_marker}\n"
+    edited = backend.gh(
+        "issue", "edit", str(number), "--repo", repository, "--body", body,
+        check=False,
+    )
+    if edited.returncode:
+        raise RuntimeError("live smoke could not mark its disposable review-rework Ticket")
 
     run_command = [
         *factory,
@@ -481,7 +493,8 @@ The implementation passes every configured gate and is merged through a pull req
         "--supervisor-agent",
         "claude",
         "--review-agent",
-        "claude",
+        "mock-review",
+        "--release-smoke-review",
         "--review-qa-tests",
         "--max-parallel",
         "1",
@@ -501,6 +514,8 @@ The implementation passes every configured gate and is merged through a pull req
     pr_url = ticket.get("pr_url", "")
     if ticket.get("status") != "In Review" or not issue_url or not pr_url:
         raise RuntimeError("Claude implementation did not reach the human exact-revision merge gate")
+    if ticket.get("attempt", 0) < 2:
+        raise RuntimeError("live smoke did not return Code Review feedback to implementation")
     if ticket.get("qa_evidence", {}).get("red", {}).get("result") != "RED PROVED" or ticket.get("qa_evidence", {}).get("green", {}).get("result") != "GREEN PROVED":
         raise RuntimeError("live smoke is missing causal RED/GREEN proof")
     if not ticket.get("remote_claim", {}).get("claim_sha"):
@@ -526,6 +541,29 @@ The implementation passes every configured gate and is merged through a pull req
         raise RuntimeError("live smoke is missing required Handoff Receipts")
     if ticket.get("code_review", {}).get("result", {}).get("decision") != "APPROVE":
         raise RuntimeError("live smoke is missing Code Review Agent approval")
+    review_receipts = [
+        receipt
+        for receipt in (
+            json.loads((repo / reference).read_text())
+            for reference in ticket.get("receipts", [])
+            if (repo / reference).is_file()
+        )
+        if receipt.get("role") == "code_review"
+    ]
+    review_decisions = [
+        receipt.get("output_revisions", {}).get("decision")
+        for receipt in review_receipts
+    ]
+    if review_decisions[:2] != ["REQUEST_CHANGES", "APPROVE"]:
+        raise RuntimeError(
+            "live smoke did not preserve the Code Review request-changes and approval sequence"
+        )
+    reviewed_heads = [
+        receipt.get("output_revisions", {}).get("reviewed_commit")
+        for receipt in review_receipts[:2]
+    ]
+    if len(set(reviewed_heads)) != 2 or not all(reviewed_heads):
+        raise RuntimeError("live smoke review feedback did not produce and re-review a new PR head")
     if ticket.get("merge_executed_by") != "human":
         raise RuntimeError("live smoke is missing the accountable human merge decision")
     _checked([*factory, "monitor", "--json"], repo, timeout=None)
@@ -547,7 +585,7 @@ The implementation passes every configured gate and is merged through a pull req
     ):
         raise RuntimeError("fresh local state did not reconstruct the merged PR and remote claim")
     return (
-        f"Claude live GitHub smoke PASS (Project #{publication['project_number']}, "
+        f"Claude delivery + deterministic review-rework GitHub smoke PASS (Project #{publication['project_number']}, "
         f"issue #{number}, {pr_url}, {packet.relative_to(repo)}, remote recovery PASS)"
     )
 

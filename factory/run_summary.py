@@ -101,6 +101,10 @@ def factory_run_summary(state: dict, ticket: dict) -> dict:
         "human_decisions": {
             "qa_approved": bool(ticket.get("qa_approved")),
             "merge_executed_by": ticket.get("merge_executed_by", ""),
+            "policy_required_human_merge": bool(ticket.get("policy_required_human_merge")),
+            "effective_merge_authority": ticket.get(
+                "merge_authority", governance.get("merge_authority", ""),
+            ),
         },
         "unresolved_risks": unresolved_risks,
         "unresolved_risk_count": len(unresolved_risks),

@@ -28,6 +28,7 @@ from project_contract import ProjectContract
 from planner import dependency_waves, issue_body, render_review, validate_plan
 from sensitive_data import redact_credentials
 from adapter_capabilities import role_environment
+from triage import classify_controls
 
 
 PROMPT_VERSION = "2.0"
@@ -38,6 +39,12 @@ STAGES = (
     ("vertical_slices", "04-vertical-slices", "Vertical Slices"),
 )
 STAGE_INDEX = {name: index for index, (name, _, _) in enumerate(STAGES)}
+APPROVAL_KEYS = {
+    "product_review": "product",
+    "system_architecture": "system_architecture",
+    "program_design": "program_design",
+    "alignment": "alignment",
+}
 REVISION_STAGES = {
     "product": "product_review",
     "architecture": "system_architecture",
@@ -595,16 +602,97 @@ def resolve_run(repo: Path, identifier: str | Path) -> Path:
 
 
 def load_manifest(run_dir: Path) -> dict:
-    return read_json(run_dir / "manifest.json")
+    manifest = read_json(run_dir / "manifest.json")
+    _ensure_approvals(manifest)
+    return manifest
+
+
+def _ensure_approvals(manifest: dict) -> dict:
+    """Add approval slots without invalidating compatible v2 planning runs."""
+    approvals = manifest.setdefault("approvals", {})
+    for key in APPROVAL_KEYS.values():
+        approvals.setdefault(key, None)
+    return approvals
+
+
+def _required_planning_approvals(manifest: dict) -> set[str]:
+    configured = manifest.get("governance", {}).get("planning_approvals")
+    if not isinstance(configured, list):
+        configured = ["product_review", "alignment"]
+    selected = manifest.get("planning_controls", {}).get("planning_approvals", [])
+    if not isinstance(selected, list):
+        selected = []
+    return set(configured) | set(selected)
+
+
+def _refresh_planning_controls(repo: Path, run_dir: Path, manifest: dict) -> dict:
+    """Select planning approvals from the paths proposed by Vertical Slices."""
+    slices_path, _ = _stage_paths(run_dir, "vertical_slices")
+    if not slices_path.is_file():
+        return manifest.get("planning_controls", {})
+    slices = read_json(slices_path)
+    paths = [
+        path
+        for ticket in slices.get("tickets", [])
+        for path in ticket.get("file_ownership", [])
+        if isinstance(path, str)
+    ]
+    controls = classify_controls(
+        FactoryCharter.load(repo, require_approved=True), paths,
+    )
+    applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
+    unsupported = (
+        set(controls["planning_approvals"])
+        - applicable
+        - {"alignment"}
+    )
+    if unsupported:
+        message = (
+            "the proposed paths require planning stages outside this Factory Profile: "
+            + ", ".join(sorted(unsupported))
+            + "; choose Standard or Assured and plan again"
+        )
+        manifest["planning_controls"] = controls
+        manifest["planning_control_error"] = message
+        manifest["status"] = "stale_factory_profile"
+        save_manifest(repo, run_dir, manifest)
+        raise ValueError(message)
+    manifest.pop("planning_control_error", None)
+    manifest["planning_controls"] = controls
+    return controls
+
+
+def _invalidate_approvals_from(manifest: dict, stage: str) -> None:
+    approvals = _ensure_approvals(manifest)
+    start = STAGE_INDEX.get(stage, 0)
+    for name, _, _ in STAGES[start:]:
+        key = APPROVAL_KEYS.get(name)
+        if key:
+            approvals[key] = None
+    approvals["alignment"] = None
+
+
+def _stage_approval_current(run_dir: Path, manifest: dict, stage: str) -> bool:
+    approval = _ensure_approvals(manifest).get(APPROVAL_KEYS[stage])
+    artifact, _ = _stage_paths(run_dir, stage)
+    return bool(
+        isinstance(approval, dict)
+        and artifact.is_file()
+        and approval.get("artifact_sha256") == sha_file(artifact)
+        and manifest["stages"][stage].get("source_hashes")
+        == _input_hashes(run_dir, stage, manifest)
+    )
 
 
 def save_manifest(repo: Path, run_dir: Path, manifest: dict):
+    _ensure_approvals(manifest)
     manifest["updated_at"] = now()
     write_json(run_dir / "manifest.json", manifest)
     write_dashboard_state(repo, run_dir, manifest)
 
 
 def write_dashboard_state(repo: Path, run_dir: Path, manifest: dict):
+    _ensure_approvals(manifest)
     stages = []
     for stage, filename, title in STAGES:
         record = manifest["stages"][stage]
@@ -637,6 +725,9 @@ def write_dashboard_state(repo: Path, run_dir: Path, manifest: dict):
         "run_directory": relative_path(run_dir, repo),
         "approvals": manifest["approvals"],
         "profile": manifest.get("profile", "standard"),
+        "governance": manifest.get("governance", {}),
+        "planning_controls": manifest.get("planning_controls", {}),
+        "planning_control_error": manifest.get("planning_control_error", ""),
         "policy": manifest.get("policy", {}),
         "stages": stages,
         "alignment_review": relative_path(run_dir / "alignment-review.md", repo) if (run_dir / "alignment-review.md").is_file() else "",
@@ -1001,12 +1092,8 @@ def revise_plan(
     previous_path = revision_dir / f"{revision_slug}-{revision_number:02d}-before.json"
     shutil.copyfile(revision_source, previous_path)
 
-    if stage == "product_review":
-        manifest["approvals"] = {"product": None, "alignment": None}
-        gate = "product"
-    else:
-        manifest["approvals"]["alignment"] = None
-        gate = "alignment"
+    _invalidate_approvals_from(manifest, stage)
+    gate = APPROVAL_KEYS.get(stage, "alignment")
     manifest.setdefault("approval_history", []).append({
         "gate": gate,
         "decision": "revision_requested",
@@ -1132,7 +1219,12 @@ def plan_prd(
         "created_at": now(),
         "approval_history": [],
         "updated_at": now(),
-        "approvals": {"product": None, "alignment": None},
+        "approvals": {
+            "product": None,
+            "system_architecture": None,
+            "program_design": None,
+            "alignment": None,
+        },
         "receipts": [],
         "stages": _blank_stage_state(profile_name),
     }
@@ -1173,7 +1265,19 @@ def _refresh_edited_stage(repo: Path, run_dir: Path, manifest: dict, stage: str)
     for downstream, _, _ in STAGES[STAGE_INDEX[stage] + 1:]:
         if manifest["stages"][downstream]["status"] not in {"pending", "not_applicable"}:
             manifest["stages"][downstream]["status"] = "stale"
+    _invalidate_approvals_from(manifest, stage)
     return True
+
+
+def _assert_prior_planning_approvals(
+    run_dir: Path,
+    manifest: dict,
+    stage: str,
+) -> None:
+    required = _required_planning_approvals(manifest)
+    for name, _, title in STAGES[1:STAGE_INDEX[stage]]:
+        if name in required and not _stage_approval_current(run_dir, manifest, name):
+            raise ValueError(f"approve {title} before continuing to {stage.replace('_', ' ')}")
 
 
 def review(repo: Path, kind: str, identifier: str | Path) -> Path:
@@ -1184,6 +1288,25 @@ def review(repo: Path, kind: str, identifier: str | Path) -> Path:
         _refresh_edited_stage(repo, run_dir, manifest, "product_review")
         save_manifest(repo, run_dir, manifest)
         path = run_dir / "01-product-review.md"
+    elif kind in {"architecture", "system_architecture", "program", "program_design"}:
+        stage = REVISION_STAGES.get(kind, kind)
+        _assert_product_approval_current(repo, run_dir, manifest)
+        applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
+        if stage not in applicable:
+            raise ValueError(f"{stage.replace('_', ' ')} is not part of this Factory Profile")
+        if stage not in _required_planning_approvals(manifest):
+            raise ValueError(f"the approved Factory Charter does not require {stage.replace('_', ' ')} approval")
+        _assert_prior_planning_approvals(run_dir, manifest, stage)
+        path, markdown = _stage_paths(run_dir, stage)
+        if not path.is_file():
+            raise ValueError(f"{stage.replace('_', ' ')} has not been generated")
+        _refresh_edited_stage(repo, run_dir, manifest, stage)
+        if manifest["stages"][stage].get("source_hashes") != _input_hashes(run_dir, stage, manifest):
+            manifest["stages"][stage]["status"] = "stale"
+            save_manifest(repo, run_dir, manifest)
+            raise ValueError(f"{stage.replace('_', ' ')} inputs changed; rerun continue-plan")
+        save_manifest(repo, run_dir, manifest)
+        path = markdown
     elif kind == "alignment":
         _assert_product_approval_current(repo, run_dir, manifest)
         applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
@@ -1199,10 +1322,12 @@ def review(repo: Path, kind: str, identifier: str | Path) -> Path:
             raise ValueError("an upstream artifact changed; rerun continue-plan before alignment review")
         if _refresh_edited_stage(repo, run_dir, manifest, "vertical_slices"):
             manifest["approvals"]["alignment"] = None
+        _refresh_planning_controls(repo, run_dir, manifest)
+        _assert_prior_planning_approvals(run_dir, manifest, "vertical_slices")
         path = write_alignment_review(repo, run_dir, manifest)
         save_manifest(repo, run_dir, manifest)
     else:
-        raise ValueError("review must be product or alignment")
+        raise ValueError("review must be product, architecture, program, or alignment")
     print(path.read_text())
     print(f"Review artifact: {path}")
     return path
@@ -1227,7 +1352,7 @@ def approve_product(repo: Path, identifier: str | Path, assume_yes: bool = False
         if answer != "APPROVE PRODUCT":
             raise ValueError("product approval cancelled")
     if changed:
-        manifest["approvals"]["alignment"] = None
+        _invalidate_approvals_from(manifest, "product_review")
     approval = {"approved_at": now(), "artifact_sha256": sha_file(run_dir / "01-product-review.json")}
     manifest["approvals"]["product"] = approval
     manifest.setdefault("approval_history", []).append({
@@ -1242,9 +1367,71 @@ def approve_product(repo: Path, identifier: str | Path, assume_yes: bool = False
     print(f"Next: ./factory/factory continue-plan {manifest['plan_id']}")
 
 
+def approve_planning_stage(
+    repo: Path,
+    identifier: str | Path,
+    stage: str,
+    assume_yes: bool = False,
+) -> None:
+    """Approve one Charter-selected intermediate expert artifact by exact hash."""
+    stage = REVISION_STAGES.get(stage, stage)
+    if stage not in {"system_architecture", "program_design"}:
+        raise ValueError("planning stage approval must be architecture or program")
+    run_dir = resolve_run(repo, identifier)
+    manifest = load_manifest(run_dir)
+    _assert_governance_current(repo, run_dir, manifest)
+    _assert_project_contract_current(repo, run_dir, manifest)
+    _assert_product_approval_current(repo, run_dir, manifest)
+    if stage not in _required_planning_approvals(manifest):
+        raise ValueError(
+            f"the approved Factory Charter does not require {stage.replace('_', ' ')} approval"
+        )
+    applicable = set(factory_profile(manifest.get("profile", "standard"))["planning_roles"])
+    if stage not in applicable:
+        raise ValueError(f"{stage.replace('_', ' ')} is not part of this Factory Profile")
+    _assert_prior_planning_approvals(run_dir, manifest, stage)
+    artifact, _ = _stage_paths(run_dir, stage)
+    if not artifact.is_file():
+        raise ValueError(f"{stage.replace('_', ' ')} has not been generated")
+    _refresh_edited_stage(repo, run_dir, manifest, stage)
+    record = manifest["stages"][stage]
+    if record.get("source_hashes") != _input_hashes(run_dir, stage, manifest):
+        record["status"] = "stale"
+        save_manifest(repo, run_dir, manifest)
+        raise ValueError(f"{stage.replace('_', ' ')} inputs changed; rerun continue-plan")
+    value = read_json(artifact)
+    questions = value.get("blocking_questions", value.get("open_questions", []))
+    if questions:
+        save_manifest(repo, run_dir, manifest)
+        raise ValueError(f"resolve every {stage.replace('_', ' ')} blocking question before approval")
+    title = next(title for name, _, title in STAGES if name == stage)
+    if not assume_yes:
+        phrase = f"APPROVE {title.upper()}"
+        try:
+            answer = input(f"Approve this {title}? Type {phrase}: ")
+        except EOFError as exc:
+            raise ValueError(
+                f"interactive {title} approval required; rerun in a terminal or pass --yes"
+            ) from exc
+        if answer != phrase:
+            raise ValueError(f"{title} approval cancelled")
+    approval = {"approved_at": now(), "artifact_sha256": sha_file(artifact)}
+    _ensure_approvals(manifest)[APPROVAL_KEYS[stage]] = approval
+    manifest.setdefault("approval_history", []).append({
+        "gate": stage,
+        "decision": "approved",
+        "at": approval["approved_at"],
+        "artifact_sha256": approval["artifact_sha256"],
+    })
+    manifest["status"] = f"{stage}_approved"
+    save_manifest(repo, run_dir, manifest)
+    print(f"{title} approved for {manifest['plan_id']}.")
+    print(f"Next: ./factory/factory continue-plan {manifest['plan_id']}")
+
+
 def _assert_product_approval_current(repo: Path, run_dir: Path, manifest: dict):
     if sha_file(run_dir / "source-prd.md") != manifest["prd_sha256"]:
-        manifest["approvals"] = {"product": None, "alignment": None}
+        _invalidate_approvals_from(manifest, "product_review")
         manifest["status"] = "stale_product_review"
         manifest["stages"]["product_review"]["status"] = "stale"
         save_manifest(repo, run_dir, manifest)
@@ -1253,8 +1440,7 @@ def _assert_product_approval_current(repo: Path, run_dir: Path, manifest: dict):
     approval = manifest["approvals"].get("product")
     current_hash = sha_file(run_dir / "01-product-review.json")
     if edited or not approval or approval.get("artifact_sha256") != current_hash:
-        manifest["approvals"]["product"] = None
-        manifest["approvals"]["alignment"] = None
+        _invalidate_approvals_from(manifest, "product_review")
         manifest["status"] = "awaiting_product_approval"
         save_manifest(repo, run_dir, manifest)
         raise ValueError("product review changed; review and approve it again")
@@ -1265,7 +1451,7 @@ def _assert_project_contract_current(repo: Path, run_dir: Path, manifest: dict):
     current = sha_text(ProjectContract.load(repo).context())
     if expected == current:
         return
-    manifest["approvals"] = {"product": None, "alignment": None}
+    _invalidate_approvals_from(manifest, "product_review")
     manifest["status"] = "stale_project_contract"
     save_manifest(repo, run_dir, manifest)
     raise ValueError(
@@ -1288,7 +1474,7 @@ def _assert_governance_current(repo: Path, run_dir: Path, manifest: dict):
             explicit_autonomy=expected.get("explicit_autonomy") is True,
         )
     except (FactoryCharterError, ValueError) as exc:
-        manifest["approvals"] = {"product": None, "alignment": None}
+        _invalidate_approvals_from(manifest, "product_review")
         manifest["status"] = "stale_factory_charter"
         save_manifest(repo, run_dir, manifest)
         raise ValueError(
@@ -1297,7 +1483,7 @@ def _assert_governance_current(repo: Path, run_dir: Path, manifest: dict):
         ) from exc
     if expected == current and manifest.get("profile", "standard") == current["profile"]:
         return
-    manifest["approvals"] = {"product": None, "alignment": None}
+    _invalidate_approvals_from(manifest, "product_review")
     manifest["status"] = "stale_factory_charter"
     save_manifest(repo, run_dir, manifest)
     raise ValueError(
@@ -1359,12 +1545,35 @@ def continue_plan(
             raise ValueError(f"{title} has blocking questions; edit its JSON and rerun continue-plan")
         if edited:
             manifest["approvals"]["alignment"] = None
+        if (
+            stage in {"system_architecture", "program_design"}
+            and stage in _required_planning_approvals(manifest)
+            and not _stage_approval_current(run_dir, manifest, stage)
+        ):
+            manifest["status"] = f"awaiting_{stage}_approval"
+            save_manifest(repo, run_dir, manifest)
+            review_name = "architecture" if stage == "system_architecture" else "program"
+            print(f"{title} is ready for Charter-required human approval.")
+            print(f"Next: ./factory/factory review {review_name} {manifest['plan_id']}")
+            return run_dir
     product = read_json(run_dir / "01-product-review.json")
     architecture_path = run_dir / "02-system-architecture.json"
     program_path = run_dir / "03-program-design.json"
     architecture = read_json(architecture_path) if architecture_path.is_file() else None
     program = read_json(program_path) if program_path.is_file() else None
     slices = read_json(run_dir / "04-vertical-slices.json")
+    _refresh_planning_controls(repo, run_dir, manifest)
+    for stage in ("system_architecture", "program_design"):
+        if stage in _required_planning_approvals(manifest) and not _stage_approval_current(
+            run_dir, manifest, stage,
+        ):
+            title = next(title for name, _, title in STAGES if name == stage)
+            manifest["status"] = f"awaiting_{stage}_approval"
+            save_manifest(repo, run_dir, manifest)
+            review_name = "architecture" if stage == "system_architecture" else "program"
+            print(f"{title} is ready for path-selected human approval.")
+            print(f"Next: ./factory/factory review {review_name} {manifest['plan_id']}")
+            return run_dir
     traceability = build_traceability(product, architecture, program, slices)
     validate_traceability(traceability)
     write_json(run_dir / "traceability.json", traceability)
@@ -1461,6 +1670,8 @@ def prepare_publication(repo: Path, identifier: str | Path, assume_yes: bool) ->
         raise ValueError("an upstream artifact changed; rerun continue-plan before publication")
     if _refresh_edited_stage(repo, run_dir, manifest, "vertical_slices"):
         manifest["approvals"]["alignment"] = None
+    _refresh_planning_controls(repo, run_dir, manifest)
+    _assert_prior_planning_approvals(run_dir, manifest, "vertical_slices")
     review_path = write_alignment_review(repo, run_dir, manifest)
     slices_path, _ = _stage_paths(run_dir, "vertical_slices")
     current_hashes = _input_hashes(run_dir, "vertical_slices", manifest)

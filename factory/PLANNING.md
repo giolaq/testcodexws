@@ -7,6 +7,10 @@ and hashes make disagreements visible before implementation becomes expensive.
 The Standard and Assured profiles run all four experts. Lean runs Product
 Review and Vertical Slices only; its slice contract traces requirements
 directly because architecture and program artifacts are not applicable.
+Product Review and final alignment are always human gates. The approved Factory
+Charter may also require exact-hash approval after System Architecture or
+Program Design; `continue-plan` stops at each selected gate instead of starting
+the next expert.
 
 ```mermaid
 flowchart LR
@@ -68,6 +72,13 @@ output against the stage schemas. See `CONFIGURATION.md`.
 ./factory/factory review product PLAN_ID
 ./factory/factory approve-product PLAN_ID
 ./factory/factory continue-plan PLAN_ID
+# Only when selected by factory.charter.toml:
+./factory/factory review architecture PLAN_ID
+./factory/factory approve-stage architecture PLAN_ID
+./factory/factory continue-plan PLAN_ID
+./factory/factory review program PLAN_ID
+./factory/factory approve-stage program PLAN_ID
+./factory/factory continue-plan PLAN_ID
 ./factory/factory review alignment PLAN_ID
 ./factory/factory approve PLAN_ID --new-project-title "Workshop"
 ```
@@ -86,9 +97,17 @@ and resumes the valid downstream stages. The equivalent CLI recovery is:
 
 The other technical stage names are `program` and `slices`. `continue-plan`
 runs the remaining applicable experts sequentially, stopping if any expert has
-blocking questions. `approve` combines
+blocking questions or reaches a Charter-selected human gate. Intermediate
+approval records the exact artifact hash and is invalidated when that artifact
+or any upstream contract changes. `approve` combines
 the final alignment authorization with publication, so no GitHub issue exists
 before a human accepts the whole package.
+
+Vertical Slices also feed declared file ownership through the Charter path
+classifier. A load-bearing slice selects both intermediate approvals; a slice
+in `requires_human_approval` selects System Architecture approval. The selected
+risk, paths, gate level, and approvals are stored as `planning_controls` in the
+manifest and shown in the Control Center.
 
 For a credential-free rehearsal, add `--mock` to `plan` and `continue-plan`.
 The bundled TableStory artifacts follow the same schemas, validators, manifest,

@@ -54,6 +54,7 @@ from github_repository import (
 )
 from planner import approve_plan
 from planning_pipeline import (
+    approve_planning_stage,
     approve_rehearsal,
     approve_product,
     continue_plan,
@@ -453,6 +454,7 @@ def recover_remote_ticket_state(raw: dict, summary: dict | None) -> dict:
     revisions = summary.get("revisions") if isinstance(summary.get("revisions"), dict) else {}
     verdicts = summary.get("verdicts") if isinstance(summary.get("verdicts"), dict) else {}
     decisions = summary.get("human_decisions") if isinstance(summary.get("human_decisions"), dict) else {}
+    governance = summary.get("governance") if isinstance(summary.get("governance"), dict) else {}
     metrics = summary.get("metrics") if isinstance(summary.get("metrics"), dict) else {}
     pull_request = raw.get("pull_request") if isinstance(raw.get("pull_request"), dict) else {}
     approved_head = str(revisions.get("approved_head") or "")
@@ -499,6 +501,11 @@ def recover_remote_ticket_state(raw: dict, summary: dict | None) -> dict:
         }
     merge_commit = pull_request.get("mergeCommit") or {}
     merge_commit_sha = merge_commit.get("oid", "") if isinstance(merge_commit, dict) else ""
+    policy_required_human_merge = bool(decisions.get("policy_required_human_merge"))
+    merge_authority = (
+        "human" if policy_required_human_merge
+        else str(decisions.get("effective_merge_authority") or governance.get("merge_authority") or "")
+    )
     return {
         "status": status,
         "failure": failure,
@@ -527,6 +534,8 @@ def recover_remote_ticket_state(raw: dict, summary: dict | None) -> dict:
             if key in metrics
         },
         "merge_executed_by": decisions.get("merge_executed_by", ""),
+        "merge_authority": merge_authority,
+        "policy_required_human_merge": policy_required_human_merge,
         "recovered_run_id": summary.get("run_id", ""),
         "remote_run_summary": {
             "recovered": bool(summary),
@@ -613,10 +622,15 @@ class Factory:
             self.review_agent = None
         else:
             self.review_agent = "mock-review" if args.mock else requested_review
+        release_smoke_review = bool(getattr(args, "release_smoke_review", False))
         if self.review_agent and (
             self.review_agent not in self.cfg["agents"]
             or self.review_agent in {"mock", "mock-qa", "mock-supervisor"}
-            or (self.review_agent == "mock-review" and not args.mock)
+            or (
+                self.review_agent == "mock-review"
+                and not args.mock
+                and not release_smoke_review
+            )
         ):
             raise ValueError("--review-agent must name a configured non-mock adapter")
         self.review_qa_tests = bool(args.review_qa_tests or self.cfg["qa"].get("require_human_approval", False))
@@ -1260,6 +1274,15 @@ class Factory:
         self, ticket: dict, worktree: Path, base_sha: str, pull_request: str,
     ) -> str:
         """Run the configured read-only reviewer against the exact PR candidate."""
+        if (
+            self.review_agent == "mock-review"
+            and not self.args.mock
+            and not (
+                getattr(self.args, "release_smoke_review", False)
+                and "factory-release-smoke:review-rework" in ticket.get("body", "")
+            )
+        ):
+            return "The deterministic reviewer is restricted to the marked disposable release smoke."
         head_sha = self.git("rev-parse", "HEAD", cwd=worktree).stdout.strip()
         changed_paths = sorted(filter(None, self.git(
             "diff", "--name-only", f"{base_sha}..{head_sha}", cwd=worktree,
@@ -2182,6 +2205,13 @@ class Factory:
             "Code Review Agent approved exact revision; Supervisor recommends human merge",
         )
 
+    def effective_merge_authority(self, ticket: dict) -> str:
+        """Apply path-specific human accountability above the profile default."""
+        controls = ticket.get("triage", {}).get("controls", {})
+        if controls.get("requires_human_approval"):
+            return "human"
+        return self.profile["merge_authority"]
+
     def supervisor_merge(self, ticket: dict, worktree: Path) -> None:
         if not self.supervisor:
             raise RuntimeError("An approved Code Review requires the configured Agent Supervisor to merge.")
@@ -2506,9 +2536,11 @@ class Factory:
             ticket["failure"] = ""
             try:
                 if self.review_agent:
-                    if self.profile["merge_authority"] == "supervisor":
+                    if self.effective_merge_authority(ticket) == "supervisor":
                         self.supervisor_merge(ticket, worktree)
                     else:
+                        if self.profile["merge_authority"] == "supervisor":
+                            ticket["policy_required_human_merge"] = True
                         self.supervisor_recommend_merge(ticket)
                 else:
                     self.human_publish(ticket, worktree)
@@ -3250,6 +3282,11 @@ def parser():
         action="store_true",
         help="explicitly delegate exact-revision merge in the Autonomous Demo profile",
     )
+    run_p.add_argument(
+        "--release-smoke-review",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     status = sub.add_parser("status"); status.add_argument("--repo", default=".")
     monitor_p = sub.add_parser(
         "monitor", help="inspect delivery health without repairing product code",
@@ -3294,11 +3331,20 @@ def parser():
         help="explicitly delegate exact-revision merge in the Autonomous Demo profile",
     )
     review = sub.add_parser("review", help="open a human review gate for a planning run")
-    review.add_argument("kind", choices=["product", "alignment"]); review.add_argument("plan")
+    review.add_argument(
+        "kind", choices=["product", "architecture", "program", "alignment"],
+    ); review.add_argument("plan")
     review.add_argument("--repo", default=".")
     approve_product_p = sub.add_parser("approve-product", help="approve product behavior and scope")
     approve_product_p.add_argument("plan"); approve_product_p.add_argument("--repo", default=".")
     approve_product_p.add_argument("--yes", action="store_true")
+    approve_stage_p = sub.add_parser(
+        "approve-stage",
+        help="approve a Charter-selected architecture or program-design artifact",
+    )
+    approve_stage_p.add_argument("stage", choices=["architecture", "program"])
+    approve_stage_p.add_argument("plan"); approve_stage_p.add_argument("--repo", default=".")
+    approve_stage_p.add_argument("--yes", action="store_true")
     continue_p = sub.add_parser("continue-plan", help="run architecture, program design, and vertical-slice experts")
     continue_p.add_argument("plan"); continue_p.add_argument("--repo", default=".")
     continue_p.add_argument(
@@ -3486,6 +3532,8 @@ def main():
             review_plan(repo, args.kind, args.plan)
         elif args.command == "approve-product":
             approve_product(repo, args.plan, args.yes)
+        elif args.command == "approve-stage":
+            approve_planning_stage(repo, args.plan, args.stage, args.yes)
         elif args.command == "continue-plan":
             run_dir = resolve_run(repo, args.plan)
             planning_agent = args.planning_agent or load_manifest(run_dir).get("planning_agent", "codex")

@@ -164,7 +164,8 @@ Profiles are executable role topologies, not presentation labels:
 - **Assured** adds cleanup, architecture conformance, hardening, and a read-only
   final verifier before independent code review and the same human merge gate.
 - **Autonomous Demo** keeps the end-to-end automated merge demonstration. It is
-  workshop-only and requires a fresh, visible opt-in for every run.
+  workshop-only and requires a fresh, visible opt-in for every run. A Charter
+  `requires_human_approval` path still requires a human merge.
 
 Agent Role contracts are versioned in `roles.json`; ownership, exclusions,
 verification responsibility, and receipt requirements remain stable when an
@@ -271,6 +272,19 @@ Approval launches nothing. Continue explicitly to run **System Architecture**,
 ./factory/factory continue-plan PLAN_ID
 ./factory/factory review alignment PLAN_ID
 ```
+
+If the approved Charter also names `system_architecture` or `program_design` in
+`policy.planning_approvals`, `continue-plan` pauses after that expert. Use the
+Control Center approval, or review and approve the exact artifact from the CLI:
+
+```sh
+./factory/factory review architecture PLAN_ID
+./factory/factory approve-stage architecture PLAN_ID
+./factory/factory continue-plan PLAN_ID
+```
+
+Vertical Slice file ownership can strengthen these gates automatically when it
+intersects a Charter load-bearing or human-approval path.
 
 The run lives at `.factory/plans/PLAN_ID/` and contains:
 
@@ -544,6 +558,9 @@ Before a public/template release, freeze a clean tree and run:
 
 ```sh
 ./factory/factory --version
+python3 -m unittest discover -s factory/tests
+npm --prefix workshop-guide test
+npm --prefix workshop-guide run lint
 ./factory/factory release-check
 ./factory/factory release-check --rehearsal
 ```
@@ -553,9 +570,10 @@ credentials, obsolete participant-facing language, and a clean worktree. The
 `--rehearsal` check clones committed HEAD and executes the complete Standard
 planning, approval, execution-role, and retry path. Maintainers can additionally
 validate GitHub Issue, Project, PR, merge, and dashboard synchronization from a
-disposable repository. This opt-in check runs the Claude Standard path, creates
-a fresh Project, approves independent Acceptance Tests, merges one Ticket, and
-verifies its Evidence Packet links:
+disposable repository. This opt-in check runs Claude planning and delivery with
+a deterministic review adapter, creates a fresh Project, approves independent
+Acceptance Tests, returns one review comment to the same implementation branch,
+merges the repaired Ticket, and verifies its Evidence Packet links:
 
 ```sh
 ./factory/factory release-check --live-smoke \
@@ -566,7 +584,7 @@ verifies its Evidence Packet links:
 
 ```text
 factory configure [--preset claude-workshop|codex-workshop]
-                  [--profile lean|standard|assured]
+                  [--profile lean|standard|assured|autonomous-demo]
                   [--agent NAME] [--qa-agent NAME]
                   [--planning-agent claude|codex]
                   [--review-qa-tests|--no-review-qa-tests]
@@ -575,17 +593,19 @@ factory control-center [--port N] [--no-open]
 factory init [--repo PATH] [--name NAME] [--force]
 factory prepare [--repo PATH] [--yes]
 factory seed [recipe-rebrand|tv] [--github-repo OWNER/REPOSITORY] [--agent NAME]
-factory run [--repo PATH] [--profile lean|standard|assured]
-            [--agent NAME] [--qa-agent NAME]
+factory run [--repo PATH] [--profile lean|standard|assured|autonomous-demo]
+            [--agent NAME] [--qa-agent NAME] [--supervisor-agent NAME]
+            [--review-agent NAME] [--allow-autonomous-merge]
             [--review-qa-tests|--no-review-qa-tests] [--scenario tv|recipe-rebrand]
             [--max-parallel N]
             [--project-number N] [--once] [--dry-run] [--mock]
 factory plan PRD.md [--output RUN_DIRECTORY] [--default-agent NAME]
-                    [--profile lean|standard|assured]
+                    [--profile lean|standard|assured|autonomous-demo]
                     [--planning-agent claude|codex]
                     [--min-tickets N] [--max-tickets N] [--mock]
-factory review product|alignment PLAN_ID
+factory review product|architecture|program|alignment PLAN_ID
 factory approve-product PLAN_ID [--yes]
+factory approve-stage architecture|program PLAN_ID [--yes]
 factory continue-plan PLAN_ID [--mock]
 factory revise PLAN_ID product|architecture|program|slices
                (--feedback TEXT|--feedback-file PATH) [--mock]

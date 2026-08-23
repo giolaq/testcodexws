@@ -90,6 +90,28 @@ Review the Charter separately, then bind approval to its exact policy hash:
 Any policy edit invalidates that approval. Planning and execution fail closed
 until a person approves the new exact hash.
 
+Product Review and alignment must remain in `policy.planning_approvals`. Add
+intermediate gates when the consequence or architecture warrants them:
+
+```toml
+[policy]
+planning_approvals = [
+  "product_review",
+  "system_architecture",
+  "program_design",
+  "alignment",
+]
+```
+
+With this policy, `continue-plan` pauses after each selected expert. Approve the
+exact artifact in the Control Center, or use `factory approve-stage architecture
+PLAN_ID` and `factory approve-stage program PLAN_ID`. Editing an approved
+artifact or an upstream input clears affected approvals. After Vertical Slices
+declare file ownership, the execution path classifier adds both intermediate
+approvals for a load-bearing path, or System Architecture approval for a
+`requires_human_approval` path. An incompatible Lean plan fails with an
+instruction to replan as Standard or Assured.
+
 ```toml
 schema_version = 1
 
@@ -260,7 +282,10 @@ review and does not run the Code Review Agent.
 with `merge_authority = "supervisor"` and the transient
 `--allow-autonomous-merge` flag on both planning and execution. The Control
 Center shows the same warning and never saves the opt-in. Only that profile lets
-the orchestrator execute a validated Supervisor merge recommendation.
+the orchestrator execute a validated Supervisor merge recommendation. A
+Charter path classified as `requires_human_approval` still stops at the human
+exact-revision merge gate; the narrower path rule overrides the profile and is
+preserved in the remote run summary for fresh-checkout recovery.
 
 ## Register your own agent
 

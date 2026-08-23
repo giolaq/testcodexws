@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 import subprocess
 
@@ -68,6 +69,37 @@ class FactoryCharterTests(unittest.TestCase):
             self.assertEqual(charter.editable_paths, ProjectContract.detect(repo).source_roots)
             self.assertTrue(charter.requires_human_approval)
             self.assertTrue(charter.stop_conditions)
+
+    def test_charter_cannot_remove_product_and_alignment_accountability_gates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            path = FactoryCharter.draft(repo, ProjectContract.detect(repo)).write()
+            path.write_text(path.read_text().replace(
+                'planning_approvals = ["product_review", "alignment"]',
+                'planning_approvals = ["system_architecture"]',
+            ))
+
+            with self.assertRaisesRegex(
+                FactoryCharterError, "must include product_review and alignment",
+            ):
+                FactoryCharter.load(repo)
+
+    def test_profile_cannot_omit_a_charter_required_planning_stage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            charter = replace(
+                FactoryCharter.draft(repo, ProjectContract.detect(repo)),
+                planning_approvals=(
+                    "product_review", "system_architecture", "alignment",
+                ),
+            )
+            charter.write()
+            charter = charter.approve()
+
+            with self.assertRaisesRegex(
+                FactoryCharterError, "Lean does not run.*system_architecture",
+            ):
+                charter.governance("lean")
 
     def test_planning_fails_closed_until_the_exact_charter_is_approved(self):
         with tempfile.TemporaryDirectory() as directory:

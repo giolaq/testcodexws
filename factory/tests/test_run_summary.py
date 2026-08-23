@@ -32,6 +32,8 @@ class RunSummaryTests(unittest.TestCase):
             "triage": {"result": "READY_TO_IMPLEMENT", "controls": {"risk": "shared", "gate_level": "full"}},
             "metrics": {"agent_seconds": 2.5, "gate_seconds": 1.2, "human_wait_seconds": 3, "retry_count": 1, "verifier_rejections": 1},
             "remote_claim": {"owner_run_id": "run-123", "claimed_at": "2026-08-23T12:00:00+00:00"},
+            "merge_authority": "human",
+            "policy_required_human_merge": True,
         }
 
         summary = factory_run_summary(state, ticket)
@@ -48,6 +50,8 @@ class RunSummaryTests(unittest.TestCase):
         self.assertEqual(summary["input_hashes"]["charter"], "c" * 64)
         self.assertEqual(summary["input_hashes"]["base_revision"], "a" * 40)
         self.assertEqual(summary["unresolved_risks"], ["local log contained [REDACTED]"])
+        self.assertTrue(summary["human_decisions"]["policy_required_human_merge"])
+        self.assertEqual(summary["human_decisions"]["effective_merge_authority"], "human")
 
     def test_rendered_summary_can_be_validated_and_recovered_from_a_comment(self):
         payload = {

@@ -310,7 +310,9 @@ to:
 - select a path and verify its prerequisites;
 - reach every checkpoint using the Control Center, with equivalent commands available;
 - find the ticket board, ticket evidence, and troubleshooting section;
-- explain the two human planning approvals and the Acceptance Test approval;
+- explain the required Product Review and alignment approvals, any
+  Charter-selected intermediate planning approvals, and the Acceptance Test
+  approval;
 - explain one dependency unlock;
 - complete and peer review a Factory Canvas;
 - export a sanitized Evidence Packet; and
@@ -323,15 +325,21 @@ release audit. The day before delivery:
 
 ```sh
 ./factory/factory --version
+python3 -m unittest discover -s factory/tests
+npm --prefix workshop-guide test
+npm --prefix workshop-guide run lint
 ./factory/factory release-check
 ./factory/factory release-check --rehearsal
 ```
 
-The rehearsal release check executes the complete Standard journey in a clean
-clone. Run the full Python and website suites, a participant-link check, and
-deployed website verification separately. In a dedicated disposable GitHub
-repository with Claude authenticated, also run the golden-path smoke below. It
-creates a fresh Project and merges one planned Ticket:
+The website suite includes structural accessibility checks; the release audit
+checks participant links and possible secrets. The rehearsal release check
+executes the complete Standard journey in a clean clone. Verify the deployed
+website separately. In a dedicated disposable GitHub repository with Claude
+authenticated, also run the golden-path smoke below. It creates a fresh
+Project, uses Claude for planning, QA, implementation, and supervision,
+deterministically sends one Code Review comment back to the same PR, and merges
+the repaired Ticket:
 
 ```sh
 ./factory/factory release-check --live-smoke \

@@ -48,6 +48,8 @@ SCENARIOS = {"recipe-rebrand", "tv"}
 DEFAULT_AGENTS = {"claude", "codex", "cursor", "mock", "mock-qa", "mock-supervisor", "mock-review"}
 RETRYABLE_PLANNING_STATUSES = {
     "product_approved",
+    "system_architecture_approved",
+    "program_design_approved",
     "blocked",
     "stale_alignment",
     "planning_system_architecture",
@@ -56,6 +58,7 @@ RETRYABLE_PLANNING_STATUSES = {
 }
 REPLAN_REQUIRED_STATUSES = {
     "stale_factory_charter",
+    "stale_factory_profile",
     "stale_project_contract",
     "stale_product_review",
 }
@@ -70,7 +73,7 @@ MAX_ARTIFACT = 512_000
 ACTION_REGISTRY = frozenset({
     "doctor", "init-project", "approve-charter", "publish-setup", "prepare-project",
     "configure", "plan", "restart-plan", "revise-product", "revise-stage",
-    "approve-product", "continue-plan", "publish-plan", "approve-tests", "merge",
+    "approve-product", "approve-stage", "continue-plan", "publish-plan", "approve-tests", "merge",
     "run", "run-once", "dry-run", "retry", "release-claim", "evidence",
     "monitor", "publish-monitor", "reset-run", "reset-all",
 })
@@ -597,6 +600,24 @@ class ControlCenter:
                 headline = "The delivery plan needs your approval"
                 detail = "Architecture, program design, and vertical slices are complete. No ticket is created until you approve alignment."
                 next_label, next_detail, next_view = "Review alignment", "Trace requirements through the four expert artifacts.", "planning"
+            elif planning.get("status") in {
+                "awaiting_system_architecture_approval",
+                "awaiting_program_design_approval",
+            }:
+                phase_index = 2
+                state = "attention"
+                architecture = planning.get("status") == "awaiting_system_architecture_approval"
+                title = "System Architecture" if architecture else "Program Design"
+                headline = f"{title} needs your approval"
+                detail = (
+                    "The Factory Charter requires a person to approve this exact expert artifact "
+                    "before downstream planning can continue."
+                )
+                next_label, next_detail, next_view = (
+                    f"Review {title}",
+                    "Inspect the artifact, then approve its exact hash or request a revision.",
+                    "planning",
+                )
             else:
                 phase_index = 2
                 headline = "Technical planning is ready to run"
@@ -808,6 +829,7 @@ class ControlCenter:
         if requires_replan:
             planning["replan_reason"] = {
                 "stale_factory_charter": "The approved Factory Charter changed or this run predates Charter governance.",
+                "stale_factory_profile": planning.get("planning_control_error", "The proposed paths require a stronger Factory Profile."),
                 "stale_project_contract": "The Project Contract or detected repository inventory changed.",
                 "stale_product_review": "The PRD copy changed after Product Review.",
             }.get(planning_status, "Planning inputs changed.")
@@ -820,6 +842,11 @@ class ControlCenter:
             else f"Enter a correction for {failed_stage.get('title', 'expert')}" if requires_correction
             else "Open recovery options" if failed_stage
             else "Run remaining experts" if planning_status == "product_approved"
+            else "Run remaining experts" if planning_status in {
+                "system_architecture_approved", "program_design_approved",
+            }
+            else "Review System Architecture" if planning_status == "awaiting_system_architecture_approval"
+            else "Review Program Design" if planning_status == "awaiting_program_design_approval"
             else "Review Product Review" if planning_status == "awaiting_product_approval"
             else "Review alignment" if planning_status == "awaiting_alignment_approval"
             else "Planning complete" if planning_status in {"alignment_approved", "published"}
@@ -1093,6 +1120,19 @@ class ControlCenter:
             return f"Resolve {title} decisions", [revise, resume]
         if action == "approve-product":
             return "Approve product intent", [base + ["approve-product", self._plan_id(payload), "--yes"]]
+        if action == "approve-stage":
+            plan = self._plan_id(payload)
+            stage = self._string(payload, "stage", required=True)
+            aliases = {
+                "system_architecture": ("architecture", "System Architecture"),
+                "program_design": ("program", "Program Design"),
+            }
+            if stage not in aliases:
+                raise InputError("Planning stage approval must be architecture or program.")
+            alias, title = aliases[stage]
+            return f"Approve {title}", [
+                base + ["approve-stage", alias, plan, "--yes"],
+            ]
         if action == "continue-plan":
             plan = self._plan_id(payload)
             command = base + ["continue-plan", plan]

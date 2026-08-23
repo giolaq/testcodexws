@@ -221,6 +221,33 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(recovered["qa_approved"])
         self.assertEqual(recovered["next_human_action"], "merge_exact_revision")
 
+    def test_fresh_checkout_preserves_path_required_human_merge(self):
+        approved = "d" * 40
+        summary = {
+            "schema_version": 1,
+            "run_id": "remote-run",
+            "ticket": 7,
+            "status": "In Review",
+            "governance": {"merge_authority": "supervisor"},
+            "revisions": {"approved_head": approved},
+            "verdicts": {"code_review": "APPROVE"},
+            "human_decisions": {
+                "policy_required_human_merge": True,
+                "effective_merge_authority": "human",
+            },
+        }
+        raw = {
+            "status": "In Review",
+            "pull_request": {
+                "state": "OPEN", "headRefOid": approved,
+            },
+        }
+
+        recovered = recover_remote_ticket_state(raw, summary)
+
+        self.assertEqual(recovered["merge_authority"], "human")
+        self.assertTrue(recovered["policy_required_human_merge"])
+
     def test_fresh_checkout_blocks_when_pr_head_no_longer_matches_remote_approval(self):
         summary = {
             "schema_version": 1, "run_id": "remote-run", "ticket": 7,
@@ -931,6 +958,35 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(completed["merge_executed_by"], "supervisor")
             self.assertTrue(state["governance"]["explicit_autonomy"])
             self.assertEqual(receipts[-1]["role"], "supervisor_merge")
+
+    def test_charter_review_path_keeps_human_merge_in_autonomous_demo(self):
+        factory = Factory.__new__(Factory)
+        factory.profile = {"merge_authority": "supervisor"}
+
+        self.assertEqual(
+            factory.effective_merge_authority({
+                "triage": {"controls": {"requires_human_approval": True}},
+            }),
+            "human",
+        )
+        self.assertEqual(
+            factory.effective_merge_authority({
+                "triage": {"controls": {"requires_human_approval": False}},
+            }),
+            "supervisor",
+        )
+
+    def test_live_deterministic_reviewer_requires_release_marker(self):
+        factory = Factory.__new__(Factory)
+        factory.review_agent = "mock-review"
+        factory.args = SimpleNamespace(mock=False, release_smoke_review=True)
+
+        failure = factory.run_code_review(
+            {"body": "ordinary Ticket"}, Path("/unused"), "a" * 40,
+            "https://github.test/pull/1",
+        )
+
+        self.assertIn("restricted to the marked disposable release smoke", failure)
 
     def test_lean_and_assured_profiles_execute_complete_role_and_gate_sequences(self):
         expected_roles = {
