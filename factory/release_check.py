@@ -429,6 +429,7 @@ It returns JSON with exactly `status: ready` and does not change existing routes
 
 ## Scope
 Implement and test only this endpoint. Keep the change offline and deterministic.
+Human approval for this disposable smoke explicitly covers adding the Acceptance Test under `demo-app/tests/`.
 
 ## Success evidence
 An independent Acceptance Test proves the status code, JSON payload, and an existing route regression.

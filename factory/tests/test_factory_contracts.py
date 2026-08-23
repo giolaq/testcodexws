@@ -4,13 +4,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 
 FACTORY = Path(__file__).parents[1] / "orchestrator.py"
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from factory_contracts import handoff_receipt, validate_handoff_receipt
-from release_check import audit_release, validate_standard_rehearsal
+from release_check import audit_release, run_live_github_smoke, validate_standard_rehearsal
 
 
 class FactoryContractTests(unittest.TestCase):
@@ -191,6 +192,38 @@ class FactoryContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("--confirm-disposable-repo", result.stdout)
+
+    def test_live_smoke_brief_records_protected_acceptance_test_approval(self):
+        class StopAfterProductReview(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / ".factory/plans").mkdir(parents=True)
+            backend = Mock(owner="giolaq", name="test1")
+
+            def checked(command, cwd, timeout=180):
+                if "plan" in command:
+                    (repo / ".factory/plans/latest.json").write_text(json.dumps({
+                        "plan_id": "live-plan",
+                    }))
+                if command[-3:] == ["review", "product", "live-plan"]:
+                    brief = next((repo / ".factory").glob("live-smoke-*.md")).read_text()
+                    self.assertIn(
+                        "Human approval for this disposable smoke explicitly covers adding "
+                        "the Acceptance Test under `demo-app/tests/`.",
+                        brief,
+                    )
+                    raise StopAfterProductReview
+                return ""
+
+            with (
+                patch("github_backend.GitHubBackend", return_value=backend),
+                patch("release_check.shutil.which", return_value="/usr/bin/gh"),
+                patch("release_check._checked", side_effect=checked),
+                self.assertRaises(StopAfterProductReview),
+            ):
+                run_live_github_smoke(repo, True)
 
     def test_profiles_command_exposes_executable_role_topologies(self):
         result = subprocess.run(
