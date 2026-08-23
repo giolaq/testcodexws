@@ -108,9 +108,10 @@ exact artifact in the Control Center, or use `factory approve-stage architecture
 PLAN_ID` and `factory approve-stage program PLAN_ID`. Editing an approved
 artifact or an upstream input clears affected approvals. After Vertical Slices
 declare file ownership, the execution path classifier adds both intermediate
-approvals for a load-bearing path, or System Architecture approval for a
-`requires_human_approval` path. An incompatible Lean plan fails with an
-instruction to replan as Standard or Assured.
+approvals for a load-bearing path. An incompatible Lean plan fails with an
+instruction to replan as Standard or Assured. A `requires_human_approval` path
+instead strengthens the Ticket's final merge boundary without making the normal
+Standard planning path longer.
 
 ```toml
 schema_version = 1

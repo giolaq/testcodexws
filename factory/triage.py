@@ -57,8 +57,6 @@ def classify_controls(charter, paths: list[str]) -> dict:
         for stage in ("system_architecture", "program_design"):
             if stage not in planning_approvals:
                 planning_approvals.insert(-1, stage)
-    elif human_approval and "system_architecture" not in planning_approvals:
-        planning_approvals.insert(-1, "system_architecture")
     return {
         "risk": risk,
         "gate_level": selected,

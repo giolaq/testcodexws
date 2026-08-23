@@ -105,9 +105,10 @@ before a human accepts the whole package.
 
 Vertical Slices also feed declared file ownership through the Charter path
 classifier. A load-bearing slice selects both intermediate approvals; a slice
-in `requires_human_approval` selects System Architecture approval. The selected
-risk, paths, gate level, and approvals are stored as `planning_controls` in the
-manifest and shown in the Control Center.
+in `requires_human_approval` keeps the human merge boundary but does not add an
+intermediate planning gate. The selected risk, paths, gate level, and approvals
+are stored as `planning_controls` in the manifest and shown in the Control
+Center.
 
 For a credential-free rehearsal, add `--mock` to `plan` and `continue-plan`.
 The bundled TableStory artifacts follow the same schemas, validators, manifest,

@@ -283,8 +283,8 @@ Control Center approval, or review and approve the exact artifact from the CLI:
 ./factory/factory continue-plan PLAN_ID
 ```
 
-Vertical Slice file ownership can strengthen these gates automatically when it
-intersects a Charter load-bearing or human-approval path.
+Vertical Slice file ownership strengthens these gates automatically when it
+intersects a Charter load-bearing path.
 
 The run lives at `.factory/plans/PLAN_ID/` and contains:
 
