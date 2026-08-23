@@ -15,7 +15,7 @@ parser.add_argument("--attempt", type=int, default=1)
 args = parser.parse_args()
 
 assignment = Path(args.prompt).read_text()
-demonstrate_comments = "Add the recipe data model and API" in assignment
+demonstrate_comments = "demo-app/recipe_api.py" in assignment
 if args.ticket == 1 and args.attempt == 1 and demonstrate_comments:
     result = {
         "schema_version": 2,

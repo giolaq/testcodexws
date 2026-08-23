@@ -824,7 +824,7 @@ class RuntimeTests(unittest.TestCase):
             subprocess.run(["tar", "-xf", str(baseline_archive), "-C", str(repo)], check=True)
             ticket = {
                 "number": 1,
-                "title": "Add the recipe data model and API",
+                "title": "Deliver searchable recipe data and API contracts",
                 "labels": ["agent-ready"],
                 "mock_action": "recipe-api",
                 "body": (
