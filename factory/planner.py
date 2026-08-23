@@ -266,17 +266,19 @@ def approve_plan(
         issue_urls[numbers[key]] = issue_url
         created.add(numbers[key])
         print(f"Created #{numbers[key]}: {ticket['title']}")
+    added_to_project = set()
     for key in order:  # apply any human edits and final dependency numbers
         ticket = by_key[key]
         backend.gh(
             "issue", "edit", numbers[key], "--repo", repository, "--title", ticket["title"],
             "--body", issue_body(ticket, numbers, plan["plan_id"], governance), "--add-label", "agent-ready",
         )
-        backend.add_issue_to_project(numbers[key], issue_urls[numbers[key]])
+        if backend.add_issue_to_project(numbers[key], issue_urls[numbers[key]]):
+            added_to_project.add(numbers[key])
     remote = {ticket["number"]: ticket for ticket in backend.load()}
     for key in order:
         number = numbers[key]
-        if number in created:
+        if number in created or number in added_to_project:
             status = "Backlog" if by_key[key]["dependencies"] else "Ready"
             backend.set_status(remote[number], status, "Approved ticket plan")
     project = backend.json("project", "view", backend.project_number, "--owner", backend.owner, "--format", "json")

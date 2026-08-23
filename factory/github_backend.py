@@ -326,7 +326,7 @@ class GitHubBackend:
         self._project_items_loaded = True
         return raw_items
 
-    def add_issue_to_project(self, number: int, url: str) -> None:
+    def add_issue_to_project(self, number: int, url: str) -> bool:
         """Add one explicitly approved Ticket without importing repository backlog."""
         if self.project_id is None:
             self.ensure_project()
@@ -334,12 +334,13 @@ class GitHubBackend:
             self._load_project_items()
         number = int(number)
         if number in self.items:
-            return
+            return False
         item = self.json(
             "project", "item-add", self.project_number, "--owner", self.owner,
             "--url", url, "--format", "json",
         )
         self.items[number] = item["id"]
+        return True
 
     def _ensure_labels(self):
         for status in STATES:

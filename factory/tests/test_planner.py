@@ -113,6 +113,7 @@ class PlannerTests(unittest.TestCase):
                 self.project_number = project_number
                 self.created = []
                 self.added = []
+                self.status_updates = []
 
             def preflight(self):
                 return None
@@ -121,30 +122,33 @@ class PlannerTests(unittest.TestCase):
                 if args[:2] == ("project", "create"):
                     return {"number": 12}
                 if args[:2] == ("issue", "list"):
-                    return []
+                    return [{
+                        "number": 41,
+                        "url": "https://github.test/giolaq/test1/issues/41",
+                        "body": "<!-- factory-plan:abc123:T1 -->",
+                    }]
                 if args[:2] == ("project", "view"):
                     return {"url": "https://github.test/users/giolaq/projects/12"}
                 raise AssertionError(f"unexpected GitHub JSON call: {args}")
 
             def gh(self, *args):
                 if args[:2] == ("issue", "create"):
-                    number = 40 + len(self.created) + 1
-                    url = f"https://github.test/giolaq/test1/issues/{number}"
-                    self.created.append((number, url))
-                    return subprocess.CompletedProcess(args, 0, url + "\n", "")
+                    raise AssertionError("the approved existing issue must be reused")
                 return subprocess.CompletedProcess(args, 0, "", "")
 
             def add_issue_to_project(self, number, url):
                 self.added.append((number, url))
+                return True
 
             def load(self):
                 return [
                     {"number": number, "labels": ["agent-ready"]}
-                    for number, _ in self.created
+                    for number, _ in self.added
                 ]
 
             def set_status(self, ticket, status, note):
                 ticket["status"] = status
+                self.status_updates.append((ticket["number"], status))
 
         plan = sample_plan()
         plan["tickets"] = plan["tickets"][:1]
@@ -159,7 +163,10 @@ class PlannerTests(unittest.TestCase):
                 )
 
         backend = RecordingBackend.instance
-        self.assertEqual(backend.added, backend.created)
+        self.assertEqual(backend.added, [
+            (41, "https://github.test/giolaq/test1/issues/41"),
+        ])
+        self.assertEqual(backend.status_updates, [(41, "Ready")])
 
 
 if __name__ == "__main__":
