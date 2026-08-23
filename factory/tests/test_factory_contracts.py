@@ -214,6 +214,11 @@ class FactoryContractTests(unittest.TestCase):
                         "the Acceptance Test under `demo-app/tests/`.",
                         brief,
                     )
+                    self.assertIn(
+                        "The endpoint remains in the disposable repository after merge; "
+                        "cleanup or removal is outside this smoke run.",
+                        brief,
+                    )
                     raise StopAfterProductReview
                 return ""
 
