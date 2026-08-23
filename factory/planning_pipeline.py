@@ -714,6 +714,8 @@ def write_dashboard_state(repo: Path, run_dir: Path, manifest: dict):
             "error": record.get("error", ""),
             "validation_error": record.get("validation_error", ""),
             "rejected_artifact": record.get("rejected_artifact", ""),
+            "failure_count": record.get("failure_count", 0),
+            "same_failure_count": record.get("same_failure_count", 0),
         })
     state = {
         "plan_id": manifest["plan_id"],
@@ -923,6 +925,15 @@ def _run_stage_agent_impl(
             stage, value, inputs, manifest.get("profile", "standard"),
             ProjectContract.load(repo),
         )
+        if stage == "vertical_slices":
+            count = len(value["tickets"])
+            minimum = manifest["ticket_limits"]["minimum"]
+            maximum = manifest["ticket_limits"]["maximum"]
+            if not minimum <= count <= maximum:
+                raise ValueError(
+                    f"vertical slices expert returned {count} tickets; "
+                    f"expected {minimum}-{maximum}"
+                )
     except ValueError as exc:
         failure_number = int(stage_record.get("failure_count", 0)) + 1
         rejected_path = run_dir / "rejected" / f"{stage}-attempt-{failure_number}.json"
@@ -936,12 +947,6 @@ def _run_stage_agent_impl(
         })
         append_log(log, f"Deterministic validation failed: {message}")
         raise
-    if stage == "vertical_slices":
-        count = len(value["tickets"])
-        minimum = manifest["ticket_limits"]["minimum"]
-        maximum = manifest["ticket_limits"]["maximum"]
-        if not minimum <= count <= maximum:
-            raise ValueError(f"vertical slices expert returned {count} tickets; expected {minimum}-{maximum}")
     write_json(json_path, value)
     _, markdown_path = _stage_paths(run_dir, stage)
     markdown_path.write_text(_render_stage(stage, value, manifest["plan_id"], json_path))
@@ -1009,6 +1014,18 @@ def _run_stage_agent(
                 else "internal"
             )
         record["error"] = redact_credentials(str(exc))[:2000]
+        history = record.setdefault("failure_history", [])
+        history.append({
+            "at": now(),
+            "kind": record["failure_kind"],
+            "error": record["error"],
+        })
+        del history[:-10]
+        record["same_failure_count"] = sum(
+            1 for failure in history
+            if failure.get("kind") == record["failure_kind"]
+            and failure.get("error") == record["error"]
+        )
         attempt = len(manifest.get("revisions", [])) + 1 if feedback else 1
         suffix = f"-revision-{attempt}" if feedback else ""
         prompt_path = repo / ".factory/prompts" / f"planner-{manifest['plan_id']}-{stage}{suffix}.md"

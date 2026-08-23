@@ -216,6 +216,40 @@ class PlanningPipelineTests(unittest.TestCase):
         self.assertEqual(completed["status"], "awaiting_alignment_approval")
         self.assertEqual(completed["stages"]["vertical_slices"]["status"], "complete")
 
+    def test_ticket_count_failure_preserves_rejected_artifact_for_correction(self):
+        product = json.loads((FIXTURES / "01-product-review.json").read_text())
+        architecture = json.loads((FIXTURES / "02-system-architecture.json").read_text())
+        program = json.loads((FIXTURES / "03-program-design.json").read_text())
+        too_short = json.loads((FIXTURES / "04-vertical-slices.json").read_text())
+        too_short["tickets"] = too_short["tickets"][:1]
+        success = subprocess.CompletedProcess(["claude"], 0, "", "")
+
+        with patch("planning_pipeline._validate_stage"):
+            with patch(
+                "planning_pipeline._run_claude_agent",
+                side_effect=[
+                    (success, product),
+                    (success, architecture),
+                    (success, program),
+                    (success, too_short),
+                ],
+            ):
+                run = plan_prd(
+                    self.repo, self.prd, None, "codex", 3, 12,
+                    "claude", "claude", mock=False,
+                )
+                approve_product(self.repo, run.name, assume_yes=True)
+
+                with self.assertRaisesRegex(ValueError, "returned 1 tickets; expected 3-12"):
+                    continue_plan(self.repo, run.name, "claude")
+
+        stage = load_manifest(run)["stages"]["vertical_slices"]
+        self.assertEqual(stage["failure_kind"], "validation")
+        self.assertEqual(stage["validation_error"], "vertical slices expert returned 1 tickets; expected 3-12")
+        rejected = self.repo / stage["rejected_artifact"]
+        self.assertTrue(rejected.is_file())
+        self.assertEqual(len(json.loads(rejected.read_text())["tickets"]), 1)
+
     def test_operator_can_revise_a_rejected_artifact_when_retry_repeats_the_error(self):
         product = json.loads((FIXTURES / "01-product-review.json").read_text())
         architecture = json.loads((FIXTURES / "02-system-architecture.json").read_text())

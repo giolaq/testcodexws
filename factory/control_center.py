@@ -134,10 +134,18 @@ def planning_recovery(stage: dict | None, current_agent: str, adapters: list[str
         name for name in adapters
         if name in PLANNING_AGENTS and name != current_agent
     ]
+    attempts = max(1, int(stage.get("failure_count") or 0))
+    same_failure_count = max(
+        1,
+        int(stage.get("same_failure_count") or 0),
+        attempts if not stage.get("same_failure_count") else 0,
+    )
+    recommended_adapter = alternatives[0] if alternatives else ""
     if stage.get("failure_kind") == "validation":
         kind = "validation"
         summary = "The artifact must be corrected before planning can continue."
         retry_same = False
+        recommended_action = "correct_and_retry"
     elif any(marker in normalized for marker in (
         "session limit", "rate limit", "usage limit", "quota exceeded",
         "too many requests", "capacity",
@@ -148,6 +156,7 @@ def planning_recovery(stage: dict | None, current_agent: str, adapters: list[str
             "Retrying the same adapter now will repeat this failure."
         )
         retry_same = False
+        recommended_action = "switch_adapter" if recommended_adapter else "wait"
     elif any(marker in normalized for marker in (
         "not logged in", "login required", "authentication", "unauthorized",
         "invalid api key", "missing openai api key", "api key",
@@ -155,22 +164,38 @@ def planning_recovery(stage: dict | None, current_agent: str, adapters: list[str
         kind = "authentication"
         summary = "Repair the adapter login, then run preflight before retrying."
         retry_same = False
+        recommended_action = "preflight"
     elif any(marker in normalized for marker in (
         "command not found", "no such file", "executable not found",
     )):
         kind = "adapter_setup"
         summary = "Install or configure the planning adapter, then run preflight."
         retry_same = False
+        recommended_action = "preflight"
+    elif same_failure_count >= 2:
+        kind = "repeated_agent_failure"
+        summary = (
+            f"{current_agent.title() or 'The planning adapter'} failed "
+            f"{same_failure_count} times with the same error. "
+            "Same-agent retry is disabled; switch adapter and continue from the saved artifacts."
+        )
+        retry_same = False
+        recommended_action = "switch_adapter" if recommended_adapter else "inspect_log"
     else:
         kind = "agent_process"
         summary = "The agent process failed unexpectedly. Inspect the log, then retry explicitly."
         retry_same = True
+        recommended_action = "retry_same_adapter"
     return {
         "kind": kind,
         "summary": summary,
         "retry_same_adapter": retry_same,
         "alternative_adapters": alternatives,
         "current_adapter": current_agent,
+        "recommended_action": recommended_action,
+        "recommended_adapter": recommended_adapter,
+        "attempts": attempts,
+        "same_failure_count": same_failure_count,
     }
 
 

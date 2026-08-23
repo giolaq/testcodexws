@@ -279,7 +279,7 @@ approval needs a distinct reviewer identity supplied through the uncommitted
 | --- | --- |
 | GitHub, Wi-Fi, or a model is slow | Switch to the deterministic recipe scenario. |
 | Product Review is blocked | Resolve the blocking question; don't continue to architecture. |
-| A planning retry repeats the same error | Read the failed expert's recovery card. For validation, use the prefilled **Apply correction and continue** instruction. For a session or rate limit, switch adapters or wait; the Control Center disables same-adapter retry. If governance changed, use **Restart planning safely**. |
+| A planning retry repeats the same error | Read the failed expert's recovery card. For validation, use the prefilled **Apply correction and continue** instruction. For a session or rate limit, select **Fix with Codex** (or another configured adapter). After the same process failure occurs twice, the Control Center disables same-agent retry and preserves completed upstream artifacts. If governance changed, use **Restart planning safely**. |
 | QA Review takes too long | Review one test set, then finish without `--review-qa-tests`. |
 | A ticket is blocked | Inspect the final log and gate output before using `factory retry`. |
 | A port is occupied | Stop the old process or use a fresh checkout. |

@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from control_center import ControlCenter, ControlCenterServer, InputError
+from control_center import ControlCenter, ControlCenterServer, InputError, planning_recovery
 from factory_charter import FactoryCharter
 from orchestrator import parser
 from project_contract import ProjectContract
@@ -708,6 +708,26 @@ class ControlCenterTests(unittest.TestCase):
             self.assertTrue(snapshot["planning"]["recovery"]["retry_same_adapter"])
             self.assertEqual(snapshot["planning"]["continue_label"], "Open recovery options")
 
+    def test_repeated_agent_failure_stops_blind_retry_and_recommends_a_switch(self):
+        recovery = planning_recovery(
+            {
+                "id": "system_architecture",
+                "status": "blocked",
+                "failure_kind": "agent",
+                "failure_count": 2,
+                "error": "The agent process exited unexpectedly.",
+            },
+            "claude",
+            ["claude", "codex"],
+        )
+
+        self.assertEqual(recovery["kind"], "repeated_agent_failure")
+        self.assertEqual(recovery["recommended_action"], "switch_adapter")
+        self.assertEqual(recovery["recommended_adapter"], "codex")
+        self.assertEqual(recovery["attempts"], 2)
+        self.assertFalse(recovery["retry_same_adapter"])
+        self.assertIn("failed 2 times", recovery["summary"])
+
     def test_stale_governance_requires_a_control_center_replan_instead_of_retry(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))
@@ -922,6 +942,8 @@ class ControlCenterTests(unittest.TestCase):
         self.assertIn('id="planning-recovery-feedback"', javascript)
         self.assertIn("Apply correction and continue", javascript)
         self.assertIn("Switch adapter and continue", javascript)
+        self.assertIn("Fix with", javascript)
+        self.assertIn("Same-agent retry disabled", javascript)
         self.assertIn("Retry same adapter", javascript)
         self.assertIn('action("revise-stage", { stage: item.id, feedback })', javascript)
         self.assertIn("Restart planning safely", javascript)
