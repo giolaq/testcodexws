@@ -225,6 +225,59 @@ class FactoryContractTests(unittest.TestCase):
             ):
                 run_live_github_smoke(repo, True)
 
+    def test_live_smoke_repairs_one_ticket_count_validation_once(self):
+        class StopAfterBoundedRepair(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            run_dir = repo / ".factory/plans/live-plan"
+            run_dir.mkdir(parents=True)
+            backend = Mock(owner="giolaq", name="test1")
+            continue_attempts = 0
+
+            def checked(command, cwd, timeout=180):
+                nonlocal continue_attempts
+                if "plan" in command:
+                    (repo / ".factory/plans/latest.json").write_text(json.dumps({
+                        "plan_id": "live-plan",
+                    }))
+                if command[-2:] == ["continue-plan", "live-plan"]:
+                    continue_attempts += 1
+                    if continue_attempts == 1:
+                        (run_dir / "manifest.json").write_text(json.dumps({
+                            "stages": {
+                                "vertical_slices": {
+                                    "status": "blocked",
+                                    "failure_kind": "validation",
+                                    "validation_error": (
+                                        "vertical slices expert returned 2 tickets; expected 1-1"
+                                    ),
+                                    "same_failure_count": 1,
+                                },
+                            },
+                        }))
+                        raise RuntimeError("vertical slices expert returned 2 tickets; expected 1-1")
+                if "revise" in command:
+                    self.assertEqual(command[command.index("revise") + 1:command.index("revise") + 3], [
+                        "live-plan", "slices",
+                    ])
+                    feedback = command[command.index("--feedback") + 1]
+                    self.assertIn("exactly one vertical slice", feedback)
+                    self.assertIn("Acceptance Test", feedback)
+                    raise StopAfterBoundedRepair
+                return ""
+
+            with (
+                patch("github_backend.GitHubBackend", return_value=backend),
+                patch("release_check.shutil.which", return_value="/usr/bin/gh"),
+                patch("release_check._checked", side_effect=checked),
+                self.assertRaises(StopAfterBoundedRepair),
+            ):
+                run_live_github_smoke(repo, True)
+
+            self.assertEqual(continue_attempts, 1)
+
     def test_profiles_command_exposes_executable_role_topologies(self):
         result = subprocess.run(
             [sys.executable, str(FACTORY), "profiles", "--json"],

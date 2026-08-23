@@ -387,6 +387,44 @@ def run_clean_standard_rehearsal(repo: Path) -> str:
         )
 
 
+def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> None:
+    """Repair one mechanical slice-count violation, then fail closed."""
+    command = [*factory, "continue-plan", plan_id]
+    try:
+        _checked(command, repo, timeout=None)
+        return
+    except RuntimeError:
+        manifest_path = repo / ".factory/plans" / plan_id / "manifest.json"
+        if not manifest_path.is_file():
+            raise
+        manifest = json.loads(manifest_path.read_text())
+        record = manifest.get("stages", {}).get("vertical_slices", {})
+        validation_error = str(record.get("validation_error") or "")
+        repairable = (
+            record.get("status") == "blocked"
+            and record.get("failure_kind") == "validation"
+            and record.get("same_failure_count") == 1
+            and re.fullmatch(
+                r"vertical slices expert returned \d+ tickets; expected 1-1",
+                validation_error,
+            )
+        )
+        if not repairable:
+            raise
+
+    feedback = (
+        f"The deterministic validator rejected the artifact: {validation_error}. "
+        "Return exactly one vertical slice. That one ticket must deliver the endpoint "
+        "and carry the independent Acceptance Test evidence; the QA role authors the "
+        "protected test during that ticket's workflow, not as a separate ticket. "
+        "Preserve the approved requirement, contract, and program-element traceability."
+    )
+    _checked([
+        *factory, "revise", plan_id, "slices", "--feedback", feedback,
+    ], repo, timeout=None)
+    _checked(command, repo, timeout=None)
+
+
 def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
     """Exercise live Claude delivery and deterministic review rework in a disposable repo."""
     if not confirmed:
@@ -453,7 +491,7 @@ The implementation passes every configured gate and is merged through a pull req
     plan_id = json.loads((repo / ".factory/plans/latest.json").read_text())["plan_id"]
     _checked([*factory, "review", "product", plan_id], repo, timeout=None)
     _checked([*factory, "approve-product", plan_id, "--yes"], repo, timeout=None)
-    _checked([*factory, "continue-plan", plan_id], repo, timeout=None)
+    _continue_live_smoke_plan(repo, factory, plan_id)
     _checked([*factory, "review", "alignment", plan_id], repo, timeout=None)
     project_title = f"Factory release smoke {run_id}"
     _checked([
