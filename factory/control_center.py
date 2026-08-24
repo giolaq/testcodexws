@@ -40,6 +40,7 @@ from github_repository import (
     repository_from_remote,
 )
 from factory_charter import CHARTER_PATH, FactoryCharter, FactoryCharterError
+from human_attention import human_attention_snapshot
 from project_contract import CONTRACT_PATH, ProjectContract, ProjectContractError
 
 
@@ -393,6 +394,9 @@ class ControlCenter:
                 "merge_authority": charter.merge_authority,
                 "gate_level": charter.gate_level,
                 "planning_approvals": list(charter.planning_approvals),
+                "max_awaiting_human_review": charter.max_awaiting_human_review,
+                "max_blocked_for_human": charter.max_blocked_for_human,
+                "oldest_review_hours": charter.oldest_review_hours,
             }
         except FactoryCharterError as exc:
             return {
@@ -742,10 +746,12 @@ class ControlCenter:
                 "Running agents may finish, but the factory will not create more review work."
             )
             next_label = (
-                f"Open oldest decision #{ticket_number}" if ticket_number else "Open human decisions"
+                f"Open oldest decision #{ticket_number}"
+                if ticket_number
+                else f"Open {oldest.get('status', 'planning decision')}"
             )
             next_detail = "Complete the oldest required decision to reduce the queue and resume dispatch."
-            next_view = "tickets"
+            next_view = "tickets" if ticket_number else "planning"
 
         operation_phase = {
             "doctor": 0, "configure": 0, "plan": 2, "restart-plan": 2, "revise-product": 2, "revise-stage": 2,
@@ -886,6 +892,14 @@ class ControlCenter:
         config = self.session_config()
         project = self.project_contract()
         charter = self.factory_charter()
+        factory["human_attention"] = human_attention_snapshot(
+            self.repo,
+            factory.get("tickets", []),
+            review_limit=charter.get("max_awaiting_human_review", 3),
+            blocked_limit=charter.get("max_blocked_for_human", 2),
+            oldest_limit=charter.get("oldest_review_hours", 24),
+            planning=planning,
+        )
         supervisor = read_json(self.repo / ".factory" / "supervisor" / "state.json", {})
         if factory.get("supervisor_agent") == "disabled" or (
             not factory.get("supervisor_agent") and config.get("profile") == "lean"

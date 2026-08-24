@@ -444,8 +444,14 @@ class GitHubBackend:
         pr = self.existing_pr(ticket["number"])
         if not pr or not pr.get("mergedAt"):
             return None
-        self.gh("issue", "close", ticket["number"], "--repo", f"{self.owner}/{self.name}", check=False)
         return pr
+
+    def close_issue(self, ticket):
+        """Close the Issue only after the orchestrator validates the merged revision."""
+        self.gh(
+            "issue", "close", ticket["number"],
+            "--repo", f"{self.owner}/{self.name}", check=False,
+        )
 
     def is_merged(self, ticket):
         return self.merged_pr(ticket) is not None

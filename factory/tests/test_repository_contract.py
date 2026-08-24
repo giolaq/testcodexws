@@ -82,6 +82,14 @@ class RepositoryContractTests(unittest.TestCase):
         ):
             self.assertNotIn(retired, workflow)
 
+    def test_release_workflow_does_not_duplicate_pull_request_runs(self):
+        workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
+
+        self.assertIn(
+            "on:\n  push:\n    branches: [main]\n  pull_request:",
+            workflow,
+        )
+
     def test_rehearsal_workflow_asserts_the_human_merge_gate(self):
         workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
 
@@ -95,6 +103,13 @@ class RepositoryContractTests(unittest.TestCase):
         )
         self.assertNotIn("assert all(ticket['status'] == 'Done'", workflow)
         self.assertNotIn("sum(t['status'] == 'Done'", workflow)
+
+    def test_participant_surfaces_use_acceptance_test_terminology(self):
+        guide = (REPO / "workshop-guide/app/page.tsx").read_text()
+        orchestrator = (REPO / "factory/orchestrator.py").read_text()
+
+        self.assertNotIn("reviewing QA tests", guide)
+        self.assertNotIn("QA test revision", orchestrator)
 
 
 if __name__ == "__main__":

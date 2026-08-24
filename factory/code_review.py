@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import PurePosixPath
+
+from json_response import extract_last_json_object
 
 
 SCHEMA_VERSION = 2
@@ -22,20 +23,12 @@ def extract_review(output: str) -> dict:
     Agent CLIs may add progress text around the response, so decode each object
     candidate and keep the last complete mapping.
     """
-    decoder = json.JSONDecoder()
-    matches = []
-    for index, character in enumerate(output):
-        if character != "{":
-            continue
-        try:
-            value, _ = decoder.raw_decode(output[index:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict) and {"schema_version", "decision", "summary", "findings"} <= set(value):
-            matches.append(value)
-    if not matches:
+    value = extract_last_json_object(
+        output, {"schema_version", "decision", "summary", "findings"},
+    )
+    if value is None:
         raise CodeReviewError("Code Review Agent did not return a structured JSON decision.")
-    return matches[-1]
+    return value
 
 
 def _text(value, field: str) -> str:

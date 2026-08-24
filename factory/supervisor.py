@@ -22,6 +22,7 @@ from typing import Callable
 from factory_contracts import role_input
 from factory_charter import FactoryCharter
 from adapter_capabilities import role_environment
+from json_response import extract_last_json_object
 
 
 SCHEMA_VERSION = 1
@@ -62,20 +63,12 @@ def _message(value, field: str) -> str:
 
 def extract_decision(output: str) -> dict:
     """Return the last JSON object with the supervisor decision fields."""
-    decoder = json.JSONDecoder()
-    matches = []
-    for index, character in enumerate(output):
-        if character != "{":
-            continue
-        try:
-            value, _ = decoder.raw_decode(output[index:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict) and {"schema_version", "summary", "dispatch", "block"} <= set(value):
-            matches.append(value)
-    if not matches:
+    value = extract_last_json_object(
+        output, {"schema_version", "summary", "dispatch", "block"},
+    )
+    if value is None:
         raise SupervisorError("Supervisor did not return a structured JSON decision.")
-    return matches[-1]
+    return value
 
 
 def validate_decision(raw: dict, candidates: set[int], max_parallel: int) -> dict:
@@ -135,21 +128,11 @@ def validate_decision(raw: dict, candidates: set[int], max_parallel: int) -> dic
 
 def extract_merge_decision(output: str) -> dict:
     """Return the last structured Supervisor merge decision."""
-    decoder = json.JSONDecoder()
-    matches = []
     required = {"schema_version", "summary", "action", "ticket", "pull_request", "candidate_head"}
-    for index, character in enumerate(output):
-        if character != "{":
-            continue
-        try:
-            value, _ = decoder.raw_decode(output[index:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict) and required <= set(value):
-            matches.append(value)
-    if not matches:
+    value = extract_last_json_object(output, required)
+    if value is None:
         raise SupervisorError("Supervisor did not return a structured merge decision.")
-    return matches[-1]
+    return value
 
 
 def validate_merge_decision(raw: dict, ticket: dict) -> dict:
@@ -216,6 +199,7 @@ class AgentSupervisor:
         scenario: str,
         mock: bool,
         agent_timeout: int,
+        environment: dict[str, str] | None = None,
         invoke: Callable[[Path], tuple[int, str]] | None = None,
     ):
         self.repo = repo.resolve()
@@ -226,6 +210,7 @@ class AgentSupervisor:
         self.scenario = scenario
         self.mock = mock
         self.agent_timeout = agent_timeout
+        self.environment = dict(environment if environment is not None else role_environment())
         self.invoke = invoke
         self.directory = self.repo / ".factory" / "supervisor"
         self.state_path = self.directory / "state.json"
@@ -600,9 +585,7 @@ class AgentSupervisor:
                     executable="/bin/sh",
                     capture_output=True,
                     timeout=self.agent_timeout if self.mock else None,
-                    env=role_environment(
-                        "CODEX_HOME", "CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME",
-                    ),
+                    env=self.environment.copy(),
                 )
                 return result.returncode, result.stdout + result.stderr
             except subprocess.TimeoutExpired as exc:

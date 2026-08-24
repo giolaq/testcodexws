@@ -203,6 +203,7 @@ Reviewed by Sam; reduce Assured controls until the data becomes regulated.
             output = repo / ".factory/evidence/demo-plan"
             packet = (output / "evidence-packet.md").read_text()
             exported = json.loads((output / "manifest.json").read_text())
+            updated_state = json.loads((repo / ".factory/state.json").read_text())
             self.assertIn(str(output / "evidence-packet.md"), result.stdout)
             self.assertIn("# Evidence Packet — TableStory", packet)
             self.assertIn("## Factory Canvas", packet)
@@ -222,6 +223,15 @@ Reviewed by Sam; reduce Assured controls until the data becomes regulated.
             self.assertIn("Pull request link is missing", packet)
             self.assertEqual(exported["tickets"], [12])
             self.assertEqual(exported["governance"], manifest["governance"])
+            self.assertEqual(
+                updated_state["tickets"][0]["evidence_packet"],
+                {
+                    "status": "available",
+                    "path": ".factory/evidence/demo-plan/evidence-packet.md",
+                    "manifest": ".factory/evidence/demo-plan/manifest.json",
+                    "sha256": exported["packet_sha256"],
+                },
+            )
             combined = packet + json.dumps(exported)
             for secret in (
                 fake_token, fake_environment, metadata_token,

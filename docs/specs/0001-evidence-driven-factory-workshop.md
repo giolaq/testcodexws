@@ -172,11 +172,13 @@ adapter. Live planning accepts any PRD and records that contract with the plan.
   output and any worktree mutation. `REQUEST_CHANGES` returns every comment to
   implementation within the existing retry budget; gates and review rerun on
   the new commit. `APPROVE` requires an empty comments list.
-- The Supervisor has a separate post-review `MERGE` or `BLOCK` contract. The
-  orchestrator accepts `MERGE` only when the Code Review Agent approved the same
-  candidate head, required gates pass, and the decision was published. It
-  rechecks the live GitHub PR head and executes the merge; stale heads and branch
-  protection failures block the Ticket. With a single GitHub identity, formal
+- Autonomous Demo gives the Supervisor a separate post-review `MERGE` or
+  `BLOCK` contract. In that explicitly opted-in profile only, the orchestrator
+  accepts `MERGE` when the Code Review Agent approved the same candidate head,
+  required gates pass, and the decision was published. It rechecks the live
+  GitHub PR head and executes the merge; stale heads and branch-protection
+  failures block the Ticket. Lean, Standard, and Assured instead stop at the
+  human exact-revision merge gate. With a single GitHub identity, formal
   self-approval falls back to an explicit Factory comment that does not satisfy
   branch-protection approval requirements.
 - Standard and Assured profiles run an Agent Supervisor at each ready-ticket

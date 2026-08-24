@@ -244,6 +244,20 @@ class GitHubReviewTests(unittest.TestCase):
             "pr", "merge", "https://github.test/example/pull/7", "--merge", check=False,
         )
 
+    def test_merged_pr_lookup_is_read_only_until_orchestrator_validation(self):
+        backend = GitHubBackend(Path.cwd())
+        merged = {
+            "mergedAt": "2026-08-24T10:00:00Z",
+            "headRefOid": "a" * 40,
+        }
+        backend.existing_pr = mock.Mock(return_value=merged)
+        backend.gh = mock.Mock()
+
+        result = backend.merged_pr({"number": 7})
+
+        self.assertEqual(result, merged)
+        backend.gh.assert_not_called()
+
     def test_merge_retry_accepts_an_already_merged_pull_request(self):
         backend = GitHubBackend(Path.cwd())
         backend.gh = mock.Mock(return_value=completed(1, stderr="pull request is already merged"))

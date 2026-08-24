@@ -10,7 +10,8 @@ Implementation evidence: [roadmap audit](0001-production-minded-factory-and-work
 
 ## Inputs
 
-- [Human judgment doesn't leave the software factory. It relocates.](/Users/glaquidara/.codex/attachments/3fa70d3f-f894-4a38-993a-9dffab55e4da/pasted-text.txt)
+- Article research input: “Human judgment doesn't leave the software factory. It relocates.”
+  Source notes were supplied by the workshop owner during planning.
 - [Competitive analysis: Addy Osmani's Factory and Software (re)-Factory](../research/addyosmani-factory-competitive-analysis.md)
 - [Current workshop specification](../specs/0001-evidence-driven-factory-workshop.md)
 - [Current architecture](../../factory/ARCHITECTURE.md)
@@ -455,8 +456,8 @@ Every implementation Ticket must include:
 Required end-to-end scenarios:
 
 - Two runners race for one Ticket; exactly one starts.
-- A QA test already passes before implementation; the Ticket is blocked.
-- A QA test fails to collect; the Ticket is blocked with a different reason.
+- An Acceptance Test already passes before implementation; the Ticket is blocked.
+- An Acceptance Test fails to collect; the Ticket is blocked with a different reason.
 - Human review capacity is full; new dispatch stops and later resumes.
 - Code review requests changes; implementation repairs the same PR and all
   evidence is regenerated for the new head.

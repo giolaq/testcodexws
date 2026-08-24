@@ -56,6 +56,7 @@ def participant_link_failures(repo: Path, tracked: list[str]) -> list[str]:
             raw == "README.md"
             or raw == "workshop-guide/README.md"
             or (raw.startswith("factory/") and raw.endswith(".md"))
+            or (raw.startswith("docs/") and raw.endswith(".md"))
         )
         if not participant_markdown:
             continue

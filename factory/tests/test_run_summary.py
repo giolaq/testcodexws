@@ -52,6 +52,17 @@ class RunSummaryTests(unittest.TestCase):
         self.assertEqual(summary["unresolved_risks"], ["local log contained [REDACTED]"])
         self.assertTrue(summary["human_decisions"]["policy_required_human_merge"])
         self.assertEqual(summary["human_decisions"]["effective_merge_authority"], "human")
+        self.assertEqual(summary["evidence_packet"]["status"], "pending")
+        self.assertEqual(summary["evidence_packet"]["path"], "")
+
+        ticket["evidence_packet"] = {
+            "status": "available",
+            "path": ".factory/evidence/plan12345/evidence-packet.md",
+            "manifest": ".factory/evidence/plan12345/manifest.json",
+            "sha256": "e" * 64,
+        }
+        available = factory_run_summary(state, ticket)
+        self.assertEqual(available["evidence_packet"], ticket["evidence_packet"])
 
     def test_rendered_summary_can_be_validated_and_recovered_from_a_comment(self):
         payload = {

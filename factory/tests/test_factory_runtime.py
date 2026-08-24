@@ -17,6 +17,7 @@ from orchestrator import (
     Factory,
     approve_qa_tests,
     human_merge_ticket,
+    publish_evidence_run_summaries,
     publish_repository_setup,
     recover_remote_ticket_state,
     worktree_path,
@@ -45,6 +46,53 @@ def install_approved_charter(repo: Path, merge_authority: str = "human") -> None
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_live_evidence_export_republishes_actual_packet_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            state_path = repo / ".factory/state.json"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(json.dumps({
+                "mode": "github",
+                "run_id": "run-evidence",
+                "profile": "standard",
+                "governance": {},
+                "tickets": [{
+                    "number": 7,
+                    "plan_id": "plan-evidence",
+                    "status": "Done",
+                    "evidence_packet": {
+                        "status": "available",
+                        "path": ".factory/evidence/plan-evidence/evidence-packet.md",
+                        "manifest": ".factory/evidence/plan-evidence/manifest.json",
+                        "sha256": "e" * 64,
+                    },
+                }],
+            }))
+            backend = mock.Mock()
+            backend.publish_run_summary.return_value = {
+                "published": True,
+                "mode": "issue-comment",
+            }
+
+            with mock.patch("orchestrator.GitHubBackend", return_value=backend):
+                count = publish_evidence_run_summaries(
+                    repo,
+                    {
+                        "github_repository": "https://github.com/example/repo",
+                        "project_number": 3,
+                    },
+                    "plan-evidence",
+                    [7],
+                )
+
+            self.assertEqual(count, 1)
+            backend.preflight.assert_called_once_with()
+            published = backend.publish_run_summary.call_args.args[2]
+            self.assertIn('"status": "available"', published)
+            self.assertIn('"sha256": "' + "e" * 64 + '"', published)
+            updated = json.loads(state_path.read_text())
+            self.assertTrue(updated["tickets"][0]["remote_run_summary"]["published"])
+
     def test_live_human_merge_preflights_its_fresh_github_backend(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory) / "repo"
@@ -86,7 +134,10 @@ class RuntimeTests(unittest.TestCase):
             }))
             backend = mock.Mock(unsafe=True)
             backend.default_branch = "main"
-            backend.merged_pr.return_value = {"mergeCommit": {"oid": merged_head}}
+            backend.merged_pr.return_value = {
+                "headRefOid": approved_head,
+                "mergeCommit": {"oid": merged_head},
+            }
 
             def fake_run(command, *_args, **_kwargs):
                 stdout = approved_head if command[:2] == ["git", "rev-parse"] else ""
@@ -100,6 +151,68 @@ class RuntimeTests(unittest.TestCase):
                 )
 
             backend.preflight.assert_called_once_with()
+            backend.close_issue.assert_called_once()
+
+    def test_path_specific_human_gate_can_merge_under_autonomous_demo_governance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            factory = repo / "factory"
+            factory.mkdir(parents=True)
+            source = Path(__file__).parents[1]
+            shutil.copy2(source / "roles.json", factory / "roles.json")
+            shutil.copy2(source / "policy.json", factory / "policy.json")
+            install_approved_charter(repo, merge_authority="supervisor")
+            charter = FactoryCharter.load(repo, require_approved=True)
+            approved_head = "a" * 40
+            merged_head = "b" * 40
+            state_path = repo / ".factory/state.json"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(json.dumps({
+                "governance": {
+                    "charter_sha256": charter.policy_sha256(),
+                    "merge_authority": "supervisor",
+                },
+                "tickets": [{
+                    "number": 8,
+                    "title": "Change a path that requires human approval",
+                    "status": "In Review",
+                    "phase": "in-review",
+                    "attempt": 1,
+                    "approved_head": approved_head,
+                    "triage": {"controls": {"requires_human_approval": True}},
+                    "gate_results": [{"name": "tests", "required": True, "exit_code": 0}],
+                    "code_review": {
+                        "head": approved_head,
+                        "result": {"decision": "APPROVE"},
+                        "artifact": ".factory/reviews/ticket-8.json",
+                    },
+                    "branch": "factory/8-human-owned-path",
+                    "pr_url": "https://github.test/example/pull/8",
+                    "plan_id": "autonomous-path-gate",
+                    "receipts": [],
+                    "history": [],
+                }],
+            }))
+            backend = mock.Mock(unsafe=True)
+            backend.default_branch = "main"
+            backend.merged_pr.return_value = {
+                "headRefOid": approved_head,
+                "mergeCommit": {"oid": merged_head},
+            }
+
+            def fake_run(command, *_args, **_kwargs):
+                stdout = approved_head if command[:2] == ["git", "rev-parse"] else ""
+                return subprocess.CompletedProcess(command, 0, stdout, "")
+
+            with mock.patch("orchestrator.GitHubBackend", return_value=backend), mock.patch(
+                "orchestrator.run", side_effect=fake_run,
+            ):
+                human_merge_ticket(
+                    repo, 8, mock=False, project_number=8, assume_yes=True,
+                )
+
+            backend.preflight.assert_called_once_with()
+            backend.close_issue.assert_called_once()
 
     def test_publish_repository_setup_commits_and_pushes_only_approved_governance(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -321,6 +434,30 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn("changed after the remote approval", recovered["failure"])
         self.assertEqual(recovered["next_human_action"], "rerun_code_review")
 
+    def test_fresh_checkout_does_not_trust_a_stale_merged_pr_head(self):
+        summary = {
+            "schema_version": 1,
+            "run_id": "remote-run",
+            "ticket": 7,
+            "revisions": {"approved_head": "a" * 40},
+            "verdicts": {"code_review": "APPROVE"},
+        }
+        raw = {
+            "status": "Done",
+            "pull_request": {
+                "state": "MERGED",
+                "mergedAt": "2026-08-24T10:00:00Z",
+                "headRefOid": "b" * 40,
+                "mergeCommit": {"oid": "c" * 40},
+            },
+        }
+
+        recovered = recover_remote_ticket_state(raw, summary)
+
+        self.assertEqual(recovered["status"], "Blocked")
+        self.assertIn("does not match", recovered["failure"])
+        self.assertEqual(recovered["next_human_action"], "inspect_stale_merge")
+
     def test_load_tickets_reconstructs_remote_pr_and_claim_without_local_state(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory) / "repo"
@@ -391,6 +528,159 @@ class RuntimeTests(unittest.TestCase):
 
         self.assertIn("[tests] exit 0", failure)
         self.assertEqual(ticket["gate_results"][0]["classification"], "MISCONFIGURED")
+
+    def test_missing_tool_and_nonzero_skip_are_misconfigured_not_generic_failures(self):
+        commands = (
+            "factory-command-that-does-not-exist",
+            "sh -c \"printf 'required tool unavailable\\n'; exit 2\"",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                factory = Factory.__new__(Factory)
+                factory.cfg = {
+                    "factory": {"gate_timeout": 10},
+                    "gate": [{
+                        "name": "tests", "cmd": command,
+                        "required": True, "level": "full",
+                    }],
+                }
+                factory.project = SimpleNamespace(render_command=lambda value, python: value)
+                factory.charter = SimpleNamespace(gate_level="full")
+                factory.python = sys.executable
+                factory._sync_store = mock.Mock()
+                ticket = {"triage": {"controls": {"gate_level": "full"}}}
+
+                failure = factory.verify(ticket, Path.cwd())
+
+                self.assertIn("MISCONFIGURED", failure)
+                self.assertEqual(
+                    ticket["gate_results"][0]["classification"], "MISCONFIGURED",
+                )
+
+    def test_external_merge_reconciliation_rejects_a_stale_pr_head(self):
+        factory = Factory.__new__(Factory)
+        ticket = {
+            "number": 4,
+            "status": "In Review",
+            "approved_head": "a" * 40,
+            "pr_url": "https://github.test/example/pull/4",
+        }
+        factory.tickets = {4: ticket}
+        factory.backend = mock.Mock()
+        factory.backend.default_branch = "main"
+        factory.backend.merged_pr.return_value = {
+            "headRefOid": "b" * 40,
+            "mergeCommit": {"oid": "c" * 40},
+        }
+        factory.sync_default_branch = mock.Mock(return_value="c" * 40)
+        factory.transition = mock.Mock()
+        factory.record_receipt = mock.Mock()
+        factory.publish_remote_summary = mock.Mock()
+        factory.repo = Path("/unused")
+        factory.git = mock.Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
+
+        factory.sync_merged()
+
+        self.assertIn("does not match", ticket["failure"])
+        factory.transition.assert_called_once_with(
+            ticket, "Blocked", "Merged pull request head does not match the approved revision",
+        )
+        factory.backend.close_issue.assert_not_called()
+        factory.record_receipt.assert_not_called()
+
+    def test_valid_external_merge_closes_issue_only_after_exact_head_validation(self):
+        factory = Factory.__new__(Factory)
+        approved_head = "a" * 40
+        ticket = {
+            "number": 5,
+            "status": "In Review",
+            "approved_head": approved_head,
+            "pr_url": "https://github.test/example/pull/5",
+            "attempt": 1,
+            "receipts": [],
+        }
+        factory.tickets = {5: ticket}
+        factory.backend = mock.Mock()
+        factory.backend.default_branch = "main"
+        factory.backend.merged_pr.return_value = {
+            "headRefOid": approved_head,
+            "mergeCommit": {"oid": "c" * 40},
+        }
+        factory.sync_default_branch = mock.Mock(return_value="c" * 40)
+        factory.transition = mock.Mock()
+        factory.record_receipt = mock.Mock()
+        factory.publish_remote_summary = mock.Mock()
+        factory.repo = Path("/unused")
+        factory.git = mock.Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
+
+        factory.sync_merged()
+
+        factory.transition.assert_called_once_with(ticket, "Done", "PR merged and synchronized")
+        factory.backend.close_issue.assert_called_once_with(ticket)
+        factory.record_receipt.assert_called_once()
+
+    def test_planning_approval_counts_toward_human_attention_capacity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            source = Path(__file__).parents[2]
+            shutil.copytree(source / "factory", repo / "factory")
+            install_approved_charter(repo)
+            factory = Factory(self.factory_args(repo))
+            factory.tickets = {
+                1: {"number": 1, "status": "In Review", "history": []},
+                2: {"number": 2, "status": "QA Review", "history": []},
+            }
+            planning_state = repo / ".factory/planning-state.json"
+            planning_state.parent.mkdir(parents=True, exist_ok=True)
+            planning_state.write_text(json.dumps({
+                "plan_id": "plan-needs-product-review",
+                "status": "awaiting_product_approval",
+                "updated_at": "2026-08-24T09:00:00+00:00",
+            }))
+
+            attention = factory.human_attention_snapshot()
+
+            self.assertEqual(attention["awaiting_review"], 2)
+            self.assertEqual(attention["planning_approvals"], 1)
+            self.assertEqual(attention["awaiting_human"], 3)
+            self.assertTrue(attention["dispatch_paused"])
+            self.assertEqual(attention["oldest"]["plan_id"], "plan-needs-product-review")
+
+    def test_planning_question_counts_toward_blocked_human_capacity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            source = Path(__file__).parents[2]
+            shutil.copytree(source / "factory", repo / "factory")
+            install_approved_charter(repo)
+            factory = Factory(self.factory_args(repo))
+            factory.tickets = {
+                1: {
+                    "number": 1,
+                    "status": "Blocked",
+                    "failure": "Human clarification is required.",
+                    "history": [],
+                },
+            }
+            planning_state = repo / ".factory/planning-state.json"
+            planning_state.parent.mkdir(parents=True, exist_ok=True)
+            planning_state.write_text(json.dumps({
+                "plan_id": "plan-needs-an-answer",
+                "status": "blocked",
+                "updated_at": "2026-08-24T09:00:00+00:00",
+                "stages": [{
+                    "id": "system_architecture",
+                    "title": "System Architecture",
+                    "status": "blocked",
+                    "questions": ["Which trust boundary owns this data?"],
+                }],
+            }))
+
+            attention = factory.human_attention_snapshot()
+
+            self.assertEqual(attention["planning_questions"], 1)
+            self.assertEqual(attention["blocked_for_human"], 2)
+            self.assertTrue(attention["dispatch_paused"])
+            self.assertIn("human-blocked queue 2 / limit 2", attention["reason"])
 
     def test_live_agents_have_no_presentation_timeout(self):
         factory = Factory.__new__(Factory)

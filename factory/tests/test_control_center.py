@@ -646,6 +646,12 @@ class ControlCenterTests(unittest.TestCase):
             self.assertTrue(snapshot["planning"]["requires_decisions"])
             self.assertEqual(snapshot["planning"]["blocked_stage"], "system_architecture")
             self.assertEqual(snapshot["planning"]["continue_label"], "Answer expert questions")
+            self.assertEqual(
+                snapshot["factory"]["human_attention"]["planning_questions"], 1,
+            )
+            self.assertEqual(
+                snapshot["factory"]["human_attention"]["awaiting_human"], 1,
+            )
             self.assertEqual(journey["headline"], "System Architecture is waiting for you")
             self.assertEqual(journey["next"]["label"], "Answer blocked questions")
 
@@ -940,6 +946,19 @@ class ControlCenterTests(unittest.TestCase):
             self.assertEqual(paused["headline"], "NEEDS YOU — new dispatch is paused")
             self.assertIn("queue 3 / limit 3", paused["detail"])
             self.assertEqual(paused["ticket"], 3)
+
+            active_factory["human_attention"] = {
+                "dispatch_paused": True,
+                "reason": "human decision queue 3 / limit 3",
+                "oldest": {
+                    "ticket": None,
+                    "plan_id": "abc12345",
+                    "status": "Product Review",
+                },
+            }
+            planning_paused = center.journey(planning, active_factory, {}, prd, [])
+            self.assertEqual(planning_paused["next"]["view"], "planning")
+            self.assertIn("Product Review", planning_paused["next"]["label"])
 
     def test_control_center_can_release_only_a_recorded_live_claim(self):
         with tempfile.TemporaryDirectory() as directory:

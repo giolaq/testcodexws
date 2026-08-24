@@ -1,5 +1,7 @@
 import json
+import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -7,6 +9,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -60,6 +63,42 @@ class SupervisorTests(unittest.TestCase):
             agent_timeout=10,
             invoke=lambda prompt: (0, "adapter preface\n" + json.dumps(response)),
         )
+
+    def test_invoke_uses_only_the_selected_adapter_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Factory Test"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "factory@example.test"], cwd=repo, check=True,
+            )
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=repo, check=True)
+            prompt = repo / "prompt.md"
+            prompt.write_text("test")
+            supervisor = AgentSupervisor(
+                repo,
+                agent="custom-supervisor",
+                template=(
+                    "{python} -c 'import os; "
+                    "print(os.getenv(\"CUSTOM_SUPERVISOR_TOKEN\", \"missing\") + \"|\" + "
+                    "os.getenv(\"AWS_SECRET_ACCESS_KEY\", \"unset\"))'"
+                ),
+                python=sys.executable,
+                codex_bin="",
+                scenario="recipe-rebrand",
+                mock=True,
+                agent_timeout=10,
+                environment={
+                    "CUSTOM_SUPERVISOR_TOKEN": "allowed",
+                },
+            )
+
+            with mock.patch.dict(os.environ, {"AWS_SECRET_ACCESS_KEY": "must-not-leak"}):
+                returncode, output = supervisor._invoke(prompt, 1)
+
+            self.assertEqual(returncode, 0)
+            self.assertEqual(output.strip(), "allowed|unset")
 
     def test_coordinate_returns_validated_dispatch_and_records_worker_reports(self):
         with tempfile.TemporaryDirectory() as directory:

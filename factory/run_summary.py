@@ -17,6 +17,13 @@ def factory_run_summary(state: dict, ticket: dict) -> dict:
     qa = ticket.get("qa_evidence", {})
     claim = ticket.get("remote_claim") or {}
     metrics = ticket.get("metrics", {})
+    recorded_evidence = ticket.get("evidence_packet")
+    recorded_evidence = recorded_evidence if isinstance(recorded_evidence, dict) else {}
+    evidence_available = (
+        recorded_evidence.get("status") == "available"
+        and recorded_evidence.get("path")
+        and recorded_evidence.get("sha256")
+    )
     unresolved_risks = []
     for value in [ticket.get("failure", ""), *ticket.get("warnings", [])]:
         sanitized = " ".join(redact_credentials(str(value)).split())[:240]
@@ -108,10 +115,12 @@ def factory_run_summary(state: dict, ticket: dict) -> dict:
         },
         "unresolved_risks": unresolved_risks,
         "unresolved_risk_count": len(unresolved_risks),
-        "evidence_packet": (
-            f".factory/evidence/{ticket.get('plan_id')}/evidence-packet.md"
-            if ticket.get("plan_id") else ""
-        ),
+        "evidence_packet": {
+            "status": "available" if evidence_available else "pending",
+            "path": str(recorded_evidence.get("path", "")) if evidence_available else "",
+            "manifest": str(recorded_evidence.get("manifest", "")) if evidence_available else "",
+            "sha256": str(recorded_evidence.get("sha256", "")) if evidence_available else "",
+        },
     }
     encoded = json.dumps(payload, sort_keys=True)
     if contains_credentials(encoded):

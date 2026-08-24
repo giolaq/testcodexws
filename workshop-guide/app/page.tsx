@@ -857,7 +857,7 @@ agent = "my-agent"`}</CodeBlock>
             <div><code>factory run</code><span>Process available tickets with configured agents.</span></div>
             <div><code>factory configure --supervisor-agent NAME</code><span>Select the adapter that coordinates Standard and Assured dispatch.</span></div>
             <div><code>factory configure --review-agent NAME</code><span>Select the read-only adapter that reviews candidate pull-request diffs.</span></div>
-            <div><code>factory approve-tests ISSUE</code><span>Allow implementation after reviewing QA tests.</span></div>
+            <div><code>factory approve-tests ISSUE</code><span>Allow implementation after reviewing Acceptance Tests.</span></div>
             <div><code>factory merge ISSUE</code><span>Perform the human exact-revision merge for Standard and Assured.</span></div>
             <div><code>factory status</code><span>Summarize the current ticket states.</span></div>
             <div><code>factory retry ISSUE</code><span>Retry a ticket after fixing its blocker.</span></div>

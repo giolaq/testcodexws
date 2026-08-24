@@ -161,7 +161,7 @@ function renderSnapshot(data) {
   const tickets = data.factory?.tickets || [];
   const active = tickets.filter((ticket) => ["In Progress", "Verifying"].includes(ticket.status)).length;
   const attention = data.factory?.human_attention || {};
-  const waiting = attention.awaiting_review ?? tickets.filter((ticket) => ["QA Review", "In Review"].includes(ticket.status)).length;
+  const waiting = attention.awaiting_human ?? attention.awaiting_review ?? tickets.filter((ticket) => ["QA Review", "In Review"].includes(ticket.status)).length;
   $("#metric-plan").textContent = data.planning?.project || "No plan";
   $("#metric-active").textContent = active;
   $("#metric-review").textContent = attention.review_limit ? `${waiting} / ${attention.review_limit}` : waiting;

@@ -104,6 +104,40 @@ class FactoryContractTests(unittest.TestCase):
                 failures,
             )
 
+    def test_release_audit_rejects_machine_local_links_in_docs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / "factory").mkdir()
+            (repo / "workshop-guide/app").mkdir(parents=True)
+            (repo / "docs/plans").mkdir(parents=True)
+            (repo / "factory/factory_contracts.py").write_text(
+                'WORKSHOP_VERSION = "workshop-v1.1.0"\n',
+            )
+            (repo / "factory/WORKSHOP_OUTLINE.md").write_text("# workshop-v1.1.0\n")
+            (repo / "factory/FACILITATOR.md").write_text("# workshop-v1.1.0\n")
+            (repo / "workshop-guide/app/page.tsx").write_text("workshop-v1.1.0\n")
+            (repo / "docs/plans/private.md").write_text(
+                "[private source](/Users/example/.codex/attachments/source.txt)\n",
+            )
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                [
+                    "git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "-qm", "fixture",
+                ],
+                cwd=repo,
+                check=True,
+            )
+
+            failures, _ = audit_release(repo)
+
+            self.assertIn(
+                "participant link escapes repository: docs/plans/private.md -> "
+                "/Users/example/.codex/attachments/source.txt",
+                failures,
+            )
+
     def test_release_rehearsal_contract_requires_gates_retry_and_role_receipts(self):
         manifest = {
             "approvals": {"product": {"approved_at": "now"}, "alignment": {"approved_at": "now"}},

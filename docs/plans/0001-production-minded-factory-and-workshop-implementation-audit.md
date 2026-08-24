@@ -108,6 +108,10 @@ Proof:
 - `test_github_backend.py::test_remote_claim_is_atomic_resumable_and_explicitly_released`.
 - `test_factory_runtime.py::test_losing_remote_claim_never_creates_a_worktree_or_starts_an_agent`.
 - `test_factory_runtime.py::test_dispatch_pauses_when_human_review_capacity_is_full`.
+- Planning approvals and answerable expert questions now enter the same queue
+  in both scheduler state and a fresh Control Center snapshot.
+- `test_factory_runtime.py::test_planning_approval_counts_toward_human_attention_capacity`
+  and `test_control_center.py::test_blocking_questions_require_control_center_decisions_instead_of_retry`.
 - Fresh-state and reset tests in `test_factory_runtime.py` and release-claim
   action tests in `test_control_center.py`.
 
@@ -145,6 +149,12 @@ Proof:
 - Live state reconstruction in `factory/orchestrator.py` reads remote claims,
   Issues, PR heads, merge/review state, and run-summary comments before trusting
   local state.
+- Merged PR reconciliation compares the merged head with the exact approved
+  revision before closing the Issue or recording Done, including fresh-state
+  recovery.
+- Remote summaries report the Evidence Packet as pending until export. Export
+  records the actual portable path and packet hash, then republishes Live
+  summaries with that evidence.
 - `factory/monitor.py` is read-only by default, scopes CI health to the
   configured default branch, detects advisories, stale claims/Tickets, review
   waits, repeated findings, hotspots, and governance drift, and updates one
@@ -154,7 +164,9 @@ Proof:
 
 Proof:
 
-- Both `test_run_summary.py` tests, including seeded secret exclusion.
+- `test_run_summary.py` covers seeded secret exclusion and pending/available
+  Evidence Packet records; `test_evidence_packet.py` verifies the exported hash
+  is persisted.
 - All four `test_monitor.py` tests, including idempotent publication and stale
   remote claims.
 - Fresh-checkout recovery and stale-head tests in `test_factory_runtime.py`.
@@ -281,8 +293,8 @@ Proof:
 | Roadmap scenario | Evidence | Verdict |
 | --- | --- | --- |
 | Two runners race; one owns and one agent starts | Atomic remote-ref test plus losing-run pre-worktree test | PASS |
-| QA test already passes | Acceptance classification and QA rejection tests | PASS |
-| QA test does not collect | Acceptance classification and QA retry/block tests | PASS |
+| Acceptance Test already passes | Acceptance classification and QA rejection tests | PASS |
+| Acceptance Test does not collect | Acceptance classification and QA retry/block tests | PASS |
 | Human queue fills and later permits dispatch | Runtime capacity snapshot/dispatch test; limits recompute on each scheduling cycle | PASS |
 | Review comments return to the same branch | Standard runtime review-rework test and clean Rehearsal attempt history | PASS |
 | Standard cannot auto-merge | Human exact-head runtime test | PASS |
@@ -296,8 +308,8 @@ Proof:
 Run from the repository root on 2026-08-24:
 
 ```text
-.factory/venv/bin/python -m pytest -q factory/tests
-222 tests · PASS · 36.98s
+.factory/venv/bin/python -m unittest discover -s factory/tests
+235 tests · PASS · 34.3s
 
 npm --prefix workshop-guide test
 8 tests · PASS

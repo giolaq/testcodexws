@@ -52,6 +52,7 @@ from github_repository import (
     connect_github_repository,
     parse_github_repository,
 )
+from human_attention import human_attention_snapshot as build_human_attention_snapshot
 from planner import approve_plan
 from planning_pipeline import (
     approve_planning_stage,
@@ -465,8 +466,16 @@ def recover_remote_ticket_state(raw: dict, summary: dict | None) -> dict:
     next_action = ""
 
     if pull_request.get("mergedAt"):
-        status = "Done"
-        next_action = "none"
+        if not approved_head or not pr_head or pr_head != approved_head:
+            status = "Blocked"
+            failure = (
+                f"Merged pull request head {pr_head or 'unknown'} does not match "
+                f"approved revision {approved_head or 'missing'}."
+            )
+            next_action = "inspect_stale_merge"
+        else:
+            status = "Done"
+            next_action = "none"
     elif pull_request and str(pull_request.get("state") or "").upper() == "CLOSED":
         status = "Blocked"
         failure = "The remote pull request was closed without merging; inspect it before retrying."
@@ -853,8 +862,14 @@ class Factory:
         attention = self.human_attention_snapshot()
         self.store.data["human_attention"] = attention
         metrics = self.store.data.setdefault("metrics", {})
+        current_human_queue = attention.get(
+            "awaiting_human", attention["awaiting_review"],
+        )
         metrics["peak_review_queue"] = max(
-            metrics.get("peak_review_queue", 0), attention["awaiting_review"],
+            metrics.get("peak_review_queue", 0), current_human_queue,
+        )
+        metrics["peak_human_attention_queue"] = max(
+            metrics.get("peak_human_attention_queue", 0), current_human_queue,
         )
         if save:
             self.store.save()
@@ -966,71 +981,13 @@ class Factory:
 
     def human_attention_snapshot(self) -> dict:
         """Return the bounded human-decision queue that controls dispatch."""
-        awaiting = [
-            ticket for ticket in self.tickets.values()
-            if ticket.get("status") in {"QA Review", "In Review"}
-        ]
-        human_words = ("human", "decision", "clarif", "approval", "answer", "scope")
-        blocked = [
-            ticket for ticket in self.tickets.values()
-            if ticket.get("status") == "Blocked" and (
-                ticket.get("blocking_questions")
-                or any(word in ticket.get("failure", "").lower() for word in human_words)
-            )
-        ]
-
-        def waiting_since(ticket: dict) -> str:
-            current = ticket.get("status")
-            events = [
-                event.get("at", "") for event in ticket.get("history", [])
-                if event.get("status") == current and event.get("at")
-            ]
-            return events[-1] if events else ticket.get("finished_at") or ticket.get("started_at") or ""
-
-        decisions = []
-        current_time = datetime.now(timezone.utc)
-        for ticket in awaiting + blocked:
-            since = waiting_since(ticket)
-            age_hours = 0.0
-            if since:
-                try:
-                    parsed = datetime.fromisoformat(since.replace("Z", "+00:00"))
-                    if parsed.tzinfo is None:
-                        parsed = parsed.replace(tzinfo=timezone.utc)
-                    age_hours = max(0.0, (current_time - parsed).total_seconds() / 3600)
-                except ValueError:
-                    pass
-            decisions.append({
-                "ticket": ticket.get("number"),
-                "status": ticket.get("status"),
-                "waiting_since": since,
-                "age_hours": round(age_hours, 2),
-            })
-        decisions.sort(key=lambda item: item["waiting_since"] or "9999")
-        review_limit = self.charter.max_awaiting_human_review
-        blocked_limit = self.charter.max_blocked_for_human
-        oldest_limit = self.charter.oldest_review_hours
-        reason = ""
-        if len(awaiting) >= review_limit:
-            reason = f"human review queue {len(awaiting)} / limit {review_limit}"
-        elif len(blocked) >= blocked_limit:
-            reason = f"human-blocked queue {len(blocked)} / limit {blocked_limit}"
-        elif decisions and decisions[0]["age_hours"] >= oldest_limit:
-            reason = (
-                f"oldest human decision has waited {decisions[0]['age_hours']:.1f}h "
-                f"/ limit {oldest_limit}h"
-            )
-        return {
-            "dispatch_paused": bool(reason),
-            "reason": reason,
-            "awaiting_review": len(awaiting),
-            "review_limit": review_limit,
-            "blocked_for_human": len(blocked),
-            "blocked_limit": blocked_limit,
-            "oldest_review_hours": oldest_limit,
-            "oldest": decisions[0] if decisions else None,
-            "decisions": decisions,
-        }
+        return build_human_attention_snapshot(
+            self.repo,
+            list(self.tickets.values()),
+            review_limit=self.charter.max_awaiting_human_review,
+            blocked_limit=self.charter.max_blocked_for_human,
+            oldest_limit=self.charter.oldest_review_hours,
+        )
 
     def refresh_readiness(self):
         for ticket in self.tickets.values():
@@ -2075,13 +2032,16 @@ class Factory:
             except subprocess.TimeoutExpired:
                 result = type("TimedOut", (), {"returncode": 124})()
                 output = f"{gate['name']} timed out after {self.cfg['factory']['gate_timeout']}s"
-            skipped = result.returncode == 0 and bool(
+            misconfigured = result.returncode in {126, 127} or bool(
                 re.search(r"(?im)\b[1-9]\d*\s+skipped\b", output)
                 or re.search(r"(?im)(?:#|ℹ)\s*skipped\s+[1-9]\d*\b", output)
-                or re.search(r"(?im)\b(required tool unavailable|not installed)\b", output)
+                or re.search(
+                    r"(?im)\b(required tool unavailable|not installed|command not found)\b",
+                    output,
+                )
             )
             classification = (
-                "MISCONFIGURED" if skipped else "PASS" if result.returncode == 0 else "FAIL"
+                "MISCONFIGURED" if misconfigured else "PASS" if result.returncode == 0 else "FAIL"
             )
             gate_results.append({
                 "name": gate["name"], "required": gate.get("required", True),
@@ -2090,8 +2050,9 @@ class Factory:
                 "classification": classification,
                 "duration_seconds": round(time.monotonic() - started, 2),
             })
-            if result.returncode or skipped:
-                message = f"[{gate['name']}] exit {result.returncode}\n{output}"
+            if result.returncode or misconfigured:
+                prefix = "MISCONFIGURED: " if misconfigured else ""
+                message = f"{prefix}[{gate['name']}] exit {result.returncode}\n{output}"
                 (failures if gate.get("required", True) else warnings).append(message)
         ticket["warnings"] = warnings
         ticket["gate_results"] = gate_results
@@ -2207,10 +2168,7 @@ class Factory:
 
     def effective_merge_authority(self, ticket: dict) -> str:
         """Apply path-specific human accountability above the profile default."""
-        controls = ticket.get("triage", {}).get("controls", {})
-        if controls.get("requires_human_approval"):
-            return "human"
-        return self.profile["merge_authority"]
+        return ticket_merge_authority(ticket, self.profile["merge_authority"])
 
     def supervisor_merge(self, ticket: dict, worktree: Path) -> None:
         if not self.supervisor:
@@ -2469,7 +2427,7 @@ class Factory:
                 for gate in ticket.get("gate_results", [])
             ]
             if ticket.get("qa_evidence", {}).get("red", {}).get("result") == "RED PROVED":
-                verification.insert(0, "RED PROVED against the QA test revision.")
+                verification.insert(0, "RED PROVED against the Acceptance Test revision.")
             if ticket.get("qa_evidence", {}).get("green", {}).get("result") == "GREEN PROVED":
                 verification.insert(1, "GREEN PROVED with the identical focused command.")
             self.record_receipt(
@@ -2563,6 +2521,19 @@ class Factory:
             return
         head = self.sync_default_branch()
         for ticket, pr in merged:
+            approved_head = ticket.get("approved_head", "")
+            merged_pr_head = pr.get("headRefOid", "")
+            if not approved_head or merged_pr_head != approved_head:
+                ticket["failure"] = (
+                    f"Merged pull request head {merged_pr_head or 'unknown'} does not match "
+                    f"approved revision {approved_head or 'missing'}."
+                )
+                self.transition(
+                    ticket,
+                    "Blocked",
+                    "Merged pull request head does not match the approved revision",
+                )
+                continue
             merge_sha = (pr.get("mergeCommit") or {}).get("oid")
             if merge_sha:
                 reachable = self.git("merge-base", "--is-ancestor", merge_sha, head, check=False)
@@ -2571,6 +2542,7 @@ class Factory:
                     self.transition(ticket, "Blocked", "Merged dependency is missing from the synchronized base")
                     continue
             self.transition(ticket, "Done", "PR merged and synchronized")
+            self.backend.close_issue(ticket)
             automated = ticket.get("merge_executed_by") == "supervisor"
             self.record_receipt(
                 ticket,
@@ -2632,6 +2604,7 @@ class Factory:
                 scenario=self.args.scenario,
                 mock=self.args.mock,
                 agent_timeout=int(self.cfg["factory"]["agent_timeout"]),
+                environment=self.adapter_environment(self.supervisor_agent),
             )
             print(f"Supervisor adapter: {self.supervisor_agent}", flush=True)
         for cycle in self.detect_cycles():
@@ -2754,6 +2727,49 @@ def release_ticket_claim(
     return result
 
 
+def ticket_merge_authority(ticket: dict, default_authority: str) -> str:
+    """Return the effective authority after path-specific accountability controls."""
+    controls = ticket.get("triage", {}).get("controls", {})
+    if controls.get("requires_human_approval"):
+        return "human"
+    return default_authority
+
+
+def publish_evidence_run_summaries(
+    repo: Path,
+    session: dict,
+    plan_id: str,
+    ticket_numbers: list[int],
+) -> int:
+    """Republish Live run summaries after an actual Evidence Packet exists."""
+    if not session.get("github_repository"):
+        return 0
+    store = StateStore(repo)
+    if store.data.get("mode") != "github":
+        return 0
+    selected = [
+        ticket for ticket in store.data.get("tickets", [])
+        if ticket.get("plan_id") == plan_id and ticket.get("number") in ticket_numbers
+    ]
+    if not selected:
+        return 0
+    backend = GitHubBackend(
+        repo,
+        session.get("project_number"),
+        repository=session["github_repository"],
+    )
+    backend.preflight()
+    run_id = store.data.get("run_id", "")
+    for ticket in selected:
+        payload = factory_run_summary(store.data, ticket)
+        publication = backend.publish_run_summary(
+            ticket["number"], run_id, render_factory_run_summary(payload),
+        )
+        ticket["remote_run_summary"] = publication
+    store.save()
+    return len(selected)
+
+
 def human_merge_ticket(
     repo: Path,
     number: int,
@@ -2774,11 +2790,6 @@ def human_merge_ticket(
     if ticket.get("status") != "In Review":
         raise ValueError(f"Ticket #{number} is {ticket.get('status')}, not In Review")
     charter = FactoryCharter.load(repo, require_approved=True)
-    if charter.merge_authority != "human":
-        raise ValueError(
-            "The approved Factory Charter delegates merge authority; use the explicitly opted-in "
-            "Autonomous Demo run instead of a human-merge command."
-        )
     governance = store.data.get("governance")
     if not isinstance(governance, dict):
         raise ValueError(
@@ -2790,8 +2801,14 @@ def human_merge_ticket(
             "Factory Charter changed after this Ticket was verified. Re-run verification under "
             "the current approved Charter before merging."
         )
-    if governance.get("merge_authority") != "human":
-        raise ValueError("The recorded Factory Run does not grant human merge authority.")
+    effective_authority = ticket_merge_authority(
+        ticket, governance.get("merge_authority", ""),
+    )
+    if effective_authority != "human":
+        raise ValueError(
+            "This Ticket delegates merge authority to the Supervisor. Use the explicitly "
+            "opted-in Autonomous Demo run instead of a human-merge command."
+        )
     approved_head = ticket.get("approved_head", "")
     if not re.fullmatch(r"[a-f0-9]{40,64}", approved_head or ""):
         raise ValueError("Ticket does not record an exact approved candidate revision.")
@@ -2850,6 +2867,10 @@ def human_merge_ticket(
         merged_pr = backend.merged_pr(ticket)
         if not merged_pr:
             raise ValueError("GitHub did not report the pull request as merged.")
+        if merged_pr.get("headRefOid") != approved_head:
+            raise ValueError(
+                "Merged pull request head does not match the exact approved revision."
+            )
         merged_head = (merged_pr.get("mergeCommit") or {}).get("oid", "")
         run(["git", "fetch", "origin", backend.default_branch], repo)
         run(["git", "merge", "--ff-only", f"origin/{backend.default_branch}"], repo)
@@ -2863,6 +2884,7 @@ def human_merge_ticket(
                 raise ValueError("Merged GitHub revision is not reachable from the synchronized default branch.")
         else:
             merged_head = run(["git", "rev-parse", "HEAD"], repo).stdout.strip()
+        backend.close_issue(ticket)
     contract = role_input(repo, "human_review")
     receipt = handoff_receipt(
         run_id=ticket.get("plan_id") or f"ticket-{number}",
@@ -3448,8 +3470,17 @@ def main():
                 args.tickets,
                 Path(args.output) if args.output else None,
             )
+            exported = json.loads(evidence_manifest.read_text())
+            republished = publish_evidence_run_summaries(
+                repo,
+                session,
+                exported["plan_id"],
+                exported["tickets"],
+            )
             print(f"Evidence Packet: {packet}")
             print(f"Evidence manifest: {evidence_manifest}")
+            if republished:
+                print(f"Remote run summaries updated: {republished}")
         elif args.command == "release-check":
             raise SystemExit(render_release_check(
                 repo,

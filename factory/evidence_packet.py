@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 from datetime import datetime, timezone
@@ -391,4 +392,24 @@ def export_evidence(
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(redact_credentials(json.dumps(export_manifest, indent=2)) + "\n")
+    if selected:
+        def portable_path(path: Path) -> str:
+            try:
+                return str(path.resolve().relative_to(repo.resolve()))
+            except ValueError:
+                return path.name
+
+        evidence_record = {
+            "status": "available",
+            "path": portable_path(packet_path),
+            "manifest": portable_path(manifest_path),
+            "sha256": export_manifest["packet_sha256"],
+        }
+        for ticket in selected:
+            ticket["evidence_packet"] = evidence_record
+        state["updated_at"] = export_manifest["generated_at"]
+        state_path = repo / ".factory/state.json"
+        temporary = state_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n")
+        os.replace(temporary, state_path)
     return packet_path, manifest_path
