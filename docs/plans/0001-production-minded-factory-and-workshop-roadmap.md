@@ -1,6 +1,6 @@
 # Production-minded Factory and Workshop Roadmap
 
-**Status:** Release candidate — local/Rehearsal pass; disposable Live packet target required
+**Status:** Release candidate — local/Rehearsal pass; disposable Live delivery blocked by Claude session capacity
 **Owner:** Workshop lead
 **Created:** 2026-08-23
 **Scope:** Factory engine, Control Center, GitHub integration, workshop website,

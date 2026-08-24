@@ -9,13 +9,14 @@
 ## Verdict
 
 The roadmap's local implementation and credential-free Standard Rehearsal are
-complete and verified. The first owner-authorized Live GitHub run proved
-delivery and recovery but did not preserve an Evidence Packet before reset.
-The Live release command now creates a unique endpoint per invocation and
-exports the packet before reset, so an explicitly disposable repository can be
-reused without invalidating causal RED proof. The previously authorized
-`giolaq/test1` repository is no longer available on GitHub, so a new disposable
-target must be authorized before the final Live proof can run. The public
+complete and verified. The owner-authorized `giolaq/testcodexws` smoke proved
+the current planning, GitHub Project publication, remote claim, and independent
+QA RED path. Its implementation stage then stopped fail-closed when Claude
+reported a session limit that resets at 18:30 Europe/London; no PR, merge, or
+current Evidence Packet is claimed. The Live release command creates a unique
+endpoint per invocation and exports the packet before reset, so the disposable
+repository can be reused after capacity resets without invalidating causal RED
+proof. The public
 Vercel site also still serves an older build, and the private repository has
 not yet been tagged or enabled as a public template. These are release gates,
 not silently accepted omissions.
@@ -24,7 +25,7 @@ not silently accepted omissions.
 | --- | --- | --- |
 | Milestones 0–6 | PASS | Source contracts, operator surfaces, focused tests, full Python suite, website suite, and Standard Rehearsal |
 | Milestone 7 local behavior | PASS | Compatibility/update tests, release audit, clean-clone Standard Rehearsal, link/secret/version checks |
-| Disposable Live GitHub path | HISTORICAL DELIVERY + RECOVERY PASS; CURRENT PACKET TARGET REQUIRED | The first `giolaq/test1` run reached Project #8, Issue #11, PR #12, exact-head human merge, remote run summary, and fresh-local-state recovery. That repository is no longer resolvable, so those links are historical rather than current release evidence. |
+| Disposable Live GitHub path | CURRENT PLANNING/PUBLICATION/QA PASS; DELIVERY BLOCKED BY CLAUDE CAPACITY | `giolaq/testcodexws` Project #11 and Issue #11 preserve plan `99737bf1307e`, remote claim `ee518e687022`, and a QA-authored behavior-assertion RED. Claude's implementation session limit stopped the run before PR/review/merge/packet proof. Historical end-to-end recovery evidence remains available only as recorded below. |
 | Deployed website identity | FAIL — old deployment | `https://software-refactory-workshop.vercel.app/` does not currently render `workshop-v1.1.0` or the new evidence/Monitor language |
 | Tag and public-template settings | PENDING | Repository is private, `main` is the default branch, and `isTemplate` is false |
 
@@ -275,6 +276,15 @@ Proof:
   produced GREEN, Mock Review recorded `REQUEST_CHANGES` then `APPROVE` on two
   distinct heads, the Supervisor recommended `MERGE`, and the human merge gate
   merged candidate `567c9b1` as `e66d889`.
+- Current disposable Live partial smoke: PASS through planning, Project #11,
+  Issue #11, remote claim `ee518e687022`, and independent QA RED in
+  `giolaq/testcodexws`. Product Review completed without questions; the
+  architecture and exact-one-slice validators each rejected one invalid
+  artifact and accepted the bounded correction. The implementation branch
+  contains only the endpoint and protected Acceptance Test, and its five
+  Python tests, two JavaScript tests, and `git diff --check` pass. The factory
+  correctly blocked before PR publication when all bounded Claude
+  implementation attempts reported the account session limit.
 - Fresh-state recovery: PASS. After local reset, a new run reconstructed Issue
   #11 as `Done`, restored PR #12 and claim `ea8522b`, and marked the sanitized
   remote summary as recovered.
@@ -320,7 +330,7 @@ Run from the repository root on 2026-08-24:
 
 ```text
 .factory/venv/bin/python -m unittest discover -s factory/tests
-238 tests · PASS · 40.1s
+239 tests · PASS · 40.2s
 
 npm --prefix workshop-guide test
 8 tests · PASS
@@ -343,17 +353,15 @@ factory workshop-v1.1.0
 
 The first full-suite attempt used the host Python 3.14 interpreter and failed
 eight integration tests because that interpreter lacked `pytest`. The supported
-`.factory/venv` invocation above passes all 238 tests. Commit `cff4397` also
+`.factory/venv` invocation above passes all 239 tests. Commit `cff4397` also
 made CI install `demo-app/requirements.txt` and changed the release runbooks to
 use the prepared virtual environment, so this dependency error is now explicit
 and reproducible.
 
 ## Remaining release gates
 
-1. Authorize an explicitly disposable GitHub repository. The previously
-   authorized `giolaq/test1` repository is no longer available. Do not use the
-   active `giolaq/testcodexws` TETHER repository without separate approval.
-2. From that disposable repository, run:
+1. After Claude capacity resets, rerun the bounded smoke from the authorized
+   `giolaq/testcodexws` disposable checkout:
 
    ```sh
    ./factory/factory release-check --live-smoke \
@@ -363,15 +371,15 @@ and reproducible.
    The command generates a unique endpoint, so the same disposable repository
    may be reused for later release checks without making the focused test pass
    before implementation.
-3. Confirm the command exports and validates the Evidence Packet before local
+2. Confirm the command exports and validates the Evidence Packet before local
    reset, then inspect the Project, Issue, PR review/rework, human merge, remote
    claim/run summary, Monitor output, reset, and fresh recovery.
-4. Merge the release candidate to `main` only after the repeated Live smoke
+3. Merge the release candidate to `main` only after the repeated Live smoke
    exports its packet and CI is green.
-5. Deploy the new website and verify the rendered footer contains
+4. Deploy the new website and verify the rendered footer contains
    `workshop-v1.1.0` plus the RED/GREEN, `NEEDS YOU`, Autonomous Demo, and
    Monitor sections.
-6. Create and verify tag `workshop-v1.1.0`; make the repository public and
+5. Create and verify tag `workshop-v1.1.0`; make the repository public and
    enable template mode on the owner-approved schedule.
 
 The roadmap must remain **implementation in progress** until these external
