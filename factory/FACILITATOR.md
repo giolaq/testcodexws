@@ -346,6 +346,10 @@ the repaired Ticket:
   --confirm-disposable-repo
 ```
 
+The command creates a unique smoke endpoint and Project on every invocation so
+an explicitly disposable repository can be retested without invalidating RED
+proof. It still merges a real change; do not point it at an attendee repository.
+
 After all checks pass, tag `workshop-v1.1.0`, make the repository public, and
 enable GitHub template mode. Those external owner actions are intentionally not
 automated by the factory.

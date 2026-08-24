@@ -230,6 +230,45 @@ class FactoryContractTests(unittest.TestCase):
             ):
                 run_live_github_smoke(repo, True)
 
+    def test_live_smoke_uses_a_run_specific_endpoint_for_repeatable_red_proof(self):
+        class StopAfterProductReview(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / ".factory/plans").mkdir(parents=True)
+            backend = Mock(owner="giolaq", name="test1")
+            briefs = []
+
+            def checked(command, cwd, timeout=180):
+                if "plan" in command:
+                    brief_path = repo / command[command.index("plan") + 1]
+                    briefs.append(brief_path.read_text())
+                    (repo / ".factory/plans/latest.json").write_text(json.dumps({
+                        "plan_id": "live-plan",
+                    }))
+                if command[-3:] == ["review", "product", "live-plan"]:
+                    raise StopAfterProductReview
+                return ""
+
+            run_ids = [
+                Mock(hex="1111111111abcdef"),
+                Mock(hex="2222222222abcdef"),
+            ]
+            with (
+                patch("github_backend.GitHubBackend", return_value=backend),
+                patch("release_check.shutil.which", return_value="/usr/bin/gh"),
+                patch("release_check.uuid.uuid4", side_effect=run_ids),
+                patch("release_check._checked", side_effect=checked),
+            ):
+                for _ in run_ids:
+                    with self.assertRaises(StopAfterProductReview):
+                        run_live_github_smoke(repo, True)
+
+            self.assertIn("GET /api/factory-smoke-1111111111", briefs[0])
+            self.assertIn("GET /api/factory-smoke-2222222222", briefs[1])
+            self.assertNotEqual(briefs[0], briefs[1])
+
     def test_live_smoke_repairs_each_first_technical_validation_once(self):
         class StopAfterBoundedRepair(Exception):
             pass

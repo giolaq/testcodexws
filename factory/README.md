@@ -571,7 +571,8 @@ credentials, obsolete participant-facing language, and a clean worktree. The
 planning, approval, execution-role, and retry path. Maintainers can additionally
 validate GitHub Issue, Project, PR, merge, and dashboard synchronization from a
 disposable repository. This opt-in check runs Claude planning and delivery with
-a deterministic review adapter, creates a fresh Project, approves independent
+a deterministic review adapter, creates a fresh Project and run-specific smoke
+endpoint, approves independent
 Acceptance Tests, returns one review comment to the same implementation branch,
 merges the repaired Ticket, and verifies its Evidence Packet links:
 
@@ -579,6 +580,10 @@ merges the repaired Ticket, and verifies its Evidence Packet links:
 ./factory/factory release-check --live-smoke \
   --confirm-disposable-repo
 ```
+
+The unique endpoint preserves causal RED proof when the same explicitly
+disposable repository is reused. Every invocation still creates and merges a
+real change, so never run this command against an attendee or product repository.
 
 ## Operator reference
 

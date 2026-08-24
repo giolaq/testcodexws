@@ -450,6 +450,7 @@ def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
     backend = GitHubBackend(repo)
     backend.preflight()
     run_id = uuid.uuid4().hex[:10]
+    endpoint = f"/api/factory-smoke-{run_id}"
     repository = f"{backend.owner}/{backend.name}"
     factory = [sys.executable, "factory/orchestrator.py"]
     _checked([
@@ -469,13 +470,13 @@ def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
     ], repo, timeout=None)
     prd = repo / ".factory" / f"live-smoke-{run_id}.md"
     prd.parent.mkdir(parents=True, exist_ok=True)
-    prd.write_text("""# Factory live smoke
+    prd.write_text(f"""# Factory live smoke
 
 ## Problem
 The release needs objective proof that the external Claude delivery path works.
 
 ## Desired behavior
-Add one reversible `GET /api/factory-smoke` endpoint to the demo application.
+Add one reversible `GET {endpoint}` endpoint to the demo application.
 It returns JSON with exactly `status: ready` and does not change existing routes.
 
 ## Scope
