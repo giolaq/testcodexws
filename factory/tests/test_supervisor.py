@@ -99,6 +99,81 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(state["status"], "ready")
             self.assertEqual(state["latest"]["id"], "supervisor-1")
 
+    def test_coordinate_repairs_one_invalid_adapter_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            responses = iter([
+                {
+                    "schema_version": 1,
+                    "summary": "Dispatch the ready Ticket.",
+                    "dispatch": [{"ticket": 1, "instruction": "x" * 1201}],
+                    "block": [],
+                },
+                {
+                    "schema_version": 1,
+                    "summary": "Dispatch the ready Ticket with a bounded instruction.",
+                    "dispatch": [{"ticket": 1, "instruction": "Implement the approved Ticket scope."}],
+                    "block": [],
+                },
+            ])
+            prompts = []
+
+            supervisor = AgentSupervisor(
+                repo,
+                agent="test-supervisor",
+                template="unused",
+                python=sys.executable,
+                codex_bin="",
+                scenario="recipe-rebrand",
+                mock=True,
+                agent_timeout=10,
+                invoke=lambda prompt: (
+                    prompts.append(Path(prompt)) or 0,
+                    json.dumps(next(responses)),
+                ),
+            )
+
+            decision = supervisor.coordinate([self.ticket(1)], 1)
+
+            self.assertEqual(
+                decision["dispatch"][0]["instruction"],
+                "Implement the approved Ticket scope.",
+            )
+            self.assertEqual(len(prompts), 2)
+            repair_prompt = prompts[1].read_text()
+            self.assertIn("longer than 1200 characters", repair_prompt)
+
+    def test_coordinate_fails_closed_after_one_invalid_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            calls = []
+            invalid = {
+                "schema_version": 1,
+                "summary": "Dispatch the ready Ticket.",
+                "dispatch": [{"ticket": 1, "instruction": "x" * 1201}],
+                "block": [],
+            }
+            supervisor = AgentSupervisor(
+                repo,
+                agent="test-supervisor",
+                template="unused",
+                python=sys.executable,
+                codex_bin="",
+                scenario="recipe-rebrand",
+                mock=True,
+                agent_timeout=10,
+                invoke=lambda prompt: (calls.append(Path(prompt)) or 0, json.dumps(invalid)),
+            )
+
+            with self.assertRaisesRegex(SupervisorError, "longer than 1200 characters"):
+                supervisor.coordinate([self.ticket(1)], 1)
+
+            self.assertEqual(len(calls), 2)
+            state = json.loads((repo / ".factory/supervisor/state.json").read_text())
+            self.assertEqual(state["status"], "failed")
+            self.assertEqual(len(state["attempts"]), 2)
+            self.assertTrue(all(item["validation_error"] for item in state["attempts"]))
+
     def test_invalid_or_silent_decisions_are_rejected(self):
         with self.assertRaisesRegex(SupervisorError, "unavailable ticket"):
             validate_decision({

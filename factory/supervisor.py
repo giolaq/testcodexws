@@ -253,16 +253,56 @@ class AgentSupervisor:
             "error": "",
         }
         _write_json(self.state_path, running)
+        attempts = []
         try:
             code, output = self.invoke(prompt) if self.invoke else self._invoke(prompt, sequence)
             log.parent.mkdir(parents=True, exist_ok=True)
             log.write_text(output)
             if code:
                 raise SupervisorError(f"Supervisor adapter exited with code {code}; inspect {log.relative_to(self.repo)}.")
-            decision = validate_decision(extract_decision(output), candidates, max_parallel)
+            attempts.append({
+                "prompt": str(prompt.relative_to(self.repo)),
+                "log": str(log.relative_to(self.repo)),
+                "validation_error": "",
+            })
+            try:
+                decision = validate_decision(extract_decision(output), candidates, max_parallel)
+            except SupervisorError as first_error:
+                attempts[-1]["validation_error"] = str(first_error)
+                prompt = self._repair_prompt(sequence, prompt, output, first_error)
+                log = self.repo / ".factory" / "logs" / f"supervisor-{sequence}-repair-1.log"
+                running.update(
+                    updated_at=_now(),
+                    current_prompt=str(prompt.relative_to(self.repo)),
+                    current_log=str(log.relative_to(self.repo)),
+                    error=str(first_error),
+                )
+                _write_json(self.state_path, running)
+                code, output = self.invoke(prompt) if self.invoke else self._invoke(prompt, sequence)
+                log.parent.mkdir(parents=True, exist_ok=True)
+                log.write_text(output)
+                if code:
+                    raise SupervisorError(
+                        f"Supervisor repair adapter exited with code {code}; inspect {log.relative_to(self.repo)}."
+                    )
+                attempts.append({
+                    "prompt": str(prompt.relative_to(self.repo)),
+                    "log": str(log.relative_to(self.repo)),
+                    "validation_error": "",
+                })
+                try:
+                    decision = validate_decision(extract_decision(output), candidates, max_parallel)
+                except SupervisorError as repair_error:
+                    attempts[-1]["validation_error"] = str(repair_error)
+                    raise
         except Exception as exc:
             error = exc if isinstance(exc, SupervisorError) else SupervisorError(str(exc))
-            running.update(status="failed", updated_at=_now(), error=str(error))
+            running.update(
+                status="failed",
+                updated_at=_now(),
+                error=str(error),
+                attempts=attempts,
+            )
             _write_json(self.state_path, running)
             raise error
 
@@ -274,6 +314,7 @@ class AgentSupervisor:
             "input_hash": input_hash,
             "prompt": str(prompt.relative_to(self.repo)),
             "log": str(log.relative_to(self.repo)),
+            "attempts": attempts,
             "worker_reports": supervisor_input["worker_reports"],
         })
         events = [*state.get("events", []), decision][-MAX_EVENTS:]
@@ -447,7 +488,9 @@ class AgentSupervisor:
             "# Agent Supervisor coordination checkpoint\n\n"
             "Coordinate only the dependency-ready Tickets in the supplied state. Worker agents report "
             "through Handoff Receipts. Select a safe dispatch wave, reduce concurrency when coordination "
-            "requires it, and give each dispatched Ticket one concise instruction. Block a Ticket only "
+            "requires it, and give each dispatched Ticket one concise instruction of at most 1200 "
+            "characters. The Ticket already carries its approved scope, so do not repeat its specification; "
+            "use the instruction only for coordination guidance. Block a Ticket only "
             "when its reports or current state show a concrete risk that requires intervention.\n\n"
             "You cannot change scope, dependencies, lifecycle state, tests, gates, human approvals, or "
             "repository policy. The orchestrator validates and applies your proposed commands.\n\n"
@@ -460,6 +503,29 @@ class AgentSupervisor:
             "## Required response\n\nReturn exactly one JSON object and no Markdown:\n\n"
             '{"schema_version":1,"summary":"...","dispatch":[{"ticket":1,'
             '"instruction":"..."}],"block":[{"ticket":2,"reason":"..."}]}\n'
+        )
+        return path
+
+    def _repair_prompt(
+        self,
+        sequence: int,
+        original_prompt: Path,
+        previous_output: str,
+        error: SupervisorError,
+    ) -> Path:
+        path = self.repo / ".factory" / "prompts" / f"supervisor-{sequence}-repair-1.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            original_prompt.read_text()
+            + "\n\n## Validation repair\n\n"
+            + "The previous response was rejected by the deterministic supervisor contract. "
+            + "Return a corrected replacement for the same decision. Preserve the intended dispatch or "
+            + "block outcome, but fix the validation error. Do not repeat the Ticket specification in an "
+            + "instruction; keep every summary, instruction, and block reason at or below 1200 characters.\n\n"
+            + f"Validation error: {error}\n\n"
+            + "<rejected-response>\n"
+            + previous_output
+            + "\n</rejected-response>\n"
         )
         return path
 
