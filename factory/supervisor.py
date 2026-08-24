@@ -14,6 +14,7 @@ import json
 import os
 import shlex
 import subprocess
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -229,8 +230,13 @@ class AgentSupervisor:
         self.directory = self.repo / ".factory" / "supervisor"
         self.state_path = self.directory / "state.json"
         self.charter = FactoryCharter.load(self.repo, require_approved=True)
+        self._authority_lock = threading.Lock()
 
     def coordinate(self, tickets: list[dict], max_parallel: int) -> dict:
+        with self._authority_lock:
+            return self._coordinate(tickets, max_parallel)
+
+    def _coordinate(self, tickets: list[dict], max_parallel: int) -> dict:
         candidates = {int(ticket["number"]) for ticket in tickets if ticket.get("status") == "Ready"}
         if not candidates:
             raise SupervisorError("Supervisor requires at least one dependency-ready ticket.")
@@ -334,6 +340,11 @@ class AgentSupervisor:
 
     def authorize_merge(self, ticket: dict) -> dict:
         """Return one validated MERGE or BLOCK command for an approved PR."""
+        with self._authority_lock:
+            return self._authorize_merge(ticket)
+
+    def _authorize_merge(self, ticket: dict) -> dict:
+        """Run one serialized merge checkpoint against durable Supervisor state."""
         # Validate invariants before an agent is allowed to consider the merge.
         baseline = {
             "schema_version": SCHEMA_VERSION,

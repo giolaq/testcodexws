@@ -2,7 +2,10 @@ import json
 import shutil
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -268,6 +271,71 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(decision["kind"], "merge")
             state = json.loads((repo / ".factory/supervisor/state.json").read_text())
             self.assertEqual(state["latest"]["id"], "supervisor-merge-1")
+
+    def test_parallel_merge_checkpoints_are_serialized_with_distinct_receipts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = self.make_repo(directory)
+            activity_lock = threading.Lock()
+            active = 0
+            peak_active = 0
+
+            def ticket(number: int, head: str) -> dict:
+                value = self.ticket(number, status="In Review")
+                value.update({
+                    "pr_url": f"https://github.test/example/pull/{number}",
+                    "gate_results": [{"name": "tests", "required": True, "exit_code": 0}],
+                    "code_review": {
+                        "head": head,
+                        "result": {"decision": "APPROVE"},
+                        "publication": {"published": True, "official": True},
+                    },
+                })
+                return value
+
+            tickets = [ticket(7, "a" * 40), ticket(8, "b" * 40)]
+
+            def invoke(prompt: Path) -> tuple[int, str]:
+                nonlocal active, peak_active
+                body = Path(prompt).read_text()
+                number = 7 if "pull/7" in body else 8
+                head = "a" * 40 if number == 7 else "b" * 40
+                with activity_lock:
+                    active += 1
+                    peak_active = max(peak_active, active)
+                try:
+                    time.sleep(0.05)
+                    return 0, json.dumps({
+                        "schema_version": 1,
+                        "summary": "Merge the approved candidate.",
+                        "action": "MERGE",
+                        "ticket": number,
+                        "pull_request": f"https://github.test/example/pull/{number}",
+                        "candidate_head": head,
+                    })
+                finally:
+                    with activity_lock:
+                        active -= 1
+
+            supervisor = AgentSupervisor(
+                repo,
+                agent="test-supervisor",
+                template="unused",
+                python=sys.executable,
+                codex_bin="",
+                scenario="recipe-rebrand",
+                mock=True,
+                agent_timeout=10,
+                invoke=invoke,
+            )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                decisions = list(pool.map(supervisor.authorize_merge, tickets))
+
+            self.assertEqual(peak_active, 1)
+            self.assertEqual(
+                {decision["id"] for decision in decisions},
+                {"supervisor-merge-1", "supervisor-merge-2"},
+            )
 
 
 if __name__ == "__main__":
