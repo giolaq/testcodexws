@@ -303,6 +303,54 @@ class FactoryContractTests(unittest.TestCase):
             self.assertIn("GET /api/factory-smoke-2222222222", briefs[1])
             self.assertNotEqual(briefs[0], briefs[1])
 
+    def test_live_smoke_resolves_product_questions_with_preapproved_decisions(self):
+        class StopAfterProductApproval(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            run_dir = repo / ".factory/plans/live-plan"
+            run_dir.mkdir(parents=True)
+            backend = Mock(owner="giolaq", name="test1")
+            revised = False
+
+            def checked(command, cwd, timeout=180):
+                nonlocal revised
+                if "plan" in command:
+                    (repo / ".factory/plans/latest.json").write_text(json.dumps({
+                        "plan_id": "live-plan",
+                    }))
+                    (run_dir / "01-product-review.json").write_text(json.dumps({
+                        "blocking_questions": [
+                            "Where must the single-revert path be documented?",
+                        ],
+                    }))
+                if "revise" in command:
+                    self.assertEqual(
+                        command[command.index("revise") + 1:command.index("revise") + 3],
+                        ["live-plan", "product"],
+                    )
+                    feedback = command[command.index("--feedback") + 1]
+                    self.assertIn("pull request description", feedback)
+                    self.assertIn("Evidence Packet", feedback)
+                    self.assertIn("smallest existing-project-compatible option", feedback)
+                    (run_dir / "01-product-review.json").write_text(json.dumps({
+                        "blocking_questions": [],
+                    }))
+                    revised = True
+                if "approve-product" in command:
+                    self.assertTrue(revised)
+                    raise StopAfterProductApproval
+                return ""
+
+            with (
+                patch("github_backend.GitHubBackend", return_value=backend),
+                patch("release_check.shutil.which", return_value="/usr/bin/gh"),
+                patch("release_check._checked", side_effect=checked),
+                self.assertRaises(StopAfterProductApproval),
+            ):
+                run_live_github_smoke(repo, True)
+
     def test_live_smoke_repairs_each_first_technical_validation_once(self):
         class StopAfterBoundedRepair(Exception):
             pass
@@ -332,6 +380,9 @@ class FactoryContractTests(unittest.TestCase):
                     if "plan" in command:
                         (repo / ".factory/plans/latest.json").write_text(json.dumps({
                             "plan_id": "live-plan",
+                        }))
+                        (run_dir / "01-product-review.json").write_text(json.dumps({
+                            "blocking_questions": [],
                         }))
                     if command[-2:] == ["continue-plan", "live-plan"]:
                         continue_attempts += 1

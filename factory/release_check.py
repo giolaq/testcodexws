@@ -439,6 +439,42 @@ def _continue_live_smoke_plan(repo: Path, factory: list[str], plan_id: str) -> N
         repaired.add(stage)
 
 
+def _resolve_live_smoke_product_questions(
+    repo: Path,
+    factory: list[str],
+    plan_id: str,
+) -> None:
+    """Apply the release owner's predefined smoke decisions once, then fail closed."""
+    product_path = repo / ".factory/plans" / plan_id / "01-product-review.json"
+    product = json.loads(product_path.read_text())
+    questions = product.get("blocking_questions", [])
+    if not questions:
+        return
+    feedback = (
+        "This disposable release audit has these authoritative product decisions. "
+        "Document the single-revert path in the pull request description and the generated "
+        "Evidence Packet only; do not add a committed documentation artifact. The release "
+        "owner has approved the Acceptance Test under demo-app/tests/. For any minor detail "
+        "not fixed by the PRD, choose the smallest existing-project-compatible option that "
+        "preserves current behavior and the exact endpoint contract. Apply these decisions "
+        "to every blocking question and return a complete Product Review. Do not broaden scope."
+    )
+    _checked([
+        *factory,
+        "revise",
+        plan_id,
+        "product",
+        "--feedback",
+        feedback,
+    ], repo, timeout=None)
+    revised = json.loads(product_path.read_text())
+    remaining = revised.get("blocking_questions", [])
+    if remaining:
+        raise RuntimeError(
+            "live smoke Product Review still has blocking questions after its one bounded revision"
+        )
+
+
 def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
     """Exercise live Claude delivery and deterministic review rework in a disposable repo."""
     if not confirmed:
@@ -485,6 +521,8 @@ Implement and test only this endpoint. Keep the change offline and deterministic
 Human approval for this disposable smoke explicitly covers adding the Acceptance Test under `demo-app/tests/`.
 The endpoint remains in the disposable repository after merge; cleanup or removal is outside this smoke run.
 Prove reversibility by documenting the single-revert path, not by planning a removal ticket.
+Record that path in the pull request description and generated Evidence Packet only; do not add a committed documentation artifact.
+For any minor implementation detail not fixed above, choose the smallest existing-project-compatible option that preserves current behavior and this exact endpoint contract. No other product decision requires escalation for this disposable smoke.
 
 ## Success evidence
 An independent Acceptance Test proves the status code, JSON payload, and an existing route regression.
@@ -507,6 +545,7 @@ The implementation passes every configured gate and is merged through a pull req
     ], repo, timeout=None)
     plan_id = json.loads((repo / ".factory/plans/latest.json").read_text())["plan_id"]
     _checked([*factory, "review", "product", plan_id], repo, timeout=None)
+    _resolve_live_smoke_product_questions(repo, factory, plan_id)
     _checked([*factory, "approve-product", plan_id, "--yes"], repo, timeout=None)
     _continue_live_smoke_plan(repo, factory, plan_id)
     _checked([*factory, "review", "alignment", plan_id], repo, timeout=None)
