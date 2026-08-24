@@ -3,26 +3,28 @@
 **Roadmap:** `0001-production-minded-factory-and-workshop-roadmap.md`  
 **Release identity:** `workshop-v1.1.0`  
 **Branch:** `codex/agent-supervisor`  
-**Audited implementation baseline:** `736a5cc`
+**Audited implementation baseline:** `f166dfe`
 **Audit date:** 2026-08-24
 
 ## Verdict
 
-The roadmap's local implementation, credential-free Standard Rehearsal, and
-owner-authorized Live GitHub delivery/recovery path are complete and verified.
-The release is not yet publishable because the Live run's ignored local
-planning and Handoff Receipt files were cleared before the Evidence Packet was
-exported. A second disposable baseline repository is required to repeat that
-final export without removing the intentionally retained endpoint from the
-first smoke repository. The public Vercel site also still serves an older
-build, and the private repository has not yet been tagged or enabled as a
-public template. These are release gates, not silently accepted omissions.
+The roadmap's local implementation and credential-free Standard Rehearsal are
+complete and verified. The first owner-authorized Live GitHub run proved
+delivery and recovery but did not preserve an Evidence Packet before reset.
+The Live release command now creates a unique endpoint per invocation and
+exports the packet before reset, so an explicitly disposable repository can be
+reused without invalidating causal RED proof. The previously authorized
+`giolaq/test1` repository is no longer available on GitHub, so a new disposable
+target must be authorized before the final Live proof can run. The public
+Vercel site also still serves an older build, and the private repository has
+not yet been tagged or enabled as a public template. These are release gates,
+not silently accepted omissions.
 
 | Scope | Verdict | Authoritative evidence |
 | --- | --- | --- |
 | Milestones 0–6 | PASS | Source contracts, operator surfaces, focused tests, full Python suite, website suite, and Standard Rehearsal |
 | Milestone 7 local behavior | PASS | Compatibility/update tests, release audit, clean-clone Standard Rehearsal, link/secret/version checks |
-| Disposable Live GitHub path | DELIVERY + RECOVERY PASS; PACKET RERUN REQUIRED | `giolaq/test1` [Project #8](https://github.com/users/giolaq/projects/8), [Issue #11](https://github.com/giolaq/test1/issues/11), [PR #12](https://github.com/giolaq/test1/pull/12), exact-head human merge, remote run summary, and fresh-local-state recovery are verified; local packet export was interrupted |
+| Disposable Live GitHub path | HISTORICAL DELIVERY + RECOVERY PASS; CURRENT PACKET TARGET REQUIRED | The first `giolaq/test1` run reached Project #8, Issue #11, PR #12, exact-head human merge, remote run summary, and fresh-local-state recovery. That repository is no longer resolvable, so those links are historical rather than current release evidence. |
 | Deployed website identity | FAIL — old deployment | `https://software-refactory-workshop.vercel.app/` does not currently render `workshop-v1.1.0` or the new evidence/Monitor language |
 | Tag and public-template settings | PENDING | Repository is private, `main` is the default branch, and `isTemplate` is false |
 
@@ -212,7 +214,7 @@ Proof:
 - Visible copy remains below the 3,200-word budget, and the documented timeline
   remains 100 minutes.
 
-### Milestone 7 — Release and adoption hardening: LIVE DELIVERY PASS, PACKET PENDING
+### Milestone 7 — Release and adoption hardening: LOCAL PASS, LIVE PACKET TARGET REQUIRED
 
 - `factory/COMPATIBILITY.md` documents migration and reset behavior.
 - `factory/workshop_update.py` provides a versioned preview/apply path, records
@@ -228,6 +230,9 @@ Proof:
   Issue publication, remote claim, Claude QA/implementation/supervision,
   deterministic review request/repair/approval, exact-revision human merge,
   remote summary, Monitor, Evidence Packet, local reset, and fresh recovery.
+- Every Live smoke invocation uses a unique endpoint and Project. This keeps
+  the pre-implementation behavior absent on a reused disposable repository and
+  preserves valid RED proof without rewriting prior GitHub history.
 - CI installs the test runtime dependencies before the full unit suite. Release
   documentation uses the setup-created `.factory/venv`, preventing missing
   `pytest` from masquerading as causal-evidence failures.
@@ -239,8 +244,8 @@ Proof:
 - Local release audit: PASS for `workshop-v1.1.0`.
 - Clean Standard Rehearsal: PASS for plan `410326debec4`, five Tickets, Evidence
   Packet, and healthy Monitor.
-- Disposable Live delivery/recovery smoke: PASS against `giolaq/test1` Project
-  #8, Issue #11, and PR #12. The first supervisor reply stayed within its
+- Historical disposable Live delivery/recovery smoke: PASS against the former
+  `giolaq/test1` Project #8, Issue #11, and PR #12. The first supervisor reply stayed within its
   bounded contract; Claude QA produced a behavior-assertion RED, implementation
   produced GREEN, Mock Review recorded `REQUEST_CHANGES` then `APPROVE` on two
   distinct heads, the Supervisor recommended `MERGE`, and the human merge gate
@@ -248,7 +253,7 @@ Proof:
 - Fresh-state recovery: PASS. After local reset, a new run reconstructed Issue
   #11 as `Done`, restored PR #12 and claim `ea8522b`, and marked the sanitized
   remote summary as recovered.
-- Evidence Packet: NOT EXPORTED. An operator-side workflow reproduction was
+- Evidence Packet from that run: NOT EXPORTED. An operator-side workflow reproduction was
   launched from the disposable checkout instead of its temporary worktree and
   cleared ignored local planning/receipt artifacts before export. No packet is
   claimed. The checkout and remote default branch were restored without
@@ -260,8 +265,8 @@ Proof:
   serialized without reducing worker concurrency (`b11a3cb`); CI asserts the
   human merge gates rather than retired automatic completion (`9451092`); and
   Monitor evaluates the latest default-branch result per workflow (`736a5cc`).
-- GitHub Actions: PASS on
-  [run 32679270165](https://github.com/giolaq/test1/actions/runs/32679270165) for the 218-test
+- GitHub Actions on the former disposable repository: PASS was recorded for
+  run 32679270165 and the 218-test
   suite, TV first wave, and recipe first wave. Publishing the existing
   `factory-baseline` tag made baseline fixtures available to Actions.
 - Monitor: HEALTHY after remote recovery was proved and the completed Ticket's
@@ -288,8 +293,8 @@ Proof:
 Run from the repository root on 2026-08-24:
 
 ```text
-.factory/venv/bin/python -m unittest discover -s factory/tests -p 'test_*.py'
-218 tests · PASS · 33.582s
+.factory/venv/bin/python -m pytest -q factory/tests
+221 tests · PASS · 32.86s
 
 npm --prefix workshop-guide test
 8 tests · PASS
@@ -319,16 +324,19 @@ and reproducible.
 
 ## Remaining release gates
 
-1. Authorize a second disposable baseline repository. `giolaq/test1` now
-   intentionally contains the merged smoke endpoint, so reusing it would not
-   produce valid pre-implementation RED evidence.
-2. From that fresh repository, run:
+1. Authorize an explicitly disposable GitHub repository. The previously
+   authorized `giolaq/test1` repository is no longer available. Do not use the
+   active `giolaq/testcodexws` TETHER repository without separate approval.
+2. From that disposable repository, run:
 
    ```sh
    ./factory/factory release-check --live-smoke \
      --confirm-disposable-repo
    ```
 
+   The command generates a unique endpoint, so the same disposable repository
+   may be reused for later release checks without making the focused test pass
+   before implementation.
 3. Confirm the command exports and validates the Evidence Packet before local
    reset, then inspect the Project, Issue, PR review/rework, human merge, remote
    claim/run summary, Monitor output, reset, and fresh recovery.
