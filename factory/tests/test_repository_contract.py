@@ -69,6 +69,20 @@ class RepositoryContractTests(unittest.TestCase):
                 text,
             )
 
+    def test_rehearsal_workflow_asserts_the_human_merge_gate(self):
+        workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
+
+        self.assertIn(
+            "assert in_review == [1, 3, 7]",
+            workflow,
+        )
+        self.assertIn(
+            "assert in_review == [1, 2]",
+            workflow,
+        )
+        self.assertNotIn("assert all(ticket['status'] == 'Done'", workflow)
+        self.assertNotIn("sum(t['status'] == 'Done'", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

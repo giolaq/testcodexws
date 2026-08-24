@@ -32,16 +32,22 @@ jobs:
           node-version: "22"
       - run: ./setup_demo.sh --scenario tv
       - run: ./factory/factory run --mock --scenario tv --once --max-parallel 4
-      - name: Assert TV workshop outcomes and QA coverage
+      - name: Assert TV first wave and human merge gates
         run: |
           .factory/venv/bin/python - <<'PY'
           import json
           state = json.load(open('.factory/state.json'))
           tickets = {ticket['number']: ticket for ticket in state['tickets']}
-          assert sum(t['status'] == 'Done' for t in tickets.values()) == 7
-          assert [t['number'] for t in tickets.values() if t['status'] == 'Blocked'] == [8]
-          assert all(tickets[number]['qa_tests'] for number in range(1, 8))
-          assert tickets[7].get('merge_conflict_path')
+          in_review = [number for number, ticket in tickets.items() if ticket['status'] == 'In Review']
+          backlog = [number for number, ticket in tickets.items() if ticket['status'] == 'Backlog']
+          blocked = [number for number, ticket in tickets.items() if ticket['status'] == 'Blocked']
+          assert in_review == [1, 3, 7]
+          assert backlog == [2, 4, 5, 6]
+          assert blocked == [8]
+          assert all(tickets[number]['qa_tests'] for number in in_review)
+          assert all(tickets[number]['gate_results'] for number in in_review)
+          assert all(tickets[number]['code_review']['result']['decision'] == 'APPROVE' for number in in_review)
+          assert all(tickets[number]['approved_head'] for number in in_review)
           assert 'QA acceptance-test phase failed' in tickets[8]['failure']
           PY
 
@@ -59,16 +65,24 @@ jobs:
           node-version: "22"
       - run: ./setup_demo.sh --scenario recipe-rebrand
       - run: ./factory/factory run --mock --scenario recipe-rebrand --once --max-parallel 4
-      - name: Assert TableStory outcomes and QA coverage
+      - name: Assert TableStory first wave and human merge gates
         run: |
           .factory/venv/bin/python - <<'PY'
           import json
           state = json.load(open('.factory/state.json'))
           tickets = state['tickets']
           assert len(tickets) == 5
-          assert all(ticket['status'] == 'Done' for ticket in tickets)
-          assert all(ticket['qa_tests'] for ticket in tickets)
-          assert all(ticket['gate_results'] for ticket in tickets)
+          in_review = [ticket['number'] for ticket in tickets if ticket['status'] == 'In Review']
+          backlog = [ticket['number'] for ticket in tickets if ticket['status'] == 'Backlog']
+          assert in_review == [1, 2]
+          assert backlog == [3, 4, 5]
+          assert all(ticket['qa_tests'] for ticket in tickets if ticket['number'] in in_review)
+          assert all(ticket['gate_results'] for ticket in tickets if ticket['number'] in in_review)
+          assert all(
+              ticket['code_review']['result']['decision'] == 'APPROVE'
+              for ticket in tickets if ticket['number'] in in_review
+          )
+          assert all(ticket['approved_head'] for ticket in tickets if ticket['number'] in in_review)
           PY
       - run: .factory/venv/bin/python -m pytest -q demo-app/tests
       - run: node --test demo-app/static/tests/*.test.js
