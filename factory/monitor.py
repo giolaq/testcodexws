@@ -161,11 +161,19 @@ class FactoryMonitor:
                     "--branch", default_branch,
                     "--limit", "10", "--json", "databaseId,status,conclusion,workflowName,url,headSha",
                 )
-                failed = [run for run in ci if run.get("conclusion") == "failure"]
+                latest_by_workflow = {}
+                for run in ci:
+                    workflow = run.get("workflowName") or f"run-{run.get('databaseId', 'unknown')}"
+                    latest_by_workflow.setdefault(workflow, run)
+                failed = [
+                    run for run in latest_by_workflow.values()
+                    if run.get("conclusion") == "failure"
+                ]
                 if failed:
                     findings.append(_finding(
                         "default-branch-ci", "Default-branch CI has failures",
-                        f"{len(failed)} of the latest {len(ci)} recorded runs failed.", severity="blocking",
+                        f"The latest run is failing for {len(failed)} of {len(latest_by_workflow)} workflows.",
+                        severity="blocking",
                     ))
             except Exception as exc:
                 limitations.append(f"CI status could not be read: {str(exc)[:500]}")

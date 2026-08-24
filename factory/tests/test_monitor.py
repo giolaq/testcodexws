@@ -101,6 +101,43 @@ class MonitorTests(unittest.TestCase):
             self.assertIn("stale-ticket", kinds)
             self.assertIn("review-wait", kinds)
 
+    def test_latest_success_clears_an_older_failure_for_the_same_workflow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+            project = ProjectContract.detect(repo); project.write()
+            charter = FactoryCharter.draft(repo, project); charter.write(); charter.approve()
+            backend = mock.Mock()
+            backend.load.return_value = []
+            backend._git.return_value = subprocess.CompletedProcess(["git"], 0, "", "")
+            backend.default_branch = "main"
+            backend.owner, backend.name = "attendee", "project"
+            backend.json.side_effect = [
+                [
+                    {
+                        "databaseId": 2,
+                        "workflowName": "Factory rehearsal",
+                        "status": "completed",
+                        "conclusion": "success",
+                    },
+                    {
+                        "databaseId": 1,
+                        "workflowName": "Factory rehearsal",
+                        "status": "completed",
+                        "conclusion": "failure",
+                    },
+                ],
+                [],
+            ]
+
+            report = FactoryMonitor(repo, backend).collect()
+
+            self.assertNotIn(
+                "default-branch-ci",
+                {item["kind"] for item in report["findings"]},
+            )
+            self.assertEqual(len(report["ci"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
