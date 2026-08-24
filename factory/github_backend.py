@@ -424,9 +424,14 @@ class GitHubBackend:
         }
 
     def merge_pr(self, pr_url: str):
-        result = self.gh("pr", "merge", pr_url, "--merge", "--delete-branch", check=False)
+        result = self.gh("pr", "merge", pr_url, "--merge", check=False)
         if result.returncode:
-            raise GitHubError(result.stderr.strip() or result.stdout.strip())
+            try:
+                merged = self.json("pr", "view", pr_url, "--json", "mergedAt")
+            except GitHubError:
+                merged = {}
+            if not merged.get("mergedAt"):
+                raise GitHubError(result.stderr.strip() or result.stdout.strip())
 
     def assert_pr_head(self, pr_url: str, expected_head: str):
         value = self.json("pr", "view", pr_url, "--json", "headRefOid")

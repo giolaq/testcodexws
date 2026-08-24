@@ -234,6 +234,27 @@ class GitHubReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(GitHubError, "changed after"):
             backend.assert_pr_head("https://github.test/example/pull/7", "approved-head")
 
+    def test_merge_leaves_ticket_branch_cleanup_to_the_orchestrator(self):
+        backend = GitHubBackend(Path.cwd())
+        backend.gh = mock.Mock(return_value=completed())
+
+        backend.merge_pr("https://github.test/example/pull/7")
+
+        backend.gh.assert_called_once_with(
+            "pr", "merge", "https://github.test/example/pull/7", "--merge", check=False,
+        )
+
+    def test_merge_retry_accepts_an_already_merged_pull_request(self):
+        backend = GitHubBackend(Path.cwd())
+        backend.gh = mock.Mock(return_value=completed(1, stderr="pull request is already merged"))
+        backend.json = mock.Mock(return_value={"mergedAt": "2026-08-24T00:53:37Z"})
+
+        backend.merge_pr("https://github.test/example/pull/7")
+
+        backend.json.assert_called_once_with(
+            "pr", "view", "https://github.test/example/pull/7", "--json", "mergedAt",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

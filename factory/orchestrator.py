@@ -2903,6 +2903,8 @@ def human_merge_ticket(
     worktree = worktree_path(repo, number)
     run(["git", "worktree", "remove", "--force", str(worktree)], repo, check=False)
     run(["git", "branch", "-d", branch], repo, check=False)
+    if not mock:
+        run(["git", "push", "origin", "--delete", branch], repo, check=False)
     print(f"Ticket #{number} merged at {merged_head}.")
     return merged_head
 
