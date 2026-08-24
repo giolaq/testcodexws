@@ -69,6 +69,19 @@ class RepositoryContractTests(unittest.TestCase):
                 text,
             )
 
+    def test_release_workflow_uses_node_24_action_runtimes(self):
+        workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
+
+        self.assertEqual(workflow.count("uses: actions/checkout@v7"), 3)
+        self.assertEqual(workflow.count("uses: actions/setup-python@v7"), 3)
+        self.assertEqual(workflow.count("uses: actions/setup-node@v7"), 2)
+        for retired in (
+            "actions/checkout@v4",
+            "actions/setup-python@v5",
+            "actions/setup-node@v4",
+        ):
+            self.assertNotIn(retired, workflow)
+
     def test_rehearsal_workflow_asserts_the_human_merge_gate(self):
         workflow = (REPO / ".github/workflows/factory-verify.yml").read_text()
 

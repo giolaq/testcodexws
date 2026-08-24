@@ -3,7 +3,7 @@
 **Roadmap:** `0001-production-minded-factory-and-workshop-roadmap.md`  
 **Release identity:** `workshop-v1.1.0`  
 **Branch:** `codex/agent-supervisor`  
-**Audited implementation baseline:** `f166dfe`
+**Audited implementation baseline:** PR #36 current head
 **Audit date:** 2026-08-24
 
 ## Verdict
@@ -236,6 +236,9 @@ Proof:
 - CI installs the test runtime dependencies before the full unit suite. Release
   documentation uses the setup-created `.factory/venv`, preventing missing
   `pytest` from masquerading as causal-evidence failures.
+- CI uses the current Node 24 generations of the official checkout, Python,
+  and Node setup actions. A repository contract rejects the retired Node 20
+  action majors that GitHub otherwise runs through a compatibility fallback.
 
 Proof:
 
@@ -294,7 +297,7 @@ Run from the repository root on 2026-08-24:
 
 ```text
 .factory/venv/bin/python -m pytest -q factory/tests
-221 tests · PASS · 32.86s
+222 tests · PASS · 36.98s
 
 npm --prefix workshop-guide test
 8 tests · PASS
