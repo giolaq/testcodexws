@@ -3,23 +3,26 @@
 **Roadmap:** `0001-production-minded-factory-and-workshop-roadmap.md`  
 **Release identity:** `workshop-v1.1.0`  
 **Branch:** `codex/agent-supervisor`  
-**Audited implementation baseline:** `cff4397`  
-**Audit date:** 2026-08-23
+**Audited implementation baseline:** `736a5cc`
+**Audit date:** 2026-08-24
 
 ## Verdict
 
-The roadmap's local implementation and credential-free Standard Rehearsal are
-complete and verified. The release is not yet publishable because the
-owner-authorized disposable Live GitHub smoke has not run. The public Vercel
-site also still serves an older build, and the private repository has not yet
-been tagged or enabled as a public template. These are release gates, not
-silently accepted omissions.
+The roadmap's local implementation, credential-free Standard Rehearsal, and
+owner-authorized Live GitHub delivery/recovery path are complete and verified.
+The release is not yet publishable because the Live run's ignored local
+planning and Handoff Receipt files were cleared before the Evidence Packet was
+exported. A second disposable baseline repository is required to repeat that
+final export without removing the intentionally retained endpoint from the
+first smoke repository. The public Vercel site also still serves an older
+build, and the private repository has not yet been tagged or enabled as a
+public template. These are release gates, not silently accepted omissions.
 
 | Scope | Verdict | Authoritative evidence |
 | --- | --- | --- |
 | Milestones 0–6 | PASS | Source contracts, operator surfaces, focused tests, full Python suite, website suite, and Standard Rehearsal |
 | Milestone 7 local behavior | PASS | Compatibility/update tests, release audit, clean-clone Standard Rehearsal, link/secret/version checks |
-| Disposable Live GitHub path | PENDING OWNER AUTHORIZATION | Implemented by `release_check.run_live_github_smoke`; execution creates a Project, Issue, PR, reviews, merge, claims, comments, and Claude usage |
+| Disposable Live GitHub path | DELIVERY + RECOVERY PASS; PACKET RERUN REQUIRED | `giolaq/test1` [Project #8](https://github.com/users/giolaq/projects/8), [Issue #11](https://github.com/giolaq/test1/issues/11), [PR #12](https://github.com/giolaq/test1/pull/12), exact-head human merge, remote run summary, and fresh-local-state recovery are verified; local packet export was interrupted |
 | Deployed website identity | FAIL — old deployment | `https://software-refactory-workshop.vercel.app/` does not currently render `workshop-v1.1.0` or the new evidence/Monitor language |
 | Tag and public-template settings | PENDING | Repository is private, `main` is the default branch, and `isTemplate` is false |
 
@@ -209,7 +212,7 @@ Proof:
 - Visible copy remains below the 3,200-word budget, and the documented timeline
   remains 100 minutes.
 
-### Milestone 7 — Release and adoption hardening: LOCAL PASS, LIVE PENDING
+### Milestone 7 — Release and adoption hardening: LIVE DELIVERY PASS, PACKET PENDING
 
 - `factory/COMPATIBILITY.md` documents migration and reset behavior.
 - `factory/workshop_update.py` provides a versioned preview/apply path, records
@@ -236,7 +239,34 @@ Proof:
 - Local release audit: PASS for `workshop-v1.1.0`.
 - Clean Standard Rehearsal: PASS for plan `410326debec4`, five Tickets, Evidence
   Packet, and healthy Monitor.
-- Disposable Live smoke: not executed; see Remaining release gates.
+- Disposable Live delivery/recovery smoke: PASS against `giolaq/test1` Project
+  #8, Issue #11, and PR #12. The first supervisor reply stayed within its
+  bounded contract; Claude QA produced a behavior-assertion RED, implementation
+  produced GREEN, Mock Review recorded `REQUEST_CHANGES` then `APPROVE` on two
+  distinct heads, the Supervisor recommended `MERGE`, and the human merge gate
+  merged candidate `567c9b1` as `e66d889`.
+- Fresh-state recovery: PASS. After local reset, a new run reconstructed Issue
+  #11 as `Done`, restored PR #12 and claim `ea8522b`, and marked the sanitized
+  remote summary as recovered.
+- Evidence Packet: NOT EXPORTED. An operator-side workflow reproduction was
+  launched from the disposable checkout instead of its temporary worktree and
+  cleared ignored local planning/receipt artifacts before export. No packet is
+  claimed. The checkout and remote default branch were restored without
+  rewriting GitHub history.
+- Live defects found and fixed with regressions: one bounded Supervisor
+  decision repair (`7cbf956`), separation of GitHub merge from branch cleanup
+  plus idempotent already-merged recovery (`eff087b`), and merge-backend
+  preflight (`133dd55`). Parallel Supervisor authority checkpoints are now
+  serialized without reducing worker concurrency (`b11a3cb`); CI asserts the
+  human merge gates rather than retired automatic completion (`9451092`); and
+  Monitor evaluates the latest default-branch result per workflow (`736a5cc`).
+- GitHub Actions: PASS on
+  [run 32679270165](https://github.com/giolaq/test1/actions/runs/32679270165) for the 218-test
+  suite, TV first wave, and recipe first wave. Publishing the existing
+  `factory-baseline` tag made baseline fixtures available to Actions.
+- Monitor: HEALTHY after remote recovery was proved and the completed Ticket's
+  claim was explicitly released. Dependency advisories remain an observed
+  GitHub API limitation (`404`) rather than a hidden PASS claim.
 
 ## Required end-to-end scenario matrix
 
@@ -249,17 +279,17 @@ Proof:
 | Review comments return to the same branch | Standard runtime review-rework test and clean Rehearsal attempt history | PASS |
 | Standard cannot auto-merge | Human exact-head runtime test | PASS |
 | Autonomous Demo needs opt-in and exact head | Autonomous Demo runtime and Control Center tests | PASS |
-| Local reset preserves remote evidence | Reset scope tests and Live recovery implementation | PASS locally; remote proof pending Live smoke |
-| Fresh checkout reconstructs shared state | Three runtime recovery tests plus remote summary parsing tests | PASS with fakes; remote proof pending Live smoke |
+| Local reset preserves remote evidence | Reset scope tests plus Project #8 / Issue #11 recovery | PASS with remote proof |
+| Fresh checkout reconstructs shared state | Runtime tests plus Project #8 / Issue #11 / PR #12 reconstruction | PASS with remote proof |
 | Monitor publishes at most one unchanged finding | Monitor idempotence test | PASS |
 
 ## Verification record
 
-Run from the repository root on 2026-08-23:
+Run from the repository root on 2026-08-24:
 
 ```text
 .factory/venv/bin/python -m unittest discover -s factory/tests -p 'test_*.py'
-206 tests · PASS · 34.568s
+218 tests · PASS · 33.582s
 
 npm --prefix workshop-guide test
 8 tests · PASS
@@ -282,25 +312,28 @@ factory workshop-v1.1.0
 
 The first full-suite attempt used the host Python 3.14 interpreter and failed
 eight integration tests because that interpreter lacked `pytest`. The supported
-`.factory/venv` invocation above passed all 206 tests. Commit `cff4397` also
+`.factory/venv` invocation above passes all 218 tests. Commit `cff4397` also
 made CI install `demo-app/requirements.txt` and changed the release runbooks to
 use the prepared virtual environment, so this dependency error is now explicit
 and reproducible.
 
 ## Remaining release gates
 
-1. Confirm a dedicated GitHub repository is disposable and authorize external
-   mutations and Claude usage.
-2. From that repository, run:
+1. Authorize a second disposable baseline repository. `giolaq/test1` now
+   intentionally contains the merged smoke endpoint, so reusing it would not
+   produce valid pre-implementation RED evidence.
+2. From that fresh repository, run:
 
    ```sh
    ./factory/factory release-check --live-smoke \
      --confirm-disposable-repo
    ```
 
-3. Inspect the created Project, Issue, PR review/rework, human merge, remote
+3. Confirm the command exports and validates the Evidence Packet before local
+   reset, then inspect the Project, Issue, PR review/rework, human merge, remote
    claim/run summary, Monitor output, reset, and fresh recovery.
-4. Merge the release candidate to `main` only after the Live smoke passes.
+4. Merge the release candidate to `main` only after the repeated Live smoke
+   exports its packet and CI is green.
 5. Deploy the new website and verify the rendered footer contains
    `workshop-v1.1.0` plus the RED/GREEN, `NEEDS YOU`, Autonomous Demo, and
    Monitor sections.

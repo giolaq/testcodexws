@@ -1,6 +1,6 @@
 # Production-minded Factory and Workshop Roadmap
 
-**Status:** Release candidate — local gates passed; Live smoke pending
+**Status:** Release candidate — Live delivery/recovery and CI passed; packet rerun pending
 **Owner:** Workshop lead
 **Created:** 2026-08-23
 **Scope:** Factory engine, Control Center, GitHub integration, workshop website,
