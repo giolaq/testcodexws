@@ -245,6 +245,11 @@ Proof:
 - Every Live smoke invocation uses a unique endpoint and Project. This keeps
   the pre-implementation behavior absent on a reused disposable repository and
   preserves valid RED proof without rewriting prior GitHub history.
+- Live plan publication primes the Project contract before writing items and
+  retains the item IDs returned by GitHub instead of immediately replacing
+  them from an eventually consistent Project listing. A partial retry reuses
+  the plan-marked Issues, restores their approved initial Ready/Backlog states,
+  and completes the publication record without duplicate Issues.
 - CI installs the test runtime dependencies before the full unit suite. Release
   documentation uses the setup-created `.factory/venv`, preventing missing
   `pytest` from masquerading as causal-evidence failures.
@@ -256,6 +261,11 @@ Proof:
 
 - All four `test_workshop_update.py` tests and the repository release-command
   contract test.
+- `test_planner.py::test_publication_does_not_depend_on_an_immediate_project_item_listing`
+  and
+  `test_partial_publication_retry_reuses_the_issue_and_restores_its_initial_status`
+  reproduce and close the Live Project publication race observed after GitHub
+  had accepted all nine TETHER Issues and Project items.
 - Local release audit: PASS for `workshop-v1.1.0`.
 - Clean Standard Rehearsal: PASS for plan `410326debec4`, five Tickets, Evidence
   Packet, and healthy Monitor.
@@ -302,6 +312,7 @@ Proof:
 | Local reset preserves remote evidence | Reset scope tests plus Project #8 / Issue #11 recovery | PASS with remote proof |
 | Fresh checkout reconstructs shared state | Runtime tests plus Project #8 / Issue #11 / PR #12 reconstruction | PASS with remote proof |
 | Monitor publishes at most one unchanged finding | Monitor idempotence test | PASS |
+| Project listing lags after publication | Planner stale-listing and partial-retry tests | PASS |
 
 ## Verification record
 
@@ -309,7 +320,7 @@ Run from the repository root on 2026-08-24:
 
 ```text
 .factory/venv/bin/python -m unittest discover -s factory/tests
-235 tests · PASS · 34.3s
+238 tests · PASS · 40.1s
 
 npm --prefix workshop-guide test
 8 tests · PASS
@@ -332,7 +343,7 @@ factory workshop-v1.1.0
 
 The first full-suite attempt used the host Python 3.14 interpreter and failed
 eight integration tests because that interpreter lacked `pytest`. The supported
-`.factory/venv` invocation above passes all 235 tests. Commit `cff4397` also
+`.factory/venv` invocation above passes all 238 tests. Commit `cff4397` also
 made CI install `demo-app/requirements.txt` and changed the release runbooks to
 use the prepared virtual environment, so this dependency error is now explicit
 and reproducible.

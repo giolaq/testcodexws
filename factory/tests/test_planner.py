@@ -177,6 +177,116 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(backend.status_updates, [(41, "Ready")])
         self.assertEqual(published["publication"]["issues"], {"T1": 41})
 
+    def test_publication_does_not_depend_on_an_immediate_project_item_listing(self):
+        class DelayedProjectBackend:
+            instance = None
+
+            def __init__(self, repo, project_number=None):
+                type(self).instance = self
+                self.owner = "giolaq"
+                self.name = "test1"
+                self.project_number = project_number
+                self.status_updates = []
+                self.item_added = False
+
+            def preflight(self):
+                return None
+
+            def json(self, *args):
+                if args[:2] == ("issue", "list"):
+                    return []
+                if args[:2] == ("project", "view"):
+                    return {"url": "https://github.test/users/giolaq/projects/9"}
+                raise AssertionError(f"unexpected GitHub JSON call: {args}")
+
+            def gh(self, *args):
+                output = (
+                    "https://github.test/giolaq/test1/issues/1\n"
+                    if args[:2] == ("issue", "create") else ""
+                )
+                return subprocess.CompletedProcess(args, 0, output, "")
+
+            def add_issue_to_project(self, number, url):
+                self.item_added = True
+                return True
+
+            def load(self):
+                if self.item_added:
+                    raise AssertionError("publication must not immediately reload new Project items")
+                return []
+
+            def set_status(self, ticket, status, note):
+                self.status_updates.append((ticket["number"], status))
+
+        plan = sample_plan()
+        plan["tickets"] = plan["tickets"][:1]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(plan))
+
+            with mock.patch("planner.GitHubBackend", DelayedProjectBackend):
+                url = approve_plan(Path(directory), path, 9, True)
+
+            published = json.loads(path.read_text())
+
+        self.assertEqual(url, "https://github.test/users/giolaq/projects/9")
+        self.assertEqual(DelayedProjectBackend.instance.status_updates, [(1, "Ready")])
+        self.assertEqual(published["publication"]["issues"], {"T1": 1})
+
+    def test_partial_publication_retry_reuses_the_issue_and_restores_its_initial_status(self):
+        class PartialPublicationBackend:
+            instance = None
+
+            def __init__(self, repo, project_number=None):
+                type(self).instance = self
+                self.owner = "giolaq"
+                self.name = "test1"
+                self.project_number = project_number
+                self.status_updates = []
+
+            def preflight(self):
+                return None
+
+            def json(self, *args):
+                if args[:2] == ("issue", "list"):
+                    return [{
+                        "number": 1,
+                        "url": "https://github.test/giolaq/test1/issues/1",
+                        "body": "<!-- factory-plan:abc123:T1 -->",
+                        "labels": [{"name": "agent-ready"}],
+                    }]
+                if args[:2] == ("project", "view"):
+                    return {"url": "https://github.test/users/giolaq/projects/9"}
+                raise AssertionError(f"unexpected GitHub JSON call: {args}")
+
+            def gh(self, *args):
+                if args[:2] == ("issue", "create"):
+                    raise AssertionError("a partial publication retry must reuse the marked issue")
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            def add_issue_to_project(self, number, url):
+                return False
+
+            def load(self):
+                return []
+
+            def set_status(self, ticket, status, note):
+                self.status_updates.append((ticket["number"], status))
+
+        plan = sample_plan()
+        plan["tickets"] = plan["tickets"][:1]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(plan))
+
+            with mock.patch("planner.GitHubBackend", PartialPublicationBackend):
+                approve_plan(Path(directory), path, 9, True)
+
+            published = json.loads(path.read_text())
+
+        self.assertEqual(PartialPublicationBackend.instance.status_updates, [(1, "Ready")])
+        self.assertEqual(published["publication"]["issues"], {"T1": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -242,12 +242,26 @@ def approve_plan(
     )
     existing = backend.json(
         "issue", "list", "--repo", repository, "--state", "all", "--limit", 500,
-        "--json", "number,title,body,url",
+        "--json", "number,title,body,url,labels",
     )
     marker = re.compile(rf"<!-- factory-plan:{re.escape(plan['plan_id'])}:([^ ]+) -->")
     by_key = {ticket["key"]: ticket for ticket in plan["tickets"]}
     numbers = {}
     issue_urls = {int(issue["number"]): issue["url"] for issue in existing}
+    remote = {
+        int(issue["number"]): {
+            "number": int(issue["number"]),
+            "labels": [
+                label.get("name", "") if isinstance(label, dict) else str(label)
+                for label in issue.get("labels", [])
+            ],
+        }
+        for issue in existing
+    }
+    # Prime Project fields, item IDs, and lifecycle labels before publishing.
+    # GitHub's item listing is eventually consistent after item-add; do not
+    # replace the item IDs returned by those writes with an immediate reload.
+    backend.load()
     for issue in existing:
         match = marker.search(issue.get("body") or "")
         if match and match.group(1) in by_key:
@@ -264,6 +278,7 @@ def approve_plan(
         issue_url = result.stdout.strip().splitlines()[-1]
         numbers[key] = int(issue_url.rsplit("/", 1)[-1])
         issue_urls[numbers[key]] = issue_url
+        remote[numbers[key]] = {"number": numbers[key], "labels": ["agent-ready"]}
         created.add(numbers[key])
         print(f"Created #{numbers[key]}: {ticket['title']}")
     added_to_project = set()
@@ -275,10 +290,9 @@ def approve_plan(
         )
         if backend.add_issue_to_project(numbers[key], issue_urls[numbers[key]]):
             added_to_project.add(numbers[key])
-    remote = {ticket["number"]: ticket for ticket in backend.load()}
     for key in order:
         number = numbers[key]
-        if number in created or number in added_to_project:
+        if not plan.get("publication") or number in created or number in added_to_project:
             status = "Backlog" if by_key[key]["dependencies"] else "Ready"
             backend.set_status(remote[number], status, "Approved ticket plan")
     project = backend.json("project", "view", backend.project_number, "--owner", backend.owner, "--format", "json")
