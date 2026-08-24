@@ -45,6 +45,62 @@ def install_approved_charter(repo: Path, merge_authority: str = "human") -> None
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_live_human_merge_preflights_its_fresh_github_backend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            factory = repo / "factory"
+            factory.mkdir(parents=True)
+            source = Path(__file__).parents[1]
+            shutil.copy2(source / "roles.json", factory / "roles.json")
+            shutil.copy2(source / "policy.json", factory / "policy.json")
+            install_approved_charter(repo)
+            charter = FactoryCharter.load(repo, require_approved=True)
+            approved_head = "a" * 40
+            merged_head = "b" * 40
+            state_path = repo / ".factory/state.json"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(json.dumps({
+                "governance": {
+                    "charter_sha256": charter.policy_sha256(),
+                    "merge_authority": "human",
+                },
+                "tickets": [{
+                    "number": 7,
+                    "title": "Deliver one approved slice",
+                    "status": "In Review",
+                    "phase": "in-review",
+                    "attempt": 1,
+                    "approved_head": approved_head,
+                    "gate_results": [{"name": "tests", "required": True, "exit_code": 0}],
+                    "code_review": {
+                        "head": approved_head,
+                        "result": {"decision": "APPROVE"},
+                        "artifact": ".factory/reviews/ticket-7.json",
+                    },
+                    "branch": "factory/7-approved-slice",
+                    "pr_url": "https://github.test/example/pull/7",
+                    "plan_id": "live-merge",
+                    "receipts": [],
+                    "history": [],
+                }],
+            }))
+            backend = mock.Mock(unsafe=True)
+            backend.default_branch = "main"
+            backend.merged_pr.return_value = {"mergeCommit": {"oid": merged_head}}
+
+            def fake_run(command, *_args, **_kwargs):
+                stdout = approved_head if command[:2] == ["git", "rev-parse"] else ""
+                return subprocess.CompletedProcess(command, 0, stdout, "")
+
+            with mock.patch("orchestrator.GitHubBackend", return_value=backend), mock.patch(
+                "orchestrator.run", side_effect=fake_run,
+            ):
+                human_merge_ticket(
+                    repo, 7, mock=False, project_number=8, assume_yes=True,
+                )
+
+            backend.preflight.assert_called_once_with()
+
     def test_publish_repository_setup_commits_and_pushes_only_approved_governance(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

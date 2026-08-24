@@ -2841,6 +2841,7 @@ def human_merge_ticket(
         merged_head = run(["git", "rev-parse", "HEAD"], repo).stdout.strip()
     else:
         backend = GitHubBackend(repo, project_number)
+        backend.preflight()
         pr_url = ticket.get("pr_url", "")
         if not pr_url:
             raise ValueError("Ticket pull request is missing.")
