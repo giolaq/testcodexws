@@ -92,7 +92,7 @@ def audit_release(repo: Path) -> tuple[list[str], list[str]]:
     manual = [
         "Run the full Python suite plus website build, tests, structural accessibility checks, and lint.",
         "Run `factory release-check --rehearsal` from the frozen checkout.",
-        "Run `factory release-check --live-smoke --confirm-disposable-repo` in a disposable GitHub repository with Claude configured.",
+        "Run `factory release-check --live-smoke --confirm-disposable-repo` in a disposable GitHub repository with an authenticated Agent Adapter configured.",
         "Check participant-facing links from the frozen checkout.",
         "Verify the deployed website displays the frozen workshop version.",
         f"Create and verify Git tag {WORKSHOP_VERSION}, then enable public/template settings.",
@@ -475,10 +475,12 @@ def _resolve_live_smoke_product_questions(
         )
 
 
-def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
-    """Exercise live Claude delivery and deterministic review rework in a disposable repo."""
+def run_live_github_smoke(repo: Path, confirmed: bool, agent: str = "claude") -> str:
+    """Exercise live adapter delivery and deterministic review rework in a disposable repo."""
     if not confirmed:
         raise ValueError("live smoke requires --confirm-disposable-repo")
+    if agent not in {"claude", "codex"}:
+        raise ValueError("live smoke agent must be claude or codex")
     if not shutil.which("gh"):
         raise RuntimeError("GitHub CLI is required for the live smoke test")
 
@@ -495,13 +497,13 @@ def run_live_github_smoke(repo: Path, confirmed: bool) -> str:
         "doctor",
         "--full",
         "--planning-agent",
-        "claude",
+        agent,
         "--agent",
-        "claude",
+        agent,
         "--qa-agent",
-        "claude",
+        agent,
         "--supervisor-agent",
-        "claude",
+        agent,
         "--review-agent",
         "mock-review",
     ], repo, timeout=None)
@@ -535,9 +537,9 @@ The implementation passes every configured gate and is merged through a pull req
         "--profile",
         "standard",
         "--planning-agent",
-        "claude",
+        agent,
         "--default-agent",
-        "claude",
+        agent,
         "--min-tickets",
         "1",
         "--max-tickets",
@@ -582,11 +584,11 @@ The implementation passes every configured gate and is merged through a pull req
         "--profile",
         "standard",
         "--agent",
-        "claude",
+        agent,
         "--qa-agent",
-        "claude",
+        agent,
         "--supervisor-agent",
-        "claude",
+        agent,
         "--review-agent",
         "mock-review",
         "--release-smoke-review",
@@ -600,7 +602,7 @@ The implementation passes every configured gate and is merged through a pull req
     state = json.loads(state_path.read_text())
     ticket = next(item for item in state["tickets"] if item["number"] == number)
     if ticket.get("status") != "QA Review" or not ticket.get("qa_tests"):
-        raise RuntimeError("Claude QA did not produce protected Acceptance Tests for review")
+        raise RuntimeError(f"{agent.title()} QA did not produce protected Acceptance Tests for review")
     _checked([*factory, "approve-tests", str(number), "--yes"], repo, timeout=None)
     _checked(run_command, repo, timeout=None)
     state = json.loads(state_path.read_text())
@@ -608,7 +610,9 @@ The implementation passes every configured gate and is merged through a pull req
     issue_url = ticket.get("issue_url", "")
     pr_url = ticket.get("pr_url", "")
     if ticket.get("status") != "In Review" or not issue_url or not pr_url:
-        raise RuntimeError("Claude implementation did not reach the human exact-revision merge gate")
+        raise RuntimeError(
+            f"{agent.title()} implementation did not reach the human exact-revision merge gate"
+        )
     if ticket.get("attempt", 0) < 2:
         raise RuntimeError("live smoke did not return Code Review feedback to implementation")
     if ticket.get("qa_evidence", {}).get("red", {}).get("result") != "RED PROVED" or ticket.get("qa_evidence", {}).get("green", {}).get("result") != "GREEN PROVED":
@@ -680,7 +684,7 @@ The implementation passes every configured gate and is merged through a pull req
     ):
         raise RuntimeError("fresh local state did not reconstruct the merged PR and remote claim")
     return (
-        f"Claude delivery + deterministic review-rework GitHub smoke PASS (Project #{publication['project_number']}, "
+        f"{agent.title()} delivery + deterministic review-rework GitHub smoke PASS (Project #{publication['project_number']}, "
         f"issue #{number}, {pr_url}, {packet.relative_to(repo)}, remote recovery PASS)"
     )
 
@@ -691,6 +695,7 @@ def render_release_check(
     rehearsal: bool = False,
     live_smoke: bool = False,
     confirm_disposable_repo: bool = False,
+    live_agent: str = "claude",
 ) -> int:
     failures, manual = audit_release(repo)
     results = []
@@ -701,7 +706,7 @@ def render_release_check(
             failures.append(f"clean Standard Rehearsal failed: {exc}")
     if not failures and live_smoke:
         try:
-            results.append(run_live_github_smoke(repo, confirm_disposable_repo))
+            results.append(run_live_github_smoke(repo, confirm_disposable_repo, live_agent))
         except Exception as exc:
             failures.append(f"live GitHub smoke failed: {exc}")
     if failures:

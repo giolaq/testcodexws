@@ -227,6 +227,68 @@ class FactoryContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("--confirm-disposable-repo", result.stdout)
 
+    def test_live_smoke_routes_the_selected_adapter_through_every_external_role(self):
+        class StopAtDelivery(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            run_dir = repo / ".factory/plans/live-plan"
+            run_dir.mkdir(parents=True)
+            backend = Mock(owner="giolaq", name="testcodexws")
+            backend.json.return_value = {"body": "Approved smoke ticket"}
+            backend.gh.return_value = Mock(returncode=0)
+            commands = []
+
+            def checked(command, cwd, timeout=180):
+                commands.append(command)
+                if "plan" in command:
+                    (repo / ".factory/plans/latest.json").write_text(json.dumps({
+                        "plan_id": "live-plan",
+                    }))
+                    (run_dir / "01-product-review.json").write_text(json.dumps({
+                        "blocking_questions": [],
+                    }))
+                if "approve" in command and "--new-project-title" in command:
+                    (run_dir / "04-vertical-slices.json").write_text(json.dumps({
+                        "publication": {
+                            "project_number": 12,
+                            "issues": {"SMOKE-1": 7},
+                        },
+                    }))
+                if "run" in command:
+                    raise StopAtDelivery
+                return ""
+
+            with (
+                patch("github_backend.GitHubBackend", return_value=backend),
+                patch("release_check.shutil.which", return_value="/usr/bin/gh"),
+                patch("release_check._checked", side_effect=checked),
+                self.assertRaises(StopAtDelivery),
+            ):
+                run_live_github_smoke(repo, True, agent="codex")
+
+            doctor = next(command for command in commands if "doctor" in command)
+            plan = next(command for command in commands if "plan" in command)
+            delivery = next(command for command in commands if "run" in command)
+            for flag in (
+                "--planning-agent", "--agent", "--qa-agent", "--supervisor-agent",
+            ):
+                self.assertEqual(doctor[doctor.index(flag) + 1], "codex")
+            self.assertEqual(plan[plan.index("--planning-agent") + 1], "codex")
+            self.assertEqual(plan[plan.index("--default-agent") + 1], "codex")
+            for flag in ("--agent", "--qa-agent", "--supervisor-agent"):
+                self.assertEqual(delivery[delivery.index(flag) + 1], "codex")
+
+    def test_release_check_help_exposes_live_agent_selection(self):
+        result = subprocess.run(
+            [sys.executable, str(FACTORY), "release-check", "--help"],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertIn("--live-agent {claude,codex}", result.stdout)
+
     def test_live_smoke_brief_records_protected_acceptance_test_approval(self):
         class StopAfterProductReview(Exception):
             pass

@@ -3264,7 +3264,13 @@ def parser():
     release_check.add_argument(
         "--live-smoke",
         action="store_true",
-        help="run the Claude golden path and create a fresh Project in a disposable GitHub repo",
+        help="run an authenticated Agent Adapter golden path and create a fresh Project in a disposable GitHub repo",
+    )
+    release_check.add_argument(
+        "--live-agent",
+        choices=["claude", "codex"],
+        default="claude",
+        help="Agent Adapter used for Live planning, QA, implementation, and supervision",
     )
     release_check.add_argument("--confirm-disposable-repo", action="store_true")
     seed = sub.add_parser("seed", help="create deterministic fallback tickets without PRD planning")
@@ -3487,6 +3493,7 @@ def main():
                 rehearsal=args.rehearsal,
                 live_smoke=args.live_smoke,
                 confirm_disposable_repo=args.confirm_disposable_repo,
+                live_agent=args.live_agent,
             ))
         elif args.command == "seed":
             seed_backlog(repo, args)
