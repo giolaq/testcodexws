@@ -131,11 +131,16 @@ main { min-height: 100vh; margin-left: var(--sidebar); padding: calc(var(--topba
 .journey-step i { z-index: 1; display: grid; width: 32px; height: 32px; margin: 0 auto 8px; place-items: center; border: 2px solid #dadce0; border-radius: 50%; background: #fff; color: var(--muted); font-style: normal; font-size: 11px; font-weight: 800; }
 .journey-step.complete i { border-color: var(--green); background: var(--green); color: #fff; }
 .journey-step.current i { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 0 5px var(--blue-soft); }
+.journey-step.running i { animation: active-phase-pulse 1.8s ease-in-out infinite; }
 .journey-step b { font-size: 11px; }
 .journey-step small { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.35; }
 .journey-step.current b { color: var(--blue); }
 
 @keyframes pulse { 50% { transform: scale(.78); opacity: .7; } }
+@keyframes active-phase-pulse {
+  0%, 100% { background: #fff; box-shadow: 0 0 0 5px var(--blue-soft); transform: scale(1); }
+  45% { background: var(--blue-soft); box-shadow: 0 0 0 10px rgba(26,115,232,.12); transform: scale(1.08); }
+}
 
 .overview-grid { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(300px,.7fr); gap: 18px; }
 .operation-surface, .decisions-surface { min-height: 380px; padding: 22px 24px; }
@@ -391,4 +396,5 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .journey-step.running i, .now-pulse.running { animation: none; }
 }

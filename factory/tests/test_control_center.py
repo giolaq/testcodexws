@@ -1035,6 +1035,26 @@ class ControlCenterTests(unittest.TestCase):
         self.assertIn("finding.summary || finding.title || finding.id", javascript)
         self.assertIn("payload.mode = mode()", javascript)
 
+    def test_factory_progress_pulses_only_the_current_running_phase(self):
+        frontend = Path(__file__).parents[1] / "control_center"
+        source = (frontend / "index.html").read_text()
+        javascript = (frontend / "app.js").read_text()
+        styles = (frontend / "styles.css").read_text()
+
+        self.assertIn(">Factory progress<", source)
+        self.assertNotIn(">Workshop progress<", source)
+        self.assertIn(
+            'journey.state === "running" && phase.status === "current"',
+            javascript,
+        )
+        self.assertIn('${isRunning ? " running" : ""}', javascript)
+        self.assertIn(".journey-step.running i", styles)
+        self.assertIn("@keyframes active-phase-pulse", styles)
+        self.assertIn(
+            ".journey-step.running i, .now-pulse.running { animation: none; }",
+            styles,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

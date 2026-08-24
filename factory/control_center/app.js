@@ -197,7 +197,12 @@ function renderJourney(journey) {
   $("#journey-next-detail").textContent = journey.next?.detail || "Continue with the current workshop phase.";
   $("#journey-next").textContent = journey.next?.label || "Open current phase";
   $("#global-next").textContent = `Next: ${journey.next?.label || journey.phase_label}`;
-  $("#journey-steps").innerHTML = journey.phases.map((phase, index) => `<li class="journey-step ${esc(phase.status)}"><button type="button" data-journey-view="${esc(phase.view)}"><i>${phase.status === "complete" ? "✓" : index + 1}</i><b>${esc(phase.label)}</b><small>${esc(phase.description)}</small></button></li>`).join("");
+  $("#journey-steps").innerHTML = journey.phases.map((phase, index) => {
+    const isRunning = journey.state === "running" && phase.status === "current";
+    const phaseClass = `journey-step ${esc(phase.status)}${isRunning ? " running" : ""}`;
+    const ariaCurrent = phase.status === "current" ? ' aria-current="step"' : "";
+    return `<li class="${phaseClass}"${ariaCurrent}><button type="button" data-journey-view="${esc(phase.view)}"><i>${phase.status === "complete" ? "✓" : index + 1}</i><b>${esc(phase.label)}</b><small>${esc(phase.description)}</small></button></li>`;
+  }).join("");
   $$('[data-journey-view]').forEach((button) => button.addEventListener("click", () => showView(button.dataset.journeyView)));
 }
 
