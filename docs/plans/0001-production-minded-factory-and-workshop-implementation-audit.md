@@ -332,7 +332,7 @@ factory workshop-v1.1.0
 
 The first full-suite attempt used the host Python 3.14 interpreter and failed
 eight integration tests because that interpreter lacked `pytest`. The supported
-`.factory/venv` invocation above passes all 218 tests. Commit `cff4397` also
+`.factory/venv` invocation above passes all 235 tests. Commit `cff4397` also
 made CI install `demo-app/requirements.txt` and changed the release runbooks to
 use the prepared virtual environment, so this dependency error is now explicit
 and reproducible.
