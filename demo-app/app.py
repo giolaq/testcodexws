@@ -39,6 +39,7 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.get("/api/factory-smoke-f137258d0e")
     def factory_smoke():
+        """Report deterministic readiness for factory release verification."""
         return {"status": "ready"}
 
     @app.get("/api/movies/<movie_id>")
