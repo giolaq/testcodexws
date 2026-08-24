@@ -37,6 +37,10 @@ def create_app(testing: bool = False) -> Flask:
         movies = [m for m in catalog if query in (m["title"] + " " + " ".join(m["genres"])).lower()]
         return jsonify(movies)
 
+    @app.get("/api/factory-smoke-f137258d0e")
+    def factory_smoke():
+        return {"status": "ready"}
+
     @app.get("/api/movies/<movie_id>")
     def movie_api(movie_id: str):
         movie = by_id.get(movie_id)
