@@ -70,6 +70,7 @@ REVISION_STAGE_ALIASES = {
 }
 MAX_BODY = 256_000
 MAX_ARTIFACT = 512_000
+MAX_PLANNING_FEEDBACK = 12_000
 ACTION_REGISTRY = frozenset({
     "doctor", "init-project", "approve-charter", "publish-setup", "prepare-project",
     "configure", "plan", "restart-plan", "revise-product", "revise-stage",
@@ -952,6 +953,48 @@ class ControlCenter:
             raise InputError("Choose a valid planning run first.")
         return manifest.get("planning_agent") == "mock"
 
+    def _blocking_decision_feedback(
+        self, payload: dict, plan_id: str, stage_id: str,
+    ) -> str | None:
+        """Build compact revision feedback from the current blocking decisions."""
+        decisions = payload.get("decisions")
+        if decisions is None:
+            return None
+        if not isinstance(decisions, list):
+            raise InputError("Decisions must be a list of text answers.")
+
+        planning = read_json(self.repo / ".factory" / "planning-state.json", {})
+        if planning.get("plan_id") != plan_id:
+            raise InputError("The selected planning run is no longer current.")
+        stage = next(
+            (item for item in planning.get("stages", []) if item.get("id") == stage_id),
+            None,
+        )
+        questions = stage.get("questions", []) if isinstance(stage, dict) else []
+        if not questions or stage.get("status") != "blocked":
+            raise InputError("This expert does not have blocking questions to answer.")
+        if len(decisions) != len(questions):
+            raise InputError("Answer every current blocking question before continuing.")
+
+        answers = []
+        for index, decision in enumerate(decisions, 1):
+            if not isinstance(decision, str) or not decision.strip():
+                raise InputError(f"Decision {index} is required.")
+            answer = decision.strip()
+            if len(answer) > 4000:
+                raise InputError(f"Decision {index} is too long.")
+            answers.append(answer)
+
+        feedback = "\n".join([
+            f"Resolve all {len(questions)} blocking questions in the rejected "
+            f"{stage.get('title') or stage_id.replace('_', ' ')} artifact using these decisions:",
+            "",
+            *(f"{index}. {answer}" for index, answer in enumerate(answers, 1)),
+        ])
+        if len(feedback) > MAX_PLANNING_FEEDBACK:
+            raise InputError("The combined decisions are too long.")
+        return feedback
+
     def _mode_flags(self, payload: dict) -> list[str]:
         if payload.get("mode", "rehearsal") != "live":
             scenario = self._string(payload, "scenario") or "recipe-rebrand"
@@ -1119,7 +1162,12 @@ class ControlCenter:
         if action == "revise-product":
             plan = self._plan_id(payload)
             plan_mock = self._plan_uses_mock(plan)
-            feedback = self._string(payload, "feedback", required=True, max_length=4000)
+            feedback = self._blocking_decision_feedback(
+                payload, plan, "product_review",
+            ) or self._string(
+                payload, "feedback", required=True,
+                max_length=MAX_PLANNING_FEEDBACK,
+            )
             feedback_path = self.runtime / "product-feedback.md"
             feedback_path.write_text(feedback + "\n")
             command = base + ["revise", plan, "product", "--feedback-file", str(feedback_path)]
@@ -1133,7 +1181,12 @@ class ControlCenter:
             alias = REVISION_STAGE_ALIASES.get(stage)
             if not alias or alias == "product":
                 raise InputError("Choose a blocked technical planning expert.")
-            feedback = self._string(payload, "feedback", required=True, max_length=12_000)
+            feedback = self._blocking_decision_feedback(
+                payload, plan, stage,
+            ) or self._string(
+                payload, "feedback", required=True,
+                max_length=MAX_PLANNING_FEEDBACK,
+            )
             feedback_path = self.runtime / f"{stage.replace('_', '-')}-feedback.md"
             feedback_path.write_text(feedback + "\n")
             revise = base + ["revise", plan, alias, "--feedback-file", str(feedback_path)]

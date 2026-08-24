@@ -398,9 +398,8 @@ function renderExpertPanel(item) {
       toast("Answer every blocking question before continuing.", true);
       return;
     }
-    const feedback = ["Resolve the blocking questions using these human decisions:", "", ...questions.flatMap((question, index) => [`${index + 1}. Question: ${question}`, `Decision: ${answers[index]}`, ""])].join("\n");
     const actionName = item.id === "product_review" ? "revise-product" : "revise-stage";
-    action(actionName, { stage: item.id, feedback });
+    action(actionName, { stage: item.id, decisions: answers });
   });
 }
 

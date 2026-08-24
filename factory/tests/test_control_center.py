@@ -340,6 +340,62 @@ class ControlCenterTests(unittest.TestCase):
                     "feedback": "Answer",
                 })
 
+    def test_many_product_blocking_decisions_use_a_compact_feedback_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            plan = "a" * 12
+            self.write_plan_manifest(center, plan, "claude")
+            questions = [
+                f"Question {index}: " + ("Clarify this product decision. " * 8)
+                for index in range(1, 21)
+            ]
+            planning_state = center.repo / ".factory/planning-state.json"
+            planning_state.write_text(json.dumps({
+                "plan_id": plan,
+                "status": "blocked",
+                "stages": [{
+                    "id": "product_review",
+                    "status": "blocked",
+                    "questions": questions,
+                }],
+            }))
+            decisions = [
+                f"Use the documented default for decision {index}."
+                for index in range(1, 21)
+            ]
+
+            title, commands = center.build_commands("revise-product", {
+                "plan_id": plan,
+                "decisions": decisions,
+            })
+
+            feedback_path = Path(commands[0][commands[0].index("--feedback-file") + 1])
+            feedback = feedback_path.read_text()
+            self.assertEqual(title, "Revise Product Review")
+            self.assertIn("1. Use the documented default for decision 1.", feedback)
+            self.assertIn("20. Use the documented default for decision 20.", feedback)
+            self.assertNotIn(questions[0], feedback)
+            self.assertLess(len(feedback), 4000)
+
+    def test_legacy_product_question_payload_has_room_for_normal_answers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            center = ControlCenter(self.make_repo(directory))
+            plan = "a" * 12
+            self.write_plan_manifest(center, plan, "claude")
+            feedback = "\n".join(
+                f"{index}. Question: {'Clarify this product decision. ' * 8}\n"
+                f"Decision: Use the documented default for decision {index}."
+                for index in range(1, 21)
+            )
+
+            title, commands = center.build_commands("revise-product", {
+                "plan_id": plan,
+                "feedback": feedback,
+            })
+
+            self.assertEqual(title, "Revise Product Review")
+            self.assertIn("--feedback-file", commands[0])
+
     def test_reset_actions_are_rehearsal_only_and_full_reset_requires_a_phrase(self):
         with tempfile.TemporaryDirectory() as directory:
             center = ControlCenter(self.make_repo(directory))
@@ -938,7 +994,8 @@ class ControlCenterTests(unittest.TestCase):
         self.assertIn("planning.continue_label", javascript)
         self.assertIn("renderExpertPanel", javascript)
         self.assertIn("Answer every blocking question", javascript)
-        self.assertIn('action(actionName, { stage: item.id, feedback })', javascript)
+        self.assertIn('action(actionName, { stage: item.id, decisions: answers })', javascript)
+        self.assertNotIn("Question: ${question}", javascript)
         self.assertIn('id="planning-recovery-feedback"', javascript)
         self.assertIn("Apply correction and continue", javascript)
         self.assertIn("Switch adapter and continue", javascript)
